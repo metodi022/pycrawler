@@ -2,10 +2,10 @@ class Log:
     """Interface class for a log.
     """
 
-    def __init__(self, job_id: int, crawler_id: int) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         raise NotImplementedError
 
-    def append(self, message: str) -> None:
+    def add_message(self, message: str, *args, **kwargs) -> None:
         """Append a message to a log.
 
         Args:

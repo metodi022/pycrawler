@@ -1,5 +1,4 @@
 from typing import Any, Optional, List
-from log.log import Log
 
 
 class Database:
@@ -18,7 +17,7 @@ class Database:
         """
         raise NotImplementedError
 
-    def get_url(self, job_id: int, crawler_id: int, log: Log, *args, **kwargs) -> Optional[str]:
+    def get_url(self, job_id: int, crawler_id: int, *args, **kwargs) -> Optional[str]:
         """Get the next url to crawl.
 
         Args:
@@ -30,7 +29,7 @@ class Database:
         """
         raise NotImplementedError
 
-    def update_url(self, job_id: int, crawler_id: int, url: str, code: int, log: Log, *args, **kwargs) -> None:
+    def update_url(self, job_id: int, crawler_id: int, url: str, code: int, *args, **kwargs) -> None:
         """Update a crawled url.
 
         Args:
@@ -41,7 +40,7 @@ class Database:
         """
         raise NotImplementedError
 
-    def invoke_transaction(self, statement: str, log: Log) -> Optional[List[Any]]:
+    def invoke_transaction(self, statement: str, *args, **kwargs) -> Optional[List[Any]]:
         """Execute a statement in a transaction and fetch results.
 
         Args:

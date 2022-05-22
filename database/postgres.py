@@ -1,8 +1,7 @@
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
-from log.log import Log
-from .database import Database
+from database.database import Database
 import psycopg2
 
 
@@ -19,11 +18,12 @@ class Postgres(Database):
                                                      password=self._password, host=self._host, port=self._port)
         conn.close()
 
-    def initialize_job(self, job_id: int, source: str, *args, **kwargs) -> None:
+    def initialize_job(self, job_id: int, source: str) -> None:
         conn: psycopg2.connection = psycopg2.connect(database=self._database, user=self._user,
                                                      password=self._password, host=self._host, port=self._port)
         cur: psycopg2.cursor = conn.cursor()
 
+        # Create table for URLs if such a table does not exist already
         cur.execute(
             "CREATE TABLE IF NOT EXISTS URLS (job INT NOT NULL, url VARCHAR(255) NOT NULL UNIQUE, crawler INT, code INT);")
 
@@ -32,7 +32,7 @@ class Postgres(Database):
         if cur.fetchone():
             raise RuntimeError('Job already exists.')
 
-        # URLs in a file with each URL on one line
+        # Parse file with path <source>, where each line represents a single URL
         with open(source, mode='r') as file:
             for line in file:
                 urlparse(line)  # Do a sanity check on the url
@@ -42,7 +42,7 @@ class Postgres(Database):
         conn.commit()
         conn.close()
 
-    def get_url(self, job_id: int, crawler_id: int, log: Log, *args, **kwargs) -> Optional[str]:
+    def get_url(self, job_id: int, crawler_id: int) -> Optional[str]:
         conn: psycopg2.connection = psycopg2.connect(database=self._database, user=self._user,
                                                      password=self._password, host=self._host, port=self._port)
         cur: psycopg2.cursor = conn.cursor()
@@ -52,39 +52,36 @@ class Postgres(Database):
         if not cur.fetchone():
             raise RuntimeError('Job doesn\'t exists')
 
-        # Get an assigned URL with no crawler and lock row to avoid race conditions
+        # Get a URL with no crawler and lock row to avoid race conditions
         cur.execute(
             f"SELECT url FROM URLS WHERE job={job_id} AND crawler IS NULL FOR UPDATE SKIP LOCKED LIMIT 1;")
         url: Tuple = cur.fetchone()
 
         # Check if there is a URL returned
         if not url:
-            log.append('No URLs found')
             return None
 
-        # Get result from URL
+        # Get result from URL and assign crawler to it
         url: str = url[0]
         cur.execute(
-            f"UPDATE URLS SET crawler=${crawler_id} WHERE job={job_id} AND url='{url}';")
+            f"UPDATE URLS SET crawler={crawler_id} WHERE job={job_id} AND url='{url}';")
 
         conn.commit()
         conn.close()
-        log.append(f"Got URL {url}")
         return url
 
-    def update_url(self, job_id: int, crawler_id: int, url: str, code: int, log: Log, *args, **kwargs) -> None:
+    def update_url(self, job_id: int, crawler_id: int, url: str, code: int) -> None:
         conn: psycopg2.connection = psycopg2.connect(database=self._database, user=self._user,
                                                      password=self._password, host=self._host, port=self._port)
         cur: psycopg2.cursor = conn.cursor()
 
         cur.execute(
-            f"UPDATE URLS SET code=${code} WHERE job={job_id} AND url='{url}' AND crawler={crawler_id};")
+            f"UPDATE URLS SET code={code} WHERE job={job_id} AND url='{url}' AND crawler={crawler_id};")
 
         conn.commit()
         conn.close()
-        log.append(f"Updated URL {url} with code {code}")
 
-    def invoke_transaction(self, statement: str, log: Log) -> Optional[List[Tuple]]:
+    def invoke_transaction(self, statement: str) -> Optional[List[Tuple]]:
         conn: psycopg2.connection = psycopg2.connect(database=self._database, user=self._user,
                                                      password=self._password, host=self._host, port=self._port)
         cur: psycopg2.cursor = conn.cursor()
@@ -94,5 +91,4 @@ class Postgres(Database):
 
         conn.close()
         conn.commit()
-        log.append(f"Executed statement {statement}")
         return data

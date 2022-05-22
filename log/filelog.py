@@ -1,5 +1,5 @@
 from datetime import datetime
-from .log import Log
+from log.log import Log
 
 
 class FileLog(Log):
@@ -9,7 +9,7 @@ class FileLog(Log):
         self._path = path
         self._file = open(path, mode='a')
 
-    def append(self, message: str) -> None:
+    def add_message(self, message: str) -> None:
         self._file.write(
             f"{datetime.now().strftime('%Y/%m/%d %H:%M:%S')} Job {self._job_id} Crawler {self._crawler_id} {message}\n")
 
