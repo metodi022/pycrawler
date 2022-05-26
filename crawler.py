@@ -5,7 +5,7 @@ from database.dequedb import DequeDB
 from log.log import Log
 from config import Config
 from modules.module import Module
-from utils import href_to_url
+from utils import href_to_url, get_origin, get_tld_object
 import tld
 
 
@@ -71,7 +71,7 @@ class Crawler:
                 break
 
             # Navigate to page
-            self.log.add_message('Navigate to URL')
+            self.log.add_message('Navigate')
             try:
                 response: Optional[Response] = self.page.goto(
                     url[0], timeout=self.config.LOAD_TIMEOUT, wait_until=self.config.WAIT_LOAD_UNTIL)  # TODO referer?
@@ -87,7 +87,7 @@ class Crawler:
 
             # Check response status
             self.log.add_message(f"Receive response status {response.status}")
-            if (response.status >= 400):
+            if response.status >= 400:
                 self.database.update_url(
                     self.job_id, self.crawler_id, url[0], response.status)
                 self.context.close()
@@ -99,9 +99,8 @@ class Crawler:
             blank_page.wait_for_function('() => window.x > 0')
 
             # Collect URLs if needed
-            if (self.config.RECURSIVE):
-                parsed_url: Optional[tld.utils.Result] = tld.get_tld(
-                    url[0], as_object=True)  # type: ignore
+            if self.config.RECURSIVE and url[1] < self.config.DEPTH:
+                parsed_url: Optional[tld.utils.Result] = get_tld_object(url[0])
                 if parsed_url is None:
                     continue
 
@@ -109,19 +108,28 @@ class Crawler:
 
                 # Iterate over each <a> tag
                 for i in range(links.count()):
+                    # Get href attribute
                     link: Optional[str] = links.nth(i).get_attribute('href')
-                    if link is None:
+                    if not link or not link.strip():
                         continue
 
-                    href_to_url(link, parsed_url)
-
-                    if (self.config.SAME_ORIGIN):
+                    # Parse attribute
+                    parsed_link: Optional[tld.utils.Result] = href_to_url(
+                        link.strip(), parsed_url)
+                    if parsed_link is None:
                         continue
 
-                    if (self.config.SAME_ETLDP1):
+                    # Check for same origin
+                    if self.config.SAME_ORIGIN and get_origin(parsed_url.parsed_url) != get_origin(parsed_link.parsed_url):
                         continue
 
-                    # TODO search for URLs if config
+                    # Check for same ETLD+1
+                    if self.config.SAME_ETLDP1 and parsed_url.fld != parsed_link.fld:
+                        continue
+
+                    # Add link to database
+                    self.log.add_message(f"Find {link}")
+                    self.database.add_url(self.job_id, link, url[1] + 1)
 
             # Run module and exit if errors occur
             self.log.add_message('Send response to module')
