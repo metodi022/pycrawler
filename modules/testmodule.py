@@ -1,7 +1,8 @@
-from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, Response
+from playwright.sync_api import Browser, BrowserContext, Page, Response
 from database.database import Database
 from log.log import Log
 from modules.module import Module
+from typing import Tuple
 
 
 class TestModule(Module):
@@ -9,10 +10,8 @@ class TestModule(Module):
     def initialize_data(database: Database) -> None:
         pass
 
-    @staticmethod
-    def add_handlers(browser: Browser, context: BrowserContext, page: Page, database: Database, log: Log) -> None:
+    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page, url: Tuple[str, int], database: Database, log: Log) -> None:
         pass
 
-    @staticmethod
-    def receive_response(browser: Browser, context: BrowserContext, page: Page, database: Database, log: Log, response: Response) -> None:
+    def receive_response(self, browser: Browser, context: BrowserContext, page: Page, database: Database, log: Log, response: Response) -> None:
         pass

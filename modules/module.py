@@ -1,6 +1,7 @@
-from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, Response
+from playwright.sync_api import Browser, BrowserContext, Page, Response
 from database.database import Database
 from log.log import Log
+from typing import Tuple
 
 
 class Module:
@@ -13,21 +14,20 @@ class Module:
         """
         raise NotImplementedError
 
-    @staticmethod
-    def add_handlers(browser: Browser, context: BrowserContext, page: Page, database: Database, log: Log) -> None:
+    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page, url: Tuple[str, int], database: Database, log: Log) -> None:
         """Add event handlers before navigating to a page.
 
         Args:
             browser (Browser): browser
             context (BrowserContext): context
             page (Page): page
+            url (str): URL
             database (Database): database
             log (Log): log
         """
         raise NotImplementedError
 
-    @staticmethod
-    def receive_response(browser: Browser, context: BrowserContext, page: Page, database: Database, log: Log, response: Response) -> None:
+    def receive_response(self, browser: Browser, context: BrowserContext, page: Page, database: Database, log: Log, response: Response) -> None:
         """Receive response from server.
 
         Args:
