@@ -5,7 +5,7 @@ from log.log import Log
 from log.filelog import FileLog
 from crawler import Crawler
 from config import Config
-from modules.testmodule import TestModule
+from modules.emptymodule import EmptyModule
 
 
 def main() -> int:
@@ -13,7 +13,7 @@ def main() -> int:
         'test', 'postgres', 'postgres', 'localhost', '5432')
     #database.initialize_job(1, 'D:\\Programming\\logincrawler\\urls.txt')
     log: Log = FileLog(1, 1, 'D:\\Programming\\logincrawler\\crawler1.txt')
-    crawler = Crawler(1, 1, Config, database, log, TestModule)
+    crawler = Crawler(1, 1, Config, database, log, EmptyModule(database, log))
     crawler.start_crawl_chromium()
     return 0
 

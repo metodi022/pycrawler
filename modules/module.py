@@ -5,16 +5,16 @@ from typing import Tuple
 
 
 class Module:
-    @staticmethod
-    def initialize_data(database: Database) -> None:
-        """Initializes module database.
+    def __init__(self, database: Database, log: Log) -> None:
+        """Initializes database for module.
 
         Args:
             database (Database): database
+            log (Log): log
         """
         raise NotImplementedError
 
-    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page, url: Tuple[str, int], database: Database, log: Log) -> None:
+    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page, url: Tuple[str, int]) -> None:
         """Add event handlers before navigating to a page.
 
         Args:
@@ -22,20 +22,16 @@ class Module:
             context (BrowserContext): context
             page (Page): page
             url (str): URL
-            database (Database): database
-            log (Log): log
         """
         raise NotImplementedError
 
-    def receive_response(self, browser: Browser, context: BrowserContext, page: Page, database: Database, log: Log, response: Response) -> None:
+    def receive_response(self, browser: Browser, context: BrowserContext, page: Page, response: Response) -> None:
         """Receive response from server.
 
         Args:
             browser (Browser): browser
             context (BrowserContext): context
             page (Page): page
-            database (Database): database
-            log (Log): log
             response (Response): response
         """
         raise NotImplementedError
