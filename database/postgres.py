@@ -25,7 +25,7 @@ class Postgres(Database):
 
         # Create table for URLs if such a table does not exist already
         cur.execute(
-            "CREATE TABLE IF NOT EXISTS URLS (job INT NOT NULL, url VARCHAR(255) NOT NULL UNIQUE, depth INT NOT NULL, crawler INT, code INT);")
+            "CREATE TABLE IF NOT EXISTS URLS (job INT NOT NULL, url VARCHAR(255) NOT NULL UNIQUE, crawler INT, code INT);")
 
         # Check if job already exists
         if self._job_exists(cur, job_id):
@@ -37,7 +37,7 @@ class Postgres(Database):
             for line in file:
                 urlparse(line)  # Do a sanity check on the URL
                 cur.execute(
-                    f"INSERT INTO URLS VALUES ({job_id}, '{line.strip()}', 0);")
+                    f"INSERT INTO URLS VALUES ({job_id}, '{line.strip()}');")
 
         conn.commit()
         conn.close()
@@ -54,8 +54,9 @@ class Postgres(Database):
 
         # Get a URL with no crawler and lock row to avoid race conditions
         cur.execute(
-            f"SELECT url, depth FROM URLS WHERE job={job_id} AND crawler IS NULL FOR UPDATE SKIP LOCKED LIMIT 1;")
+            f"SELECT url FROM URLS WHERE job={job_id} AND crawler IS NULL FOR UPDATE SKIP LOCKED LIMIT 1;")
         url: Optional[Tuple[str, int]] = cur.fetchone()
+        url = (url[0], 0) if url is not None else url
 
         # Check if there is a URL returned
         if not url:
@@ -101,7 +102,7 @@ class Postgres(Database):
         conn.commit()
         conn.close()
 
-    def _job_exists(self, cur: psycopg2.cursor, job_id: int) -> bool:
+    def _job_exists(self, cur, job_id: int) -> bool:
         # Check if job already exists
         cur.execute(f"SELECT * FROM URLS WHERE job={job_id} LIMIT 1;")
         return bool(cur.fetchone())

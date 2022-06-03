@@ -15,6 +15,7 @@ class DequeDB(Database):
             raise RuntimeError('Wrong job or crawler.')
 
         if len(self._data) == 0:
+            self._seen.clear()
             return None
 
         return self._data.popleft()
@@ -27,4 +28,9 @@ class DequeDB(Database):
             return
 
         self._seen.add(url)
+        if url[-1] == '/':
+            self._seen.add(url[:-1])
+        else:
+            self._seen.add(url + '/')
+
         self._data.append((url, depth))
