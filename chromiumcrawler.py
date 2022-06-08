@@ -132,8 +132,9 @@ class ChromiumCrawler:
         return None
 
     def _wait(self, amount: int) -> None:
-        self._blank.evaluate('window.x = 0; setTimeout(() => { window.x = 1 }, ' + str(amount) + ');')
-        self._blank.wait_for_function('() => window.x > 0')
+        if amount > 0:
+            self._blank.evaluate('window.x = 0; setTimeout(() => { window.x = 1 }, ' + str(amount) + ');')
+            self._blank.wait_for_function('() => window.x > 0')
 
     def _get_urls(self, page: Page, url: Tuple[str, int], context_database: DequeDB, context_switch: bool) -> bool:
         if not self._config.RECURSIVE or url[1] >= self._config.DEPTH:

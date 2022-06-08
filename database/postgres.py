@@ -1,7 +1,8 @@
 from typing import Optional, Tuple, List, Any
-from urllib.parse import urlparse
 
 import psycopg2
+
+from loader.loader import Loader
 
 
 class Postgres:
@@ -18,25 +19,21 @@ class Postgres:
     def disconnect(self) -> None:
         self._conn = self._conn.close()
 
-    def initialize_job(self, job_id: int, source: str) -> None:
+    def initialize_job(self, job_id: int, loader: Loader) -> None:
         cur: psycopg2.cursor = self._conn.cursor()
 
         # Create table for URLs if such a table does not exist already
         cur.execute(
-            "CREATE TABLE IF NOT EXISTS URLS (job INT NOT NULL, url VARCHAR(255) NOT NULL UNIQUE, crawler INT, "
-            "code INT);")
+            "CREATE TABLE IF NOT EXISTS URLS (rank INT NOT NULL UNIQUE, job INT NOT NULL, url VARCHAR(255) NOT NULL "
+            "UNIQUE, crawler INT, code INT, PRIMARY KEY (rank));")
 
         # Check if job already exists
         if self._job_exists(cur, job_id):
             self.disconnect()
             raise RuntimeError('Job already exists.')
 
-        # Parse file with path <source>, where each line represents a single URL
-        # TODO better
-        with open(source, mode='r') as file:
-            for line in file:
-                urlparse(line)  # Do a sanity check on the URL
-                cur.execute(f"INSERT INTO URLS VALUES (%i, %s);", (job_id, line.strip(),))
+        for entry in loader:
+            cur.execute(f"INSERT INTO URLS VALUES (%i, %i, %s);", (entry[0], job_id, entry[1].strip(),))
 
         self._conn.commit()
 
@@ -97,7 +94,7 @@ class Postgres:
         self._conn.commit()
         return data
 
-    def _job_exists(self, cur, job_id: int) -> bool:
+    def _job_exists(self, cur: psycopg2.cursor, job_id: int) -> bool:
         # Check if job already exists
         cur.execute(f"SELECT * FROM URLS WHERE job=%i LIMIT 1;", (job_id,))
         return bool(cur.fetchone())
