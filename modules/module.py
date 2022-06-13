@@ -1,5 +1,5 @@
 from logging import Logger
-from typing import Type
+from typing import Type, Optional
 
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
@@ -44,15 +44,15 @@ class Module:
         """
         raise NotImplementedError
 
-    def receive_response(self, browser: Browser, context: BrowserContext, page: Page, response: Response,
-                         context_database: DequeDB, url: str, depth: int) -> Response:
+    def receive_response(self, browser: Browser, context: BrowserContext, page: Page, response: Optional[Response],
+                         context_database: DequeDB, url: str, depth: int) -> Optional[Response]:
         """Receive response from server.
 
         Args:
             browser (Browser): browser
             context (BrowserContext): context
             page (Page): page
-            response (Response): response
+            response (Optional[Response]): response
             context_database (DequeDB): context database
             url (str): url
             depth (int): url depth

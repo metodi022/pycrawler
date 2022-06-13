@@ -24,7 +24,7 @@ class CollectUrls(Module):
     def register_job(database: Postgres, log: Logger) -> None:
         database.invoke_transaction(
             "CREATE TABLE IF NOT EXISTS URLSFEEDBACK (rank INT NOT NULL, job INT NOT NULL, url TEXT NOT NULL UNIQUE, "
-            "crawler INT, code INT);", None, False)
+            "crawler INT NOT NULL, depth INT NOT NULL, code INT NOT NULL);", None, False)
         log.info('Create URLSFEEDBACK database')
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page, context_database: DequeDB, url: str,
@@ -32,9 +32,13 @@ class CollectUrls(Module):
         context_database.add_seen(url)
         self._rank = rank
 
-    def receive_response(self, browser: Browser, context: BrowserContext, page: Page, response: Response,
-                         context_database: DequeDB, url: str, depth: int) -> Response:
-        if not self._config.RECURSIVE or depth >= self._config.DEPTH:
+    def receive_response(self, browser: Browser, context: BrowserContext, page: Page, response: Optional[Response],
+                         context_database: DequeDB, url: str, depth: int) -> Optional[Response]:
+        self._database.invoke_transaction("INSERT INTO URLSFEEDBACK VALUES (%s, %s, %s, %s, %s, %s);",
+                                          (self._rank, self.job_id, url, self.crawler_id, depth,
+                                           response.status if response is not None else -2), False)
+
+        if not self._config.RECURSIVE or depth >= self._config.DEPTH or response is None or response.status >= 400:
             return response
 
         parsed_url: Optional[tld.utils.Result] = get_tld_object(url)

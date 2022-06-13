@@ -34,7 +34,7 @@ class ChromiumCrawler:
         self._browser: Browser = self._playwright.chromium.launch()
         self._blank: Page = self._browser.new_page()
 
-        self._log.info(f"Start Chromium {self._browser.version}")
+        self._log.info(f"Start crawl, Chromium {self._browser.version}")
         self._blank.goto('about:blank')
 
         # TODO Ask Jannis for browser and context options
@@ -111,7 +111,7 @@ class ChromiumCrawler:
             # TODO referer?
             response = page.goto(url[0], timeout=self._config.LOAD_TIMEOUT, wait_until=self._config.WAIT_LOAD_UNTIL)
             if response is None:
-                self._log.warning("Response is None.")
+                self._log.warning('Response is None')
         except Exception as e:
             self._log.warning(str(e))
             if not context_switch:
@@ -153,7 +153,7 @@ class ChromiumCrawler:
 
         return True
 
-    def _invoke_response_handler(self, context: BrowserContext, page: Page, response: Response,
+    def _invoke_response_handler(self, context: BrowserContext, page: Page, response: Optional[Response],
                                  url: Tuple[str, int, int], context_switch: bool, context_database: DequeDB) -> bool:
         self._log.debug('Invoke module response handler')
 
@@ -168,6 +168,7 @@ class ChromiumCrawler:
                 break
 
         if not context_switch:
-            self._database.update_url(self.job_id, self.crawler_id, url[0], response.status * code or -1 * (not code))
+            self._database.update_url(self.job_id, self.crawler_id, url[0],
+                                      (response.status if response is not None else -2) * code or -1 * (not code))
 
         return code
