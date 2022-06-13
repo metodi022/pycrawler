@@ -1,7 +1,6 @@
 from logging import Logger
-from typing import Type, List
+from typing import Type
 
-import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
 from config import Config
@@ -10,7 +9,7 @@ from database.postgres import Postgres
 
 
 class Module:
-    def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres, log: Logger) -> None:
+    def __int__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres, log: Logger) -> None:
         """Initializes module instance.
 
         Args:
@@ -18,10 +17,21 @@ class Module:
             crawler_id (int): crawler id
             config (Type[Config]): configuration
             database (Postgres): database
-            log (Log): log
+            log (Logger): log
         """
 
-    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page, context_database: DequeDB) -> None:
+    @staticmethod
+    def register_job(database: Postgres, log: Logger) -> None:
+        """Initialize job preparations, for example creation of database.
+
+        Args:
+            database (Postgres): database
+            log (Logger): log
+        """
+        raise NotImplementedError
+
+    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page, context_database: DequeDB,
+                     url: str, rank: int) -> None:
         """Add event handlers before navigating to a page.
 
         Args:
@@ -29,11 +39,13 @@ class Module:
             context (BrowserContext): context
             page (Page): page
             context_database (DequeDB): context database
+            url (str): URL
+            rank (int): URL rank
         """
         raise NotImplementedError
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page, response: Response,
-                         context_database: DequeDB) -> None:
+                         context_database: DequeDB, url: str, depth: int) -> Response:
         """Receive response from server.
 
         Args:
@@ -42,17 +54,10 @@ class Module:
             page (Page): page
             response (Response): response
             context_database (DequeDB): context database
-        """
-        raise NotImplementedError
-
-    def filter_urls(self, urls: List[tld.utils.Result], context_database: DequeDB) -> List[tld.utils.Result]:
-        """Filter recursively gathered urls.
-
-        Args:
-            urls (List[tld.utils.Result]): urls input list
-            context_database (DequeDB): context database
+            url (str): url
+            depth (int): url depth
 
         Returns:
-            List[tld.utils.Result]: urls output list
+            response (Response): response
         """
         raise NotImplementedError

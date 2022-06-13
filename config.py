@@ -1,4 +1,4 @@
-from logging import DEBUG, INFO, WARNING, ERROR
+from logging import DEBUG
 from typing import Literal
 
 
@@ -14,7 +14,7 @@ class Config:
     WAIT_AFTER_LOAD: int = 5000  # let page execute after loading in ms
 
     # TODO
-    LOG_LEVEL = DEBUG | INFO | WARNING | ERROR  # DEBUG|INFO|WARNING|ERROR
+    LOG_LEVEL = DEBUG  # DEBUG|INFO|WARNING|ERROR
     # OBEY_ROBOTS: bool = False  # crawler should obey robots.txt
     # FOCUS_FILTER: bool = False  # crawler should visit "interesting" URLS (experimental)
 
