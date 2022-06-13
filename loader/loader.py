@@ -2,7 +2,7 @@ from typing import Tuple, Iterator
 
 
 class Loader:
-    def __int__(self, source: str) -> None:
+    def __init__(self, source: str) -> None:
         """Initialize a loader for URLs.
 
         Args:

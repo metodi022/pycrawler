@@ -5,7 +5,7 @@ from loader.loader import Loader
 
 
 class CSVLoader(Loader):
-    def __int__(self, source: str) -> None:
+    def __init__(self, source: str) -> None:
         self.source: str = source
 
     def __iter__(self) -> Iterator[Tuple[int, str]]:
