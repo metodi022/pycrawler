@@ -24,8 +24,8 @@ class Postgres:
 
         # Create table for URLs if such a table does not exist already
         cur.execute(
-            "CREATE TABLE IF NOT EXISTS URLS (rank INT NOT NULL, job INT NOT NULL, url VARCHAR(255) NOT NULL "
-            "UNIQUE, crawler INT, code INT, PRIMARY KEY (rank, job));")
+            "CREATE TABLE IF NOT EXISTS URLS (rank INT NOT NULL, job INT NOT NULL, crawler INT, "
+            "url VARCHAR(255) NOT NULL UNIQUE, finalurl TEXT, code INT);")
 
         # Check if job already exists
         if Postgres._job_exists(cur, job_id):
@@ -34,7 +34,8 @@ class Postgres:
             raise RuntimeError('Job already exists.')
 
         for entry in loader:
-            cur.execute(f"INSERT INTO URLS VALUES (%s, %s, %s);", (entry[0], job_id, entry[1].strip(),))
+            cur.execute(f"INSERT INTO URLS (rank, job, url) VALUES (%s, %s, %s);",
+                        (entry[0], job_id, entry[1].strip(),))
 
         self._conn.commit()
         cur.close()
@@ -52,7 +53,7 @@ class Postgres:
         cur.execute(f"SELECT url, rank FROM URLS WHERE job=%s AND crawler IS NULL FOR UPDATE SKIP LOCKED LIMIT 1;",
                     (job_id,))
         url: Optional[Tuple[str, int]] = cur.fetchone()
-        url: Optional[Tuple[str, int, int]] = (url[0], 0, url[1]) if url is not None else url
+        url: Optional[Tuple[str, int, int]] = (url[0], 0, url[1]) if url else url
 
         # Check if there is a URL returned
         if not url:
@@ -66,7 +67,7 @@ class Postgres:
         cur.close()
         return url
 
-    def add_url(self, job_id: int, url: str, depth: int) -> None:
+    def update_url(self, job_id: int, crawler_id: int, url: str, final_url: str, code: int) -> None:
         cur: psycopg2.cursor = self._conn.cursor()
 
         # Check if job exists
@@ -75,31 +76,17 @@ class Postgres:
             self.disconnect()
             raise RuntimeError('Job does not exists.')
 
-        cur.execute(f"INSERT INTO URLS VALUES (%s, %s, %s);", (job_id, url, depth,))
+        cur.execute(f"UPDATE URLS SET code=%s, finalurl=%s, WHERE job=%s AND url=%s AND crawler=%s;",
+                    (code, final_url, job_id, url, crawler_id,))
 
         self._conn.commit()
         cur.close()
 
-    def update_url(self, job_id: int, crawler_id: int, url: str, code: int) -> None:
-        cur: psycopg2.cursor = self._conn.cursor()
-
-        # Check if job exists
-        if not Postgres._job_exists(cur, job_id):
-            cur.close()
-            self.disconnect()
-            raise RuntimeError('Job does not exists.')
-
-        cur.execute(f"UPDATE URLS SET code=%s WHERE job=%s AND url=%s AND crawler=%s;",
-                    (code, job_id, url, crawler_id,))
-
-        self._conn.commit()
-        cur.close()
-
-    def invoke_transaction(self, transaction: str, values: Any, fetch: bool) -> Optional[List[Any]]:
+    def invoke_transaction(self, transaction: str, values: Any, fetch: bool) -> Optional[List[Tuple[Any, ...]]]:
         cur: psycopg2.cursor = self._conn.cursor()
 
         cur.execute(transaction, values)
-        data: Optional[List[Tuple[Any]]] = cur.fetchall() if fetch else []
+        data: Optional[List[Tuple[Any, ...]]] = cur.fetchall() if fetch else []
 
         self._conn.commit()
         cur.close()

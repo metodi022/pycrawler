@@ -8,6 +8,7 @@ from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.collecturls import CollectUrls
 from modules.module import Module
+from utils import get_tld_object, get_url_full
 
 
 class ChromiumCrawler:
@@ -22,7 +23,7 @@ class ChromiumCrawler:
 
         # Prepare modules
         self._modules: List[Module] = []
-        self._modules += [CollectUrls(job_id, crawler_id, config, database, log)] if self._config.RECURSIVE else []
+        self._modules += [CollectUrls(job_id, crawler_id, config, database, log)]
         self._modules += modules
 
         self._playwright: Playwright = None
@@ -73,7 +74,7 @@ class ChromiumCrawler:
             response: Optional[Response] = self._open_url(page, url, context_switch)
 
             # Check response status
-            response = self._confirm_response(response, url, context_switch)
+            response = self._confirm_response(page, response, url, context_switch)
 
             # Wait after page is loaded
             self._wait(self._config.WAIT_AFTER_LOAD)
@@ -115,12 +116,13 @@ class ChromiumCrawler:
         except Exception as e:
             self._log.warning(str(e))
             if not context_switch:
-                self._database.update_url(self.job_id, self.crawler_id, url[0], -2)
+                final_url: str = get_url_full(get_tld_object(page.url))
+                self._database.update_url(self.job_id, self.crawler_id, url[0], final_url, -2)
 
         return response
 
-    def _confirm_response(self, response: Optional[Response], url: Tuple[str, int, int], context_switch: bool) -> \
-            Optional[Response]:
+    def _confirm_response(self, page: Page, response: Optional[Response], url: Tuple[str, int, int],
+                          context_switch: bool) -> Optional[Response]:
         if response is None:
             return None
 
@@ -130,7 +132,8 @@ class ChromiumCrawler:
             return response
 
         if not context_switch:
-            self._database.update_url(self.job_id, self.crawler_id, url[0], response.status)
+            final_url: str = get_url_full(get_tld_object(page.url))
+            self._database.update_url(self.job_id, self.crawler_id, url[0], final_url, response.status)
 
         return response
 
@@ -148,7 +151,8 @@ class ChromiumCrawler:
                 module.add_handlers(self._browser, context, page, context_database, url[0], url[2])
             except Exception as e:
                 self._log.error(str(e))
-                self._database.update_url(self.job_id, self.crawler_id, url[0], -1)
+                final_url: str = get_url_full(get_tld_object(page.url))
+                self._database.update_url(self.job_id, self.crawler_id, url[0], final_url, -1)
                 return False
 
         return True
@@ -168,7 +172,8 @@ class ChromiumCrawler:
                 break
 
         if not context_switch:
-            self._database.update_url(self.job_id, self.crawler_id, url[0],
+            final_url: str = get_url_full(get_tld_object(page.url))
+            self._database.update_url(self.job_id, self.crawler_id, url[0], final_url,
                                       (response.status if response is not None else -2) * code or -1 * (not code))
 
         return code

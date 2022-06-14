@@ -23,8 +23,8 @@ class CollectUrls(Module):
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
         database.invoke_transaction(
-            "CREATE TABLE IF NOT EXISTS URLSFEEDBACK (rank INT NOT NULL, job INT NOT NULL, url TEXT NOT NULL UNIQUE, "
-            "crawler INT NOT NULL, depth INT NOT NULL, code INT NOT NULL);", None, False)
+            "CREATE TABLE IF NOT EXISTS URLSFEEDBACK (rank INT NOT NULL, job INT NOT NULL, crawler INT NOT NULL, "
+            "url TEXT NOT NULL, finalurl TEXT NOT NULL, depth INT NOT NULL, code INT NOT NULL);", None, False)
         log.info('Create URLSFEEDBACK database')
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page, context_database: DequeDB, url: str,
@@ -34,8 +34,9 @@ class CollectUrls(Module):
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page, response: Optional[Response],
                          context_database: DequeDB, url: str, depth: int) -> Optional[Response]:
-        self._database.invoke_transaction("INSERT INTO URLSFEEDBACK VALUES (%s, %s, %s, %s, %s, %s);",
-                                          (self._rank, self.job_id, url, self.crawler_id, depth,
+        final_url: str = get_url_full(get_tld_object(page.url))
+        self._database.invoke_transaction("INSERT INTO URLSFEEDBACK VALUES (%s, %s, %s, %s, %s, %s, %s);",
+                                          (self._rank, self.job_id, self.crawler_id, url, final_url, depth,
                                            response.status if response is not None else -2), False)
 
         if not self._config.RECURSIVE or depth >= self._config.DEPTH or response is None or response.status >= 400:
