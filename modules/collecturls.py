@@ -25,7 +25,7 @@ class CollectUrls(Module):
         database.invoke_transaction(
             "CREATE TABLE IF NOT EXISTS URLSFEEDBACK (rank INT NOT NULL, job INT NOT NULL, crawler INT NOT NULL, "
             "url TEXT NOT NULL, finalurl TEXT NOT NULL, depth INT NOT NULL, code INT NOT NULL);", None, False)
-        log.info('Create URLSFEEDBACK database')
+        log.info('Create URLSFEEDBACK database IF NOT EXISTS')
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page, context_database: DequeDB, url: str,
                      rank: int) -> None:
@@ -68,8 +68,7 @@ class CollectUrls(Module):
                 continue
 
             # Add link
-            self._log.debug(
-                f"Find {get_url_full(parsed_link)}, seen={context_database.get_seen(get_url_full(parsed_link))}")
+            self._log.debug(f"Find {get_url_full(parsed_link)}, {context_database.get_seen(get_url_full(parsed_link))}")
             context_database.add_url(get_url_full(parsed_link), depth + 1, self._rank)
 
         return response
