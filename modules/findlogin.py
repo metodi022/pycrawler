@@ -1,4 +1,5 @@
 import re
+import urllib.parse
 from logging import Logger
 from typing import Type, Optional
 
@@ -8,6 +9,7 @@ from config import Config
 from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
+from utils import get_tld_object, get_origin
 
 
 class FindLogin(Module):
@@ -32,8 +34,18 @@ class FindLogin(Module):
         self._rank = rank
         self._url = url
 
+        url = get_origin(get_tld_object(url))
+        context_database.add_url(url + '/login/', self._config.DEPTH - 1, rank)
+        context_database.add_url(url + '/signin/', self._config.DEPTH - 1, rank)
+        context_database.add_url(
+            f"https://www.google.com/search?q=site:{urllib.parse.quote(self._url)}+login+OR+signin",
+            self._config.DEPTH - 1, rank)
+
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page, response: Response,
                          context_database: DequeDB, url: str, depth: int) -> Response:
+        if response is None or response.status >= 400:
+            return response
+
         forms: Locator = page.locator('form')
         for i in range(forms.count()):
             if FindLogin._find_login_form(forms.nth(i), url, page.url):
@@ -41,6 +53,7 @@ class FindLogin(Module):
                     "INSERT INTO LOGIN_FORMS (rank, job, crawler, url, loginform, depth) "
                     "VALUES (%i, %i, %i, %s, %s, %i)",
                     (self._rank, self.job_id, self.crawler_id, self._url, url, depth), False)
+
         return response
 
     @staticmethod
