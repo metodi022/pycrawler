@@ -13,11 +13,7 @@ from utils import get_tld_object, get_url_from_href, get_origin, get_url_full
 
 class CollectUrls(Module):
     def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres, log: Logger) -> None:
-        self.job_id: int = job_id
-        self.crawler_id: int = crawler_id
-        self._config: Type[Config] = config
-        self._database: Postgres = database
-        self._log: Logger = log
+        super().__init__(job_id, crawler_id, config, database, log)
         self._rank: int = 0
 
     @staticmethod
@@ -33,8 +29,8 @@ class CollectUrls(Module):
         self._rank = rank
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page, response: Optional[Response],
-                         context_database: DequeDB, url: str, depth: int) -> Optional[Response]:
-        final_url: str = get_url_full(get_tld_object(page.url))
+                         context_database: DequeDB, url: str, final_url: str, depth: int) -> Optional[Response]:
+        context_database.add_seen(final_url)
         self._database.invoke_transaction("INSERT INTO URLSFEEDBACK VALUES (%s, %s, %s, %s, %s, %s, %s);",
                                           (self._rank, self.job_id, self.crawler_id, url, final_url, depth,
                                            response.status if response is not None else -2), False)

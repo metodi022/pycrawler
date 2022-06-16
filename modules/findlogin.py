@@ -14,16 +14,12 @@ from utils import get_tld_object, get_origin
 
 class FindLogin(Module):
     def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres, log: Logger) -> None:
-        self.job_id: int = job_id
-        self.crawler_id: int = crawler_id
-        self._config: Type[Config] = config
-        self._database: Postgres = database
-        self._log: Logger = log
+        super().__init__(job_id, crawler_id, config, database, log)
         self._url: str = ''
         self._rank: int = 0
 
     @staticmethod
-    def register_job(database: Postgres, log: Logger):
+    def register_job(database: Postgres, log: Logger) -> None:
         database.invoke_transaction(
             "CREATE TABLE IF NOT EXISTS LOGINFORMS (rank INT NOT NULL, job INT NOT NULL, crawler INT NOT NULL, "
             "url VARCHAR(255) NOT NULL, loginform TEXT NOT NULL, depth INT NOT NULL);", None, False)
@@ -35,14 +31,16 @@ class FindLogin(Module):
         self._url = url
 
         url = get_origin(get_tld_object(url))
-        context_database.add_url(url + '/login/', self._config.DEPTH - 1, rank)
-        context_database.add_url(url + '/signin/', self._config.DEPTH - 1, rank)
+        context_database.add_url(url + '/login/', self._config.DEPTH, rank)
+        context_database.add_url(url + '/signin/', self._config.DEPTH, rank)
+        context_database.add_url(url + '/account/', self._config.DEPTH, rank)
+        context_database.add_url(url + '/profile/', self._config.DEPTH, rank)
         context_database.add_url(
             f"https://www.google.com/search?q=site:{urllib.parse.quote(self._url)}+login+OR+signin",
             self._config.DEPTH - 1, rank)
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page, response: Response,
-                         context_database: DequeDB, url: str, depth: int) -> Response:
+                         context_database: DequeDB, url: str, final_url: str, depth: int) -> Optional[Response]:
         if response is None or response.status >= 400:
             return response
 
@@ -50,27 +48,17 @@ class FindLogin(Module):
         for i in range(forms.count()):
             if FindLogin._find_login_form(forms.nth(i), url, page.url):
                 self._database.invoke_transaction(
-                    "INSERT INTO LOGIN_FORMS (rank, job, crawler, url, loginform, depth) "
-                    "VALUES (%i, %i, %i, %s, %s, %i)",
+                    "INSERT INTO LOGINFORMS (rank, job, crawler, url, loginform, depth) "
+                    "VALUES (%s, %s, %s, %s, %s, %s)",
                     (self._rank, self.job_id, self.crawler_id, self._url, url, depth), False)
 
         return response
 
     @staticmethod
     def _find_login_form(form: Locator, url: str, final_url: str) -> bool:
-        fields: Locator = form.locator('input')
-        password_fields: int = 0
-        text_fields: int = 0
-
-        for i in range(fields.count()):
-            field: Locator = fields.nth(i)
-            field_type: Optional[str] = field.get_attribute('type')
-
-            if not field_type:
-                continue
-
-            password_fields += (field_type == 'password')
-            text_fields += (field_type in {'text', 'email', 'tel'} and field.is_visible())
+        password_fields: int = form.locator('input[type="password"]').count()
+        text_fields: int = form.locator('input[type="email"]:visible').count() + form.locator(
+            'input[type="text"]:visible').count() + form.locator('input[type="tel"]:visible').count()
 
         if password_fields == 1:
             return True
@@ -79,7 +67,9 @@ class FindLogin(Module):
             return False
 
         if text_fields == 1:
-            check: re.Pattern = re.compile("log.?in|sign.?in", re.S | re.I)
-            return form.filter(has_text=check).count() != 0 or re.search(check, url) or re.search(check, final_url)
+            check: str = r"log.?in|sign.?in"
+            result: bool = form.locator(
+                f"text=/{check}/i").count() > 0 or re.search(check, url, re.I) or re.search(check, final_url, re.I)
+            return result
 
         return False

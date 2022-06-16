@@ -1,6 +1,8 @@
-import tld
 import re
 from typing import Optional
+
+import tld
+from playwright.sync_api import Page
 
 
 def get_tld_object(url: str) -> Optional[tld.utils.Result]:
@@ -24,9 +26,11 @@ def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils
         res = get_tld_object(origin.parsed_url.scheme + ":" + href)
     else:
         if href[0] == '/':
-            path: str = origin.parsed_url.path[:-1] if origin.parsed_url.path and origin.parsed_url.path[-1] == '/' else origin.parsed_url.path
+            path: str = origin.parsed_url.path[:-1] if origin.parsed_url.path and origin.parsed_url.path[
+                -1] == '/' else origin.parsed_url.path
         else:
-            path: str = origin.parsed_url.path if origin.parsed_url.path and origin.parsed_url.path[-1] == '/' else origin.parsed_url.path + '/'
+            path: str = origin.parsed_url.path if origin.parsed_url.path and origin.parsed_url.path[
+                -1] == '/' else origin.parsed_url.path + '/'
 
         res = get_tld_object(origin.parsed_url.scheme + "://" + origin.parsed_url.netloc + path + href)
 
@@ -37,3 +41,10 @@ def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils
         return None
 
     return res
+
+
+def wait_after_load(page: Page, amount: int) -> None:
+    if amount > 0:
+        page.evaluate(
+            'window.wait_after_load = 0; setTimeout(() => { window.wait_after_load = 1 }, ' + str(amount) + ');')
+        page.wait_for_function('() => window.wait_after_load > 0')

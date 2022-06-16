@@ -6,9 +6,10 @@ from playwright.sync_api import sync_playwright, Playwright, Browser, BrowserCon
 from config import Config
 from database.dequedb import DequeDB
 from database.postgres import Postgres
+from modules.acceptcookies import AcceptCookies
 from modules.collecturls import CollectUrls
 from modules.module import Module
-from utils import get_tld_object, get_url_full
+from utils import get_tld_object, get_url_full, wait_after_load
 
 
 class ChromiumCrawler:
@@ -23,6 +24,7 @@ class ChromiumCrawler:
 
         # Prepare modules
         self._modules: List[Module] = []
+        self._modules += [AcceptCookies(job_id, crawler_id, config, database, log)]
         self._modules += [CollectUrls(job_id, crawler_id, config, database, log)]
         self._modules += modules
 
@@ -32,7 +34,7 @@ class ChromiumCrawler:
 
     def start_crawl_chromium(self) -> None:
         self._playwright: Playwright = sync_playwright().start()
-        self._browser: Browser = self._playwright.chromium.launch()
+        self._browser: Browser = self._playwright.chromium.launch(headless=self._config.HEADLESS)
         self._blank: Page = self._browser.new_page()
 
         self._log.info(f"Start crawl, Chromium {self._browser.version}")
@@ -77,7 +79,7 @@ class ChromiumCrawler:
             response = self._confirm_response(page, response, url, context_switch)
 
             # Wait after page is loaded
-            self._wait(self._config.WAIT_AFTER_LOAD)
+            wait_after_load(self._blank, self._config.WAIT_AFTER_LOAD)
 
             # Run module response handler and exit if errors occur
             if not self._invoke_response_handler(context, page, response, url, context_switch, context_database):
@@ -137,11 +139,6 @@ class ChromiumCrawler:
 
         return response
 
-    def _wait(self, amount: int) -> None:
-        if amount > 0:
-            self._blank.evaluate('window.x = 0; setTimeout(() => { window.x = 1 }, ' + str(amount) + ');')
-            self._blank.wait_for_function('() => window.x > 0')
-
     def _invoke_page_handler(self, context: BrowserContext, page: Page, url: Tuple[str, int, int],
                              context_database: DequeDB) -> bool:
         self._log.debug('Invoke module page handler')
@@ -164,8 +161,9 @@ class ChromiumCrawler:
         code: bool = True
         for module in self._modules:
             try:
+                final_url: str = get_url_full(get_tld_object(page.url))
                 response = module.receive_response(self._browser, context, page, response, context_database, url[0],
-                                                   url[1])
+                                                   final_url, url[1])
             except Exception as e:
                 self._log.error(str(e))
                 code = False

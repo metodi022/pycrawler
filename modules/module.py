@@ -9,7 +9,7 @@ from database.postgres import Postgres
 
 
 class Module:
-    def __int__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres, log: Logger) -> None:
+    def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres, log: Logger) -> None:
         """Initializes module instance.
 
         Args:
@@ -19,6 +19,11 @@ class Module:
             database (Postgres): database
             log (Logger): log
         """
+        self.job_id: int = job_id
+        self.crawler_id: int = crawler_id
+        self._config: Type[Config] = config
+        self._database: Postgres = database
+        self._log: Logger = log
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
@@ -45,7 +50,7 @@ class Module:
         raise NotImplementedError
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page, response: Optional[Response],
-                         context_database: DequeDB, url: str, depth: int) -> Optional[Response]:
+                         context_database: DequeDB, url: str, final_url: str, depth: int) -> Optional[Response]:
         """Receive response from server.
 
         Args:
@@ -55,6 +60,7 @@ class Module:
             response (Optional[Response]): response
             context_database (DequeDB): context database
             url (str): url
+            final_url (str): final url after redirection
             depth (int): url depth
 
         Returns:

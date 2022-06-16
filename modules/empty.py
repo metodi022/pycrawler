@@ -20,6 +20,6 @@ class Empty(Module):
         pass
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page, response: Optional[Response],
-                         context_database: DequeDB, url: str, depth: int) -> Optional[Response]:
+                         context_database: DequeDB, url: str, final_url: str, depth: int) -> Optional[Response]:
         # Empty
         return response

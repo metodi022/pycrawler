@@ -3,6 +3,8 @@ from typing import Literal
 
 
 class Config:
+    HEADLESS: bool = True  # Headless browser
+
     RECURSIVE: bool = True  # Discover additional URLs while crawling
     SAME_ORIGIN: bool = False  # URL discovery for same-origin only
     SAME_ETLDP1: bool = True  # URL discovery for same ETLD+1 only
