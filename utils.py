@@ -16,10 +16,12 @@ def get_url_etldp1(url: tld.utils.Result) -> str:
     return url.parsed_url.scheme + '://' + url.fld
 
 
+# TODO return full url
 def get_url_full(url: tld.utils.Result) -> str:
     return url.parsed_url.scheme + '://' + url.parsed_url.netloc + url.parsed_url.path
 
 
+# TODO return full url
 def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils.Result]:
     if re.match('^http', href) is not None:
         res: Optional[tld.utils.Result] = get_tld_object(href)

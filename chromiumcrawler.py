@@ -42,7 +42,6 @@ class ChromiumCrawler:
         self._log.info(f"Start crawl, Chromium {self._browser.version}")
 
         # TODO Ask Jannis for browser and context options
-        # TODO including routing
 
         # Start crawl process here
         self._start_crawl()
@@ -114,7 +113,6 @@ class ChromiumCrawler:
         response: Optional[Response] = None
 
         try:
-            # TODO referer?
             response = page.goto(url[0], timeout=self._config.LOAD_TIMEOUT,
                                  wait_until=self._config.WAIT_LOAD_UNTIL)
             if response is None:
