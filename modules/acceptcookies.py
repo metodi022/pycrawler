@@ -8,7 +8,6 @@ from config import Config
 from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
-from utils import wait_after_load
 
 
 class AcceptCookies(Module):
@@ -35,9 +34,9 @@ class AcceptCookies(Module):
 
             for i in range(buttons.count()):
                 buttons.nth(i).click()
-                wait_after_load(page, 1000)
+                page.wait_for_timeout(1000)
 
             page.goto(final_url)
-            wait_after_load(page, self._config.WAIT_AFTER_LOAD)
+            page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
 
         return response

@@ -2,7 +2,6 @@ import re
 from typing import Optional
 
 import tld
-from playwright.sync_api import Page
 
 
 def get_tld_object(url: str) -> Optional[tld.utils.Result]:
@@ -46,11 +45,3 @@ def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils
         res = check.groups(0) if check is not None else res
 
     return res
-
-
-def wait_after_load(page: Page, amount: int) -> None:
-    if amount > 0:
-        page.evaluate(
-            'window.wait_after_load = 0; setTimeout(() => { window.wait_after_load = 1 }, ' + str(
-                amount) + ');')
-        page.wait_for_function('() => window.wait_after_load > 0')
