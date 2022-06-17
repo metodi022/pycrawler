@@ -1,3 +1,4 @@
+from datetime import datetime
 from logging import Logger
 from typing import Type, Optional, Tuple, List
 
@@ -9,6 +10,7 @@ from database.postgres import Postgres
 from modules.acceptcookies import AcceptCookies
 from modules.collecturls import CollectUrls
 from modules.module import Module
+from modules.savestats import SaveStats
 from utils import get_tld_object, get_url_full, wait_after_load
 
 
@@ -25,8 +27,9 @@ class ChromiumCrawler:
         # Prepare modules
         self._modules: List[Module] = []
         self._modules += [AcceptCookies(job_id, crawler_id, config, database, log)]
-        self._modules += [CollectUrls(job_id, crawler_id, config, database, log)]
+        self._modules += [CollectUrls(job_id, crawler_id, config, database, log)] if config.RECURSIVE else []
         self._modules += modules
+        self._modules += [SaveStats(job_id, crawler_id, config, database, log)]
 
         self._playwright: Playwright = None
         self._browser: Browser = None
@@ -55,6 +58,8 @@ class ChromiumCrawler:
         self._log.info('End crawl')
 
     def _start_crawl(self):
+        start: datetime = datetime.now()
+
         url: Optional[Tuple[str, int, int]] = self._database.get_url(self.job_id, self.crawler_id)
         self._log.info(f"Get URL {str(url)}")
 
@@ -82,10 +87,11 @@ class ChromiumCrawler:
             wait_after_load(self._blank, self._config.WAIT_AFTER_LOAD)
 
             # Run module response handler and exit if errors occur
-            if not self._invoke_response_handler(context, page, response, url, context_switch, context_database):
+            if not self._invoke_response_handler(context, page, response, url, context_switch, context_database, start):
                 break
 
             # Get next URL to crawl
+            start = datetime.now()
             url = context_database.get_url()
             context_switch = self._config.SAME_CONTEXT
             if url is None:
@@ -155,7 +161,8 @@ class ChromiumCrawler:
         return True
 
     def _invoke_response_handler(self, context: BrowserContext, page: Page, response: Optional[Response],
-                                 url: Tuple[str, int, int], context_switch: bool, context_database: DequeDB) -> bool:
+                                 url: Tuple[str, int, int], context_switch: bool, context_database: DequeDB,
+                                 start: datetime) -> bool:
         self._log.debug('Invoke module response handler')
 
         code: bool = True
@@ -163,7 +170,7 @@ class ChromiumCrawler:
             try:
                 final_url: str = get_url_full(get_tld_object(page.url))
                 response = module.receive_response(self._browser, context, page, response, context_database, url[0],
-                                                   final_url, url[1])
+                                                   final_url, url[1], start)
             except Exception as e:
                 self._log.error(str(e))
                 code = False

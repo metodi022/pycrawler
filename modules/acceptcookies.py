@@ -1,3 +1,4 @@
+from datetime import datetime
 from logging import Logger
 from typing import Optional, Type
 
@@ -11,7 +12,8 @@ from utils import wait_after_load
 
 
 class AcceptCookies(Module):
-    def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres, log: Logger) -> None:
+    def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres,
+                 log: Logger) -> None:
         super().__init__(job_id, crawler_id, config, database, log)
         self.url: str = ''
 
@@ -20,12 +22,13 @@ class AcceptCookies(Module):
         # Empty
         pass
 
-    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page, context_database: DequeDB, url: str,
-                     rank: int) -> None:
+    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
+                     context_database: DequeDB, url: str, rank: int) -> None:
         self.url = url
 
-    def receive_response(self, browser: Browser, context: BrowserContext, page: Page, response: Optional[Response],
-                         context_database: DequeDB, url: str, final_url: str, depth: int) -> Optional[Response]:
+    def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
+                         response: Optional[Response], context_database: DequeDB, url: str,
+                         final_url: str, depth: int, start: datetime) -> Optional[Response]:
         if self.url == url:
             check: str = "accept|okay|ok|consent|stimm|verstanden|versteh|akzeptier|agree|ja"
             buttons: Locator = page.locator('button:visible', has=page.locator(f"text=/{check}/i"))

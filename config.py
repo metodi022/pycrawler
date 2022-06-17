@@ -3,7 +3,10 @@ from typing import Literal
 
 
 class Config:
-    HEADLESS: bool = True  # Headless browser
+    def __init__(self):
+        raise NotImplementedError
+
+    HEADLESS: bool = False  # Headless browser
 
     RECURSIVE: bool = True  # Discover additional URLs while crawling
     SAME_ORIGIN: bool = False  # URL discovery for same-origin only

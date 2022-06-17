@@ -14,7 +14,8 @@ class Postgres:
         self._port: str = port
 
         self._conn: psycopg2.connection = psycopg2.connect(database=self._database, user=self._user,
-                                                           password=self._password, host=self._host, port=self._port)
+                                                           password=self._password, host=self._host,
+                                                           port=self._port)
 
     def disconnect(self) -> None:
         self._conn = self._conn.close()
@@ -34,7 +35,7 @@ class Postgres:
             raise RuntimeError('Job already exists.')
 
         for entry in loader:
-            cur.execute(f"INSERT INTO URLS (rank, job, url) VALUES (%s, %s, %s);",
+            cur.execute("INSERT INTO URLS (rank, job, url) VALUES (%s, %s, %s);",
                         (entry[0], job_id, entry[1].strip(),))
 
         self._conn.commit()
@@ -50,8 +51,9 @@ class Postgres:
             raise RuntimeError('Job does not exists.')
 
         # Get a URL with no crawler and lock row to avoid race conditions
-        cur.execute(f"SELECT url, rank FROM URLS WHERE job=%s AND crawler IS NULL FOR UPDATE SKIP LOCKED LIMIT 1;",
-                    (job_id,))
+        cur.execute(
+            "SELECT url, rank FROM URLS WHERE job=%s AND crawler IS NULL FOR UPDATE SKIP LOCKED "
+            "LIMIT 1;", (job_id,))
         url: Optional[Tuple[str, int]] = cur.fetchone()
         url: Optional[Tuple[str, int, int]] = (url[0], 0, url[1]) if url else url
 
@@ -61,7 +63,8 @@ class Postgres:
             return None
 
         # Get result from URL and assign crawler to it
-        cur.execute(f"UPDATE URLS SET crawler=%s WHERE job=%s AND url=%s;", (crawler_id, job_id, url[0]))
+        cur.execute("UPDATE URLS SET crawler=%s WHERE job=%s AND url=%s;",
+                    (crawler_id, job_id, url[0]))
 
         self._conn.commit()
         cur.close()
@@ -76,13 +79,14 @@ class Postgres:
             self.disconnect()
             raise RuntimeError('Job does not exists.')
 
-        cur.execute(f"UPDATE URLS SET code=%s, finalurl=%s, WHERE job=%s AND url=%s AND crawler=%s;",
+        cur.execute("UPDATE URLS SET code=%s, finalurl=%s WHERE job=%s AND url=%s AND crawler=%s;",
                     (code, final_url, job_id, url, crawler_id,))
 
         self._conn.commit()
         cur.close()
 
-    def invoke_transaction(self, transaction: str, values: Any, fetch: bool) -> Optional[List[Tuple[Any, ...]]]:
+    def invoke_transaction(self, transaction: str, values: Any, fetch: bool) -> \
+            Optional[List[Tuple[Any, ...]]]:
         cur: psycopg2.cursor = self._conn.cursor()
 
         cur.execute(transaction, values)
@@ -94,5 +98,5 @@ class Postgres:
 
     @staticmethod
     def _job_exists(cur, job_id: int) -> bool:
-        cur.execute(f"SELECT * FROM URLS WHERE job=%s LIMIT 1;", (job_id,))
+        cur.execute("SELECT * FROM URLS WHERE job=%s LIMIT 1;", (job_id,))
         return bool(cur.fetchone())

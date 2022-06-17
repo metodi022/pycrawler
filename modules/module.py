@@ -1,3 +1,4 @@
+from datetime import datetime
 from logging import Logger
 from typing import Type, Optional
 
@@ -9,7 +10,8 @@ from database.postgres import Postgres
 
 
 class Module:
-    def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres, log: Logger) -> None:
+    def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres,
+                 log: Logger) -> None:
         """Initializes module instance.
 
         Args:
@@ -35,8 +37,8 @@ class Module:
         """
         raise NotImplementedError
 
-    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page, context_database: DequeDB,
-                     url: str, rank: int) -> None:
+    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
+                     context_database: DequeDB, url: str, rank: int) -> None:
         """Add event handlers before navigating to a page.
 
         Args:
@@ -49,8 +51,9 @@ class Module:
         """
         raise NotImplementedError
 
-    def receive_response(self, browser: Browser, context: BrowserContext, page: Page, response: Optional[Response],
-                         context_database: DequeDB, url: str, final_url: str, depth: int) -> Optional[Response]:
+    def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
+                         response: Optional[Response], context_database: DequeDB, url: str,
+                         final_url: str, depth: int, start: datetime) -> Optional[Response]:
         """Receive response from server.
 
         Args:
@@ -62,6 +65,7 @@ class Module:
             url (str): url
             final_url (str): final url after redirection
             depth (int): url depth
+            start (datetime): start time of crawl for given url
 
         Returns:
             response (Response): response
