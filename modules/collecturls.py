@@ -1,6 +1,6 @@
 from datetime import datetime
 from logging import Logger
-from typing import Type, Optional
+from typing import Type, Optional, List
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator
@@ -31,21 +31,22 @@ class CollectUrls(Module):
         self._rank = rank
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         response: Optional[Response], context_database: DequeDB, url: str,
-                         final_url: str, depth: int, start: datetime) -> Optional[Response]:
+                         responses: List[Response], context_database: DequeDB, url: str,
+                         final_url: str, depth: int, start: List[datetime]) -> None:
         context_database.add_seen(final_url)
 
         # Check if response is valid
+        response: Response = responses[-1]
         if response is None or response.status >= 400:
-            return response
+            return
 
         # Check if depth exceeded
         if depth >= self._config.DEPTH:
-            return response
+            return
 
         parsed_url: Optional[tld.utils.Result] = get_tld_object(self._url)
         if parsed_url is None:
-            return response
+            return
 
         # Iterate over each <a> tag and add its href
         links: Locator = page.locator('a[href]')
@@ -74,5 +75,3 @@ class CollectUrls(Module):
                 f"Find {context_database.get_seen(get_url_full(parsed_link))} "
                 f"{get_url_full(parsed_link)}")
             context_database.add_url(get_url_full(parsed_link), depth + 1, self._rank)
-
-        return response

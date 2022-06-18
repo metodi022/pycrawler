@@ -1,6 +1,6 @@
 from datetime import datetime
 from logging import Logger
-from typing import Optional, Type
+from typing import Type, List
 
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
@@ -30,14 +30,13 @@ class SaveStats(Module):
         self._rank = rank
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         response: Optional[Response],
-                         context_database: DequeDB, url: str, final_url: str, depth: int,
-                         start: datetime) -> \
-            Optional[Response]:
-        self._database.invoke_transaction(
-            "INSERT INTO URLSFEEDBACK VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);", (
-                self._rank, self.job_id, self.crawler_id, url, final_url, depth,
-                response.status if response is not None else -2,
-                start.strftime('%Y-%m-%d %H:%M:%S'),
-                datetime.now().strftime('%Y-%m-%d %H:%M:%S')), False)
-        return response
+                         responses: List[Response], context_database: DequeDB, url: str,
+                         final_url: str, depth: int, start: List[datetime]) -> None:
+        end: datetime = datetime.now()
+        for i, response in enumerate(responses):
+            self._database.invoke_transaction(
+                "INSERT INTO URLSFEEDBACK VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);", (
+                    self._rank, self.job_id, self.crawler_id, url, final_url, depth,
+                    response.status if response is not None else -2,
+                    start[i].strftime('%Y-%m-%d %H:%M:%S'),
+                    end.strftime('%Y-%m-%d %H:%M:%S')), False)

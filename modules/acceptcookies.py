@@ -1,6 +1,6 @@
 from datetime import datetime
 from logging import Logger
-from typing import Optional, Type, List, MutableSet
+from typing import Type, List, MutableSet
 
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Cookie
 
@@ -36,12 +36,16 @@ class AcceptCookies(Module):
         self._urls = set()
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         response: Optional[Response], context_database: DequeDB, url: str,
-                         final_url: str, depth: int, start: datetime) -> Optional[Response]:
+                         responses: List[Response], context_database: DequeDB, url: str,
+                         final_url: str, depth: int, start: List[datetime]) -> None:
+        response: Response = responses[-1]
+        if response is None or response.status >= 400:
+            return
+
         # Check if we already accepted cookies for origin
         url_origin: str = get_url_origin(get_tld_object(final_url))
         if url_origin in self._urls:
-            return response
+            return
         self._urls.add(url_origin)
 
         # Save cookies initially
@@ -76,7 +80,7 @@ class AcceptCookies(Module):
 
         # If no buttons found -> just exit
         if buttons.count() == 0:
-            return response
+            return
 
         # Click on cookie button and wait some time
         buttons.nth(button_nth).click()
@@ -84,10 +88,12 @@ class AcceptCookies(Module):
 
         # After clicking on cookie accept, check if cookie is changed and only then reload
         if not AcceptCookies._compare_cookies(cookies, context.cookies()):
-            page.goto(url)
+            temp: datetime = datetime.now()
+            response = page.goto(url)
             page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
-
-        return response
+            if response is not None:
+                start.append(temp)
+                responses.append(response)
 
     @staticmethod
     def _compare_cookies(cookies1: List[Cookie], cookies2: List[Cookie]) -> bool:

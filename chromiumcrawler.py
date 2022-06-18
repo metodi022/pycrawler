@@ -82,8 +82,9 @@ class ChromiumCrawler:
             page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
 
             # Run module response handler and exit if errors occur
-            if not self._invoke_response_handler(context, page, response, url, context_switch,
-                                                 context_database, start):
+            if not self._invoke_response_handler(context, page,
+                                                 [response] if response is not None else [], url,
+                                                 context_switch, context_database, [start]):
                 break
 
             # Get next URL to crawl
@@ -158,18 +159,17 @@ class ChromiumCrawler:
         return True
 
     def _invoke_response_handler(self, context: BrowserContext, page: Page,
-                                 response: Optional[Response], url: Tuple[str, int, int],
+                                 responses: List[Response], url: Tuple[str, int, int],
                                  context_switch: bool, context_database: DequeDB,
-                                 start: datetime) -> bool:
+                                 start: List[datetime]) -> bool:
         self._log.debug('Invoke module response handler')
 
         code: bool = True
+        final_url: str = get_url_full(get_tld_object(page.url))
         for module in self._modules:
             try:
-                final_url: str = get_url_full(get_tld_object(page.url))
-                response = module.receive_response(self._browser, context, page, response,
-                                                   context_database, url[0], final_url, url[1],
-                                                   start)
+                module.receive_response(self._browser, context, page, responses, context_database,
+                                        url[0], final_url, url[1], start)
             except Exception as error:
                 self._log.error(str(error))
                 code = False
@@ -178,6 +178,6 @@ class ChromiumCrawler:
         if not context_switch:
             final_url: str = get_url_full(get_tld_object(page.url))
             self._database.update_url(self.job_id, self.crawler_id, url[0], final_url, (
-                response.status if response is not None else -2) * code or -1 * (not code))
+                responses[0].status if responses[0] is not None else -2) * code or -1 * (not code))
 
         return code

@@ -1,6 +1,6 @@
 from datetime import datetime
 from logging import Logger
-from typing import Type, Optional
+from typing import Type, List
 
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
@@ -52,22 +52,19 @@ class Module:
         raise NotImplementedError
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         response: Optional[Response], context_database: DequeDB, url: str,
-                         final_url: str, depth: int, start: datetime) -> Optional[Response]:
+                         responses: List[Response], context_database: DequeDB, url: str,
+                         final_url: str, depth: int, start: List[datetime]) -> None:
         """Receive response from server.
 
         Args:
             browser (Browser): browser
             context (BrowserContext): context
             page (Page): page
-            response (Optional[Response]): response
+            responses (List[Response]): list of responses from crawler and modules
             context_database (DequeDB): context database
             url (str): url
             final_url (str): final url after redirection
             depth (int): url depth
             start (datetime): start time of crawl for given url
-
-        Returns:
-            response (Response): response
         """
         raise NotImplementedError

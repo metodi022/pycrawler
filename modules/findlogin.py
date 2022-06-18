@@ -2,7 +2,7 @@ import re
 import urllib.parse
 from datetime import datetime
 from logging import Logger
-from typing import Type, Optional
+from typing import Type, List
 
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator
 
@@ -45,15 +45,16 @@ class FindLogin(Module):
             self._config.DEPTH - 1, rank)
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         response: Response, context_database: DequeDB, url: str, final_url: str,
-                         depth: int, start: datetime) -> Optional[Response]:
+                         responses: List[Response], context_database: DequeDB, url: str,
+                         final_url: str, depth: int, start: List[datetime]) -> None:
         # Check if response is valid
+        response: Response = responses[-1]
         if response is None or response.status >= 400:
-            return response
+            return
 
         # Check if we search domain's popular pages
         if 'https://www.google.com/search?q' in final_url:
-            return response
+            return
 
         forms: Locator = page.locator('form')
         for i in range(forms.count()):
@@ -62,8 +63,6 @@ class FindLogin(Module):
                     "INSERT INTO LOGINFORMS (rank, job, crawler, url, loginform, depth) VALUES ("
                     "%s, %s, %s, %s, %s, %s)",
                     (self._rank, self.job_id, self.crawler_id, self._url, url, depth), False)
-
-        return response
 
     @staticmethod
     def _find_login_form(form: Locator, url: str, final_url: str) -> bool:
@@ -79,7 +78,7 @@ class FindLogin(Module):
             return False
 
         if text_fields == 1:
-            check: str = r"log.?in|sign.?in|password|user.?name"
+            check: str = r"log.?in|sign.?in|password|user.?name|account"
             result: bool = form.locator(f"text=/{check}/i").count() > 0
             result = result or re.search(check, url, re.I) or re.search(check, final_url, re.I)
             return result
