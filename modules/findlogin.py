@@ -40,9 +40,7 @@ class FindLogin(Module):
         context_database.add_url(url + '/signin/', self._config.DEPTH, rank)
         context_database.add_url(url + '/account/', self._config.DEPTH, rank)
 
-        context_database.add_url(
-            f"https://www.google.com/search?q=site:{urllib.parse.quote(url)}+login+OR+signin",
-            self._config.DEPTH - 1, rank)
+        # TODO Search engine fallback
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Response], context_database: DequeDB, url: str,
@@ -50,10 +48,6 @@ class FindLogin(Module):
         # Check if response is valid
         response: Response = responses[-1]
         if response is None or response.status >= 400:
-            return
-
-        # Check if we search domain's popular pages
-        if 'https://www.google.com/search?q' in final_url:
             return
 
         forms: Locator = page.locator('form')

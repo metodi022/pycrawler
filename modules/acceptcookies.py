@@ -2,7 +2,7 @@ from datetime import datetime
 from logging import Logger
 from typing import Type, List, MutableSet
 
-from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Cookie
+from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator
 
 from config import Config
 from database.dequedb import DequeDB
@@ -48,9 +48,6 @@ class AcceptCookies(Module):
             return
         self._urls.add(url_origin)
 
-        # Save cookies initially
-        cookies: List[Cookie] = context.cookies()
-
         # Check for buttons with certain keywords
         check: Locator = page.locator(f"text=/{AcceptCookies.CHECK_SEL}/i",
                                       has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
@@ -79,39 +76,17 @@ class AcceptCookies(Module):
         # TODO frame locators if buttons.count() == 0 ?
 
         # If no buttons found -> just exit
+        self._log.info(
+            f"Found {buttons.count()} possible cookie accept buttons for origin {url_origin}")
         if buttons.count() == 0:
             return
 
         # Click on cookie button and wait some time
         buttons.nth(button_nth).click()
         page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
-
-        # After clicking on cookie accept, check if cookie is changed and only then reload
-        if not AcceptCookies._compare_cookies(cookies, context.cookies()):
-            temp: datetime = datetime.now()
-            response = page.goto(url)
-            page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
-            if response is not None:
-                start.append(temp)
-                responses.append(response)
-
-    @staticmethod
-    def _compare_cookies(cookies1: List[Cookie], cookies2: List[Cookie]) -> bool:
-        if len(cookies1) != len(cookies2):
-            return False
-
-        seen: bool = False
-        equal: bool = True
-        for cookie1 in cookies1:
-            for cookie2 in cookies2:
-                if cookie1.get("name") == cookie2.get("name"):
-                    seen = True
-                    equal = cookie1.get("value") == cookie2.get("value")
-
-            if not seen or not equal:
-                return False
-
-            seen = False
-            equal = True
-
-        return True
+        temp: datetime = datetime.now()
+        response = page.goto(url)
+        page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
+        if response is not None:
+            start.append(temp)
+            responses.append(response)
