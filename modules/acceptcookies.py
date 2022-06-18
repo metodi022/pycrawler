@@ -1,25 +1,21 @@
 from datetime import datetime
 from logging import Logger
-from typing import Optional, Type
+from typing import Optional, Type, List, MutableSet
 
-from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator
+from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Cookie
 
 from config import Config
 from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
+from utils import get_url_origin, get_tld_object
 
 
 class AcceptCookies(Module):
-    CHECK_SEL: str = 'cookie|com|cookies|de|consent|banner|pl|gdpr|modal|bar|data|popup|policy' \
-                     '|overlay|privacy|uk|notification|nl|notice|info|co|footer|message|it|fr' \
-                     '|domain|fixed|eu|app|org|root|box|block|net|disclaimer|es|dialog|se|content' \
-                     '|at|warning|widget|cc|ui|backdrop|accept|dk|hu|cz|wrap|__next|no|be|ng|bg' \
-                     '|page|ru|law|layer|io|show|min|panel|toast|cmp|site|cookiebar|cnil|fi|hr|m' \
-                     '|cookieconsent|ch|aria|dismissible|button|is|module|msg|component|ro|active' \
-                     '|global|br|sticky|rodo|role|dismissable|in|visible|gr|messages|wp|elementor' \
-                     '|pt|cp|manager|compliance|b|settings|agreement|first|notify|si|home|legal' \
-                     '|tracking|last|system|GDPR|dsgvo|plugins|gov|___gatsby|tv|sk|form'
+    CHECK_SEL: str = 'cookie|cookies|consent|banner|gdpr|modal|popup|policy|overlay|privacy' \
+                     '|notification|notice|info|footer|message|block|disclaimer|dialog|warning' \
+                     '|backdrop|accept|law|cookiebar|cookieconsent|dismissible|compliance' \
+                     '|agreement|notify|legal|tracking|GDPR'
 
     CHECK_ENG: str = 'accept|okay|ok|consent|agree|allow|understand|continue|yes'
     CHECK_GER: str = "stimm|verstanden|versteh|akzeptier|ja|weiter|annehm"
@@ -28,7 +24,7 @@ class AcceptCookies(Module):
     def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres,
                  log: Logger) -> None:
         super().__init__(job_id, crawler_id, config, database, log)
-        self.url: str = ''
+        self._urls: MutableSet[str] = set()
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
@@ -37,21 +33,79 @@ class AcceptCookies(Module):
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: str, rank: int) -> None:
-        self.url = url
+        self._urls = set()
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          response: Optional[Response], context_database: DequeDB, url: str,
                          final_url: str, depth: int, start: datetime) -> Optional[Response]:
-        if self.url == url:
-            check: Locator = page.locator(f"text=/{AcceptCookies.CHECK_SEL}/i",
-                                          has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
-            buttons: Locator = page.locator('button:visible', has=check)
+        # Check if we already accepted cookies for origin
+        url_origin: str = get_url_origin(get_tld_object(final_url))
+        if url_origin in self._urls:
+            return response
+        self._urls.add(url_origin)
 
-            if buttons.count() > 0:
-                buttons.nth(0).click()
-                page.wait_for_timeout(5000)
+        # Save cookies initially
+        cookies: List[Cookie] = context.cookies()
 
-            page.goto(final_url)
+        # Check for buttons with certain keywords
+        check: Locator = page.locator(f"text=/{AcceptCookies.CHECK_SEL}/i",
+                                      has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
+        buttons: Locator = page.locator('button:visible', has=check)
+        button_nth: int = 0
+
+        # Check for topmost z-index button with less restrictive keywords
+        if buttons.count() == 0:
+            buttons: Locator = page.locator('button:visible',
+                                            has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
+
+            z_max: int = 0
+            for i in range(buttons.count()):
+                z_temp = buttons.nth(i).evaluate(
+                    "node => getComputedStyle(node).getPropertyValue('z-index')")
+                z_max = max(z_max, 0 if z_temp == 'auto' else int(z_temp))
+
+            for i in range(buttons.count()):
+                z_temp = buttons.nth(i).evaluate(
+                    "node => getComputedStyle(node).getPropertyValue('z-index')")
+                z_temp = 0 if z_temp == 'auto' else int(z_temp)
+                if z_temp >= z_max:
+                    button_nth = i
+                    break
+
+        # TODO frame locators if buttons.count() == 0 ?
+
+        # If no buttons found -> just exit
+        if buttons.count() == 0:
+            return response
+
+        # Click on cookie button and wait some time
+        buttons.nth(button_nth).click()
+        page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
+
+        # After clicking on cookie accept, check if cookie is changed and only then reload
+        if not AcceptCookies._compare_cookies(cookies, context.cookies()):
+            page.goto(url)
             page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
 
         return response
+
+    @staticmethod
+    def _compare_cookies(cookies1: List[Cookie], cookies2: List[Cookie]) -> bool:
+        if len(cookies1) != len(cookies2):
+            return False
+
+        seen: bool = False
+        equal: bool = True
+        for cookie1 in cookies1:
+            for cookie2 in cookies2:
+                if cookie1.get("name") == cookie2.get("name"):
+                    seen = True
+                    equal = cookie1.get("value") == cookie2.get("value")
+
+            if not seen or not equal:
+                return False
+
+            seen = False
+            equal = True
+
+        return True

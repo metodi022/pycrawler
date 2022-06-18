@@ -8,7 +8,7 @@ class Config:
 
     HEADLESS: bool = False  # Headless browser
 
-    RECURSIVE: bool = True  # Discover additional URLs while crawling
+    RECURSIVE: bool = False  # Discover additional URLs while crawling
     SAME_ORIGIN: bool = False  # URL discovery for same-origin only
     SAME_ETLDP1: bool = True  # URL discovery for same ETLD+1 only
     DEPTH: int = 1  # URL discovery limit; 0 (initial URL only), 1, 2, etc.
@@ -16,7 +16,7 @@ class Config:
 
     WAIT_LOAD_UNTIL: Literal['commit', 'domcontentloaded', 'load', 'networkidle'] = 'load'
     LOAD_TIMEOUT: int = 30000  # URL page loading timeout in ms or 0 (disable timeout)
-    WAIT_AFTER_LOAD: int = 5000  # let page execute after loading in ms
+    WAIT_AFTER_LOAD: int = 10000  # let page execute after loading in ms
 
     # TODO
     LOG_LEVEL = DEBUG  # DEBUG|INFO|WARNING|ERROR
