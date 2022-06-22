@@ -17,9 +17,6 @@ class Postgres:
                                                            password=self._password, host=self._host,
                                                            port=self._port)
 
-    def disconnect(self) -> None:
-        self._conn = self._conn.close()
-
     def register_job(self, job_id: int, loader: Loader) -> None:
         cur: psycopg2.cursor = self._conn.cursor()
 
@@ -31,7 +28,7 @@ class Postgres:
         # Check if job already exists
         if Postgres._job_exists(cur, job_id):
             cur.close()
-            self.disconnect()
+            self._conn.close()
             raise RuntimeError('Job already exists.')
 
         for entry in loader:
@@ -47,7 +44,7 @@ class Postgres:
         # Check if job exists
         if not Postgres._job_exists(cur, job_id):
             cur.close()
-            self.disconnect()
+            self._conn.close()
             raise RuntimeError('Job does not exists.')
 
         # Get a URL with no crawler and lock row to avoid race conditions
@@ -55,7 +52,6 @@ class Postgres:
             "SELECT url, rank FROM URLS WHERE job=%s AND crawler IS NULL FOR UPDATE SKIP LOCKED "
             "LIMIT 1;", (job_id,))
         url: Optional[Tuple[str, int]] = cur.fetchone()
-        url: Optional[Tuple[str, int, int]] = (url[0], 0, url[1]) if url else url
 
         # Check if there is a URL returned
         if not url:
@@ -68,7 +64,7 @@ class Postgres:
 
         self._conn.commit()
         cur.close()
-        return url
+        return url[0], 0, url[1]
 
     def update_url(self, job_id: int, crawler_id: int, url: str, final_url: str, code: int) -> None:
         cur: psycopg2.cursor = self._conn.cursor()
@@ -76,7 +72,7 @@ class Postgres:
         # Check if job exists
         if not Postgres._job_exists(cur, job_id):
             cur.close()
-            self.disconnect()
+            self._conn.close()
             raise RuntimeError('Job does not exists.')
 
         cur.execute("UPDATE URLS SET code=%s, finalurl=%s WHERE job=%s AND url=%s AND crawler=%s;",

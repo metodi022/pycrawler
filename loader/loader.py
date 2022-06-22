@@ -6,7 +6,7 @@ class Loader:
         """Initialize a loader for URLs.
 
         Args:
-            source (str): path of source file with URLs
+            source (str): path of file with URLs
         """
 
     def __iter__(self) -> Iterator[Tuple[int, str]]:

@@ -2,6 +2,7 @@ from datetime import datetime
 from logging import Logger
 from typing import Type, Optional, Tuple, List
 
+import tld
 from playwright.sync_api import sync_playwright, Playwright, Browser, BrowserContext, Page, Response
 
 from config import Config
@@ -26,14 +27,15 @@ class ChromiumCrawler:
 
         # Prepare modules
         self._modules: List[Module] = []
-        self._modules += [AcceptCookies(job_id, crawler_id, config, database, log)]
+        self._modules += [AcceptCookies(job_id, crawler_id, config, database,
+                                        log)] if config.ACCEPT_COOKIES else []
         self._modules += [
             CollectUrls(job_id, crawler_id, config, database, log)] if config.RECURSIVE else []
         self._modules += modules
         self._modules += [SaveStats(job_id, crawler_id, config, database, log)]
 
-        self._playwright: Playwright = None
-        self._browser: Browser = None
+        self._playwright: Playwright = None  # type: ignore
+        self._browser: Browser = None  # type: ignore
 
     def start_crawl_chromium(self) -> None:
         self._playwright: Playwright = sync_playwright().start()
@@ -47,9 +49,9 @@ class ChromiumCrawler:
         self._start_crawl()
 
         self._browser.close()
-        self._browser = None
+        self._browser = None  # type: ignore
         self._playwright.stop()
-        self._playwright = None
+        self._playwright = None  # type: ignore
         self._log.info('End crawl')
 
     def _start_crawl(self):
@@ -121,8 +123,10 @@ class ChromiumCrawler:
         except Exception as error:
             self._log.warning(str(error))
             if not context_switch:
-                final_url: str = get_url_full(get_tld_object(page.url))
-                self._database.update_url(self.job_id, self.crawler_id, url[0], final_url, -2)
+                final_url: Optional[tld.utils.Result] = get_tld_object(page.url)
+                self._database.update_url(self.job_id, self.crawler_id, url[0],
+                                          get_url_full(final_url) if final_url is not None else url[
+                                              0], -2)
 
         return response
 
@@ -137,8 +141,9 @@ class ChromiumCrawler:
             return response
 
         if not context_switch:
-            final_url: str = get_url_full(get_tld_object(page.url))
-            self._database.update_url(self.job_id, self.crawler_id, url[0], final_url,
+            final_url: Optional[tld.utils.Result] = get_tld_object(page.url)
+            self._database.update_url(self.job_id, self.crawler_id, url[0],
+                                      get_url_full(final_url) if final_url is not None else url[0],
                                       response.status)
 
         return response
@@ -152,8 +157,10 @@ class ChromiumCrawler:
                 module.add_handlers(self._browser, context, page, context_database, url[0], url[2])
             except Exception as error:
                 self._log.error(str(error))
-                final_url: str = get_url_full(get_tld_object(page.url))
-                self._database.update_url(self.job_id, self.crawler_id, url[0], final_url, -1)
+                final_url: Optional[tld.utils.Result] = get_tld_object(page.url)
+                self._database.update_url(self.job_id, self.crawler_id, url[0],
+                                          get_url_full(final_url) if final_url is not None else url[
+                                              0], -1)
                 return False
 
         return True
@@ -165,7 +172,8 @@ class ChromiumCrawler:
         self._log.debug('Invoke module response handler')
 
         code: bool = True
-        final_url: str = get_url_full(get_tld_object(page.url))
+        final_url: str = get_url_full(get_tld_object(page.url)) if get_tld_object(  # type: ignore
+            page.url) is not None else url[0]
         for module in self._modules:
             try:
                 module.receive_response(self._browser, context, page, responses, context_database,
@@ -176,7 +184,6 @@ class ChromiumCrawler:
                 break
 
         if not context_switch:
-            final_url: str = get_url_full(get_tld_object(page.url))
             self._database.update_url(self.job_id, self.crawler_id, url[0], final_url, (
                 responses[0].status if responses[0] is not None else -2) * code or -1 * (not code))
 

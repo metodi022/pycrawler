@@ -63,8 +63,8 @@ class Module:
             responses (List[Response]): list of responses from crawler and modules
             context_database (DequeDB): context database
             url (str): url
-            final_url (str): final url after redirection
+            final_url (str): final url after redirections
             depth (int): url depth
-            start (datetime): start time of crawl for given url
+            start (List[datetime]): start times for crawl and for each module response initiation
         """
         raise NotImplementedError

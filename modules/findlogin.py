@@ -1,9 +1,9 @@
 import re
-import urllib.parse
 from datetime import datetime
 from logging import Logger
-from typing import Type, List
+from typing import Type, List, Optional
 
+import tld.utils
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator
 
 from config import Config
@@ -29,12 +29,14 @@ class FindLogin(Module):
         log.info('Create LOGINFORMS database IF NOT EXISTS')
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB,
-                     url: str, rank: int) -> None:
+                     context_database: DequeDB, url: str, rank: int) -> None:
         self._rank = rank
         self._url = url
 
-        url = get_url_origin(get_tld_object(url))
+        temp: Optional[tld.utils.Result] = get_tld_object(url)
+        if temp is None:
+            return
+        url = get_url_origin(temp)
 
         context_database.add_url(url + '/login/', self._config.DEPTH, rank)
         context_database.add_url(url + '/signin/', self._config.DEPTH, rank)
@@ -74,7 +76,8 @@ class FindLogin(Module):
         if text_fields == 1:
             check: str = r"log.?in|sign.?in|password|user.?name|account"
             result: bool = form.locator(f"text=/{check}/i").count() > 0
-            result = result or re.search(check, url, re.I) or re.search(check, final_url, re.I)
+            result = result or re.search(check, url, re.I) is not None
+            result = result or re.search(check, final_url, re.I) is not None
             return result
 
         return False

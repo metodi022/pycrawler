@@ -5,7 +5,7 @@ import tld
 
 
 def get_tld_object(url: str) -> Optional[tld.utils.Result]:
-    return tld.get_tld(url, as_object=True)
+    return tld.get_tld(url, as_object=True)  # type: ignore
 
 
 def get_url_origin(url: tld.utils.Result) -> str:
@@ -41,9 +41,5 @@ def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils
 
     if res is not None and re.match('htm$|html$|^((?!\\.).)*$', res.parsed_url.path) is None:
         return None
-
-    if res is not None and 'https://www.google.com/search?q' in res:
-        check: re.Match = re.match('(?<=url=)[^&]+', res)
-        res = check.groups(0) if check is not None else res
 
     return res

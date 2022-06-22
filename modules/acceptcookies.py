@@ -1,7 +1,8 @@
 from datetime import datetime
 from logging import Logger
-from typing import Type, List, MutableSet
+from typing import Type, List, MutableSet, Optional
 
+import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator
 
 from config import Config
@@ -43,10 +44,10 @@ class AcceptCookies(Module):
             return
 
         # Check if we already accepted cookies for origin
-        url_origin: str = get_url_origin(get_tld_object(final_url))
-        if url_origin in self._urls:
+        url_origin: Optional[tld.utils.Result] = get_tld_object(final_url)
+        if url_origin is None or get_url_origin(url_origin) in self._urls:
             return
-        self._urls.add(url_origin)
+        self._urls.add(get_url_origin(url_origin))
 
         # Check for buttons with certain keywords
         check: Locator = page.locator(f"text=/{AcceptCookies.CHECK_SEL}/i",
@@ -77,7 +78,7 @@ class AcceptCookies(Module):
 
         # If no buttons found -> just exit
         self._log.info(
-            f"Found {buttons.count()} possible cookie accept buttons for origin {url_origin}")
+            f"Find {buttons.count()} possible cookie accept buttons")
         if buttons.count() == 0:
             return
 
@@ -85,7 +86,7 @@ class AcceptCookies(Module):
         buttons.nth(button_nth).click()
         page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
         temp: datetime = datetime.now()
-        response = page.goto(url)
+        response = page.goto(url)  # type: ignore
         page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
         if response is not None:
             start.append(temp)

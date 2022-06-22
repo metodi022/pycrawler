@@ -18,7 +18,9 @@ class Config:
     LOAD_TIMEOUT: int = 30000  # URL page loading timeout in ms or 0 (disable timeout)
     WAIT_AFTER_LOAD: int = 10000  # let page execute after loading in ms
 
-    # TODO
+    ACCEPT_COOKIES: bool = False  # Attempt to find cookie banners and accept them - unreliable
+
+    # TODO more options
     LOG_LEVEL = DEBUG  # DEBUG|INFO|WARNING|ERROR
     # OBEY_ROBOTS: bool = False  # crawler should obey robots.txt
     # FOCUS_FILTER: bool = False  # crawler should visit "interesting" URLS (experimental)
