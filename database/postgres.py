@@ -17,6 +17,9 @@ class Postgres:
                                                            password=self._password, host=self._host,
                                                            port=self._port)
 
+    def disconnect(self):
+        self._conn.close()
+
     def register_job(self, job_id: int, loader: Loader) -> None:
         cur: psycopg2.cursor = self._conn.cursor()
 

@@ -39,7 +39,7 @@ class AcceptCookies(Module):
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Response], context_database: DequeDB, url: str,
                          final_url: str, depth: int, start: List[datetime]) -> None:
-        response: Response = responses[-1]
+        response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
             return
 

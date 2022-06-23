@@ -19,6 +19,7 @@ class ChromiumCrawler:
     # noinspection PyTypeChecker
     def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres,
                  log: Logger, modules: List[Module]) -> None:
+        # Prepare database and log
         self.job_id: int = job_id
         self.crawler_id: int = crawler_id
         self._config: Type[Config] = config
@@ -34,24 +35,17 @@ class ChromiumCrawler:
         self._modules += modules
         self._modules += [SaveStats(job_id, crawler_id, config, database, log)]
 
-        self._playwright: Playwright = None  # type: ignore
-        self._browser: Browser = None  # type: ignore
-
-    def start_crawl_chromium(self) -> None:
+        # Prepare browser instances
         self._playwright: Playwright = sync_playwright().start()
         self._browser: Browser = self._playwright.chromium.launch(headless=self._config.HEADLESS)
 
+    def start_crawl_chromium(self) -> None:
         self._log.info(f"Start crawl, Chromium {self._browser.version}")
-
-        # TODO Ask Jannis for browser and context options
-
-        # Start crawl process here
         self._start_crawl()
 
-        self._browser.close()
-        self._browser = None  # type: ignore
-        self._playwright.stop()
-        self._playwright = None  # type: ignore
+    def stop_crawl_chromium(self) -> None:
+        self._browser = self._browser.close() or None  # type: ignore
+        self._playwright = self._playwright.stop() or None  # type: ignore
         self._log.info('End crawl')
 
     def _start_crawl(self):
@@ -69,9 +63,7 @@ class ChromiumCrawler:
         page: Page = context.new_page()
         self._log.debug('New context')
 
-        if not self._invoke_page_handler(context, page, url, context_database):
-            context.close()
-            return
+        self._invoke_page_handler(context, page, url, context_database)
 
         while url is not None:
             # Navigate to page
@@ -84,10 +76,8 @@ class ChromiumCrawler:
             page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
 
             # Run module response handler and exit if errors occur
-            if not self._invoke_response_handler(context, page,
-                                                 [response] if response is not None else [], url,
-                                                 context_switch, context_database, [start]):
-                break
+            self._invoke_response_handler(context, page, [response] if response is not None else [],
+                                          url, context_database, [start])
 
             # Get next URL to crawl
             start = datetime.now()
@@ -149,42 +139,19 @@ class ChromiumCrawler:
         return response
 
     def _invoke_page_handler(self, context: BrowserContext, page: Page, url: Tuple[str, int, int],
-                             context_database: DequeDB) -> bool:
+                             context_database: DequeDB) -> None:
         self._log.debug('Invoke module page handler')
 
         for module in self._modules:
-            try:
-                module.add_handlers(self._browser, context, page, context_database, url[0], url[2])
-            except Exception as error:
-                self._log.error(str(error))
-                final_url: Optional[tld.utils.Result] = get_tld_object(page.url)
-                self._database.update_url(self.job_id, self.crawler_id, url[0],
-                                          get_url_full(final_url) if final_url is not None else url[
-                                              0], -1)
-                return False
-
-        return True
+            module.add_handlers(self._browser, context, page, context_database, url[0], url[2])
 
     def _invoke_response_handler(self, context: BrowserContext, page: Page,
                                  responses: List[Response], url: Tuple[str, int, int],
-                                 context_switch: bool, context_database: DequeDB,
-                                 start: List[datetime]) -> bool:
+                                 context_database: DequeDB, start: List[datetime]) -> None:
         self._log.debug('Invoke module response handler')
 
-        code: bool = True
         final_url: str = get_url_full(get_tld_object(page.url)) if get_tld_object(  # type: ignore
             page.url) is not None else url[0]
         for module in self._modules:
-            try:
-                module.receive_response(self._browser, context, page, responses, context_database,
-                                        url[0], final_url, url[1], start)
-            except Exception as error:
-                self._log.error(str(error))
-                code = False
-                break
-
-        if not context_switch:
-            self._database.update_url(self.job_id, self.crawler_id, url[0], final_url, (
-                responses[0].status if responses[0] is not None else -2) * code or -1 * (not code))
-
-        return code
+            module.receive_response(self._browser, context, page, responses, context_database,
+                                    url[0], final_url, url[1], start)

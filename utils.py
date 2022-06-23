@@ -2,10 +2,14 @@ import re
 from typing import Optional
 
 import tld
+from tld.exceptions import TldBadUrl, TldDomainNotFound
 
 
 def get_tld_object(url: str) -> Optional[tld.utils.Result]:
-    return tld.get_tld(url, as_object=True)  # type: ignore
+    try:
+        return tld.get_tld(url, as_object=True)  # type: ignore
+    except (TldBadUrl, TldDomainNotFound):
+        return None
 
 
 def get_url_origin(url: tld.utils.Result) -> str:

@@ -1,12 +1,13 @@
+from pathlib import Path
 from typing import Tuple, Iterator
 
 
 class Loader:
-    def __init__(self, source: str) -> None:
+    def __init__(self, source: Path) -> None:
         """Initialize a loader for URLs.
 
         Args:
-            source (str): path of file with URLs
+            source (Path): path of file with URLs
         """
 
     def __iter__(self) -> Iterator[Tuple[int, str]]:

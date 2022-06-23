@@ -36,7 +36,7 @@ class CollectUrls(Module):
         context_database.add_seen(final_url)
 
         # Check if response is valid
-        response: Response = responses[-1]
+        response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
             return
 

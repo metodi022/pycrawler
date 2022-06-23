@@ -48,7 +48,7 @@ class FindLogin(Module):
                          responses: List[Response], context_database: DequeDB, url: str,
                          final_url: str, depth: int, start: List[datetime]) -> None:
         # Check if response is valid
-        response: Response = responses[-1]
+        response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
             return
 
@@ -73,11 +73,11 @@ class FindLogin(Module):
         if password_fields > 1:
             return False
 
-        if text_fields == 1:
-            check: str = r"log.?in|sign.?in|password|user.?name|account"
-            result: bool = form.locator(f"text=/{check}/i").count() > 0
-            result = result or re.search(check, url, re.I) is not None
-            result = result or re.search(check, final_url, re.I) is not None
-            return result
+        if text_fields != 1:
+            return False
 
-        return False
+        check: str = r"log.?in|sign.?in|password|user.?name|account|user"
+        result: bool = form.locator(f"text=/{check}/i").count() > 0
+        result = result or re.search(check, url, re.I) is not None
+        result = result or re.search(check, final_url, re.I) is not None
+        return result
