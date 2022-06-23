@@ -33,7 +33,7 @@ class SaveStats(Module):
                          responses: List[Response], context_database: DequeDB, url: str,
                          final_url: str, depth: int, start: List[datetime]) -> None:
         end: datetime = datetime.now()
-        for i, response in enumerate(responses if len(responses) > 0 else [None]):
+        for i, response in enumerate((responses if len(responses) > 0 else [None])):
             self._database.invoke_transaction(
                 "INSERT INTO URLSFEEDBACK VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);", (
                     self._rank, self.job_id, self.crawler_id, url, final_url, depth,

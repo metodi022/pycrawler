@@ -9,7 +9,7 @@ from config import Config
 from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
-from utils import get_url_origin, get_tld_object
+from utils import get_url_origin, get_tld_object, get_screenshot
 
 
 class AcceptCookies(Module):
@@ -26,6 +26,7 @@ class AcceptCookies(Module):
                  log: Logger) -> None:
         super().__init__(job_id, crawler_id, config, database, log)
         self._urls: MutableSet[str] = set()
+        self._rank: int = 0
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
@@ -35,6 +36,7 @@ class AcceptCookies(Module):
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: str, rank: int) -> None:
         self._urls = set()
+        self._rank = rank
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Response], context_database: DequeDB, url: str,
@@ -86,8 +88,10 @@ class AcceptCookies(Module):
         buttons.nth(button_nth).click()
         page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
         temp: datetime = datetime.now()
-        response = page.goto(url)  # type: ignore
+        response = page.goto(url, timeout=self._config.LOAD_TIMEOUT,  # type: ignore
+                             wait_until=self._config.WAIT_LOAD_UNTIL)
         page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
+        get_screenshot(page, (self._config.LOG / f"screenshots/job{self.job_id}crawler{self.crawler_id}rank{self._rank}cookie.png"))
         if response is not None:
             start.append(temp)
             responses.append(response)

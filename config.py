@@ -1,20 +1,24 @@
+import pathlib
 from logging import DEBUG
 from typing import Literal
 
 
 class Config:
-    DATABASE: str = 'test'  # database name
+    DATABASE: str = 'temp'  # database name
     USER: str = 'postgres'  # database user
     PASSWORD: str = 'postgres'  # database password
     HOST: str = 'localhost'  # database host
     PORT: str = '5432'  # database port
 
-    HEADLESS: bool = False  # Headless browser
+    LOG: pathlib.Path = pathlib.Path('./.logs/')  # path for saving logs
+    LOG_LEVEL = DEBUG  # DEBUG|INFO|WARNING|ERROR
+
+    HEADLESS: bool = True  # Headless browser
 
     RECURSIVE: bool = True  # Discover additional URLs while crawling
     SAME_ORIGIN: bool = False  # URL discovery for same-origin only
     SAME_ETLDP1: bool = True  # URL discovery for same ETLD+1 only
-    DEPTH: int = 1  # URL discovery limit; 0 (initial URL only), 1, 2, etc.
+    DEPTH: int = 0  # URL discovery limit; 0 (initial URL only), 1, 2, etc.
     SAME_CONTEXT: bool = True  # crawl additional URLs in the same context
 
     WAIT_LOAD_UNTIL: Literal['commit', 'domcontentloaded', 'load', 'networkidle'] = 'load'
@@ -24,7 +28,6 @@ class Config:
     ACCEPT_COOKIES: bool = True  # Attempt to find cookie banners and accept them (unreliable)
 
     # TODO more options
-    LOG_LEVEL = DEBUG  # DEBUG|INFO|WARNING|ERROR
     # OBEY_ROBOTS: bool = False  # crawler should obey robots.txt
     # FOCUS_FILTER: bool = False  # crawler should visit "interesting" URLS (experimental)
 

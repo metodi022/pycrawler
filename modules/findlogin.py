@@ -41,8 +41,8 @@ class FindLogin(Module):
         context_database.add_url(url + '/login/', self._config.DEPTH, rank)
         context_database.add_url(url + '/signin/', self._config.DEPTH, rank)
         context_database.add_url(url + '/account/', self._config.DEPTH, rank)
-
-        # TODO Search engine fallback
+        context_database.add_url(f"https://www.google.com/search?q=site:{url}+login+OR+signin",
+                                 self._config.DEPTH - 1, 0)
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Response], context_database: DequeDB, url: str,
@@ -52,12 +52,14 @@ class FindLogin(Module):
         if response is None or response.status >= 400:
             return
 
+        if 'google.com/search' in final_url:
+            return
+
         forms: Locator = page.locator('form')
         for i in range(forms.count()):
             if FindLogin._find_login_form(forms.nth(i), url, page.url):
                 self._database.invoke_transaction(
-                    "INSERT INTO LOGINFORMS (rank, job, crawler, url, loginform, depth) VALUES ("
-                    "%s, %s, %s, %s, %s, %s)",
+                    "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s)",
                     (self._rank, self.job_id, self.crawler_id, self._url, url, depth), False)
 
     @staticmethod
@@ -76,7 +78,7 @@ class FindLogin(Module):
         if text_fields != 1:
             return False
 
-        check: str = r"log.?in|sign.?in|password|user.?name|account|user"
+        check: str = r"log.?in|sign.?in|passwor|user.?name|account|user|melde|logg|meldung"
         result: bool = form.locator(f"text=/{check}/i").count() > 0
         result = result or re.search(check, url, re.I) is not None
         result = result or re.search(check, final_url, re.I) is not None

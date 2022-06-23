@@ -1,5 +1,6 @@
 import argparse
 import importlib
+import os
 import pathlib
 import sys
 from logging import Logger, FileHandler, Formatter
@@ -11,27 +12,30 @@ from config import Config
 from database.postgres import Postgres
 from loader.csvloader import CSVLoader
 from loader.loader import Loader
+from modules.acceptcookies import AcceptCookies
+from modules.collecturls import CollectUrls
 from modules.module import Module
+from modules.savestats import SaveStats
 
 
 def main() -> int:
     # Preparing command line argument parser
     args_parser = argparse.ArgumentParser()
     args_parser.add_argument("-o", "--log", help="path to directory where output log will be saved",
-                             type=pathlib.Path, required=True)
+                             type=pathlib.Path)
     args_parser.add_argument("-f", "--urls", help="path to file with urls", type=pathlib.Path,
                              required=True)
     args_parser.add_argument("-m", "--modules", help="which modules the crawler will run",
-                             type=str, required=True, nargs='+')
+                             type=str, required=True, nargs='*')
     args_parser.add_argument("-j", "--job", help="unique job id for crawl", type=int, required=True)
     args_parser.add_argument("-c", "--crawlers", help="how many crawlers will run concurrently",
                              type=int, required=True)
 
     # Parse command line arguments
     args = vars(args_parser.parse_args())
-    job_id: int = args.get('job', 0)
-    log_path: pathlib.Path = args.get('log', pathlib.Path('.'))
-    urls_path: pathlib.Path = args.get('urls', pathlib.Path('.'))
+    job_id: int = args.get('job') or 0
+    log_path: pathlib.Path = args.get('log') or Config.LOG
+    urls_path: pathlib.Path = args.get('urls') or pathlib.Path('.')
 
     # Verify arguments
     if not log_path.exists() and log_path.is_dir():
@@ -40,10 +44,12 @@ def main() -> int:
     if not urls_path.exists() and not urls_path.is_dir():
         raise RuntimeError('Path to file with urls is incorrect')
 
-    if args.get('crawlers', 0) <= 0:
+    if (args.get('crawlers') or 0) <= 0:
         raise RuntimeError('Invalid number of crawlers')
 
     # Main log
+    if not (log_path / 'screenshots').exists():
+        os.mkdir(log_path / 'screenshots')
     handler: FileHandler = FileHandler(log_path / f"job{job_id}.log")
     handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
     log: Logger = Logger(f"Job {job_id}")
@@ -54,17 +60,20 @@ def main() -> int:
     loader: Loader = CSVLoader(urls_path)
     database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
                                   Config.PORT)
-    database.register_job(job_id, loader)
+    database.register_job(job_id, (args.get('crawlers') or 0), loader)
     log.info('Load database with URLs')
 
-    modules: List[Type[Module]] = _get_modules(args.get('modules', []))
+    CollectUrls.register_job(database, log)
+    AcceptCookies.register_job(database, log)
+    modules: List[Type[Module]] = _get_modules((args.get('modules') or []))
     for module in modules:
         module.register_job(database, log)
+    SaveStats.register_job(database, log)
     database.disconnect()
 
     # Prepare crawlers
     crawlers: List[Process] = []
-    for i in range(1, args.get('crawlers', 0) + 1):
+    for i in range(1, (args.get('crawlers') or 0) + 1):
         handler = FileHandler(log_path / f"job{job_id}crawler{i}.log")
         handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
         log = Logger(f"Job {job_id} Crawler {i}")

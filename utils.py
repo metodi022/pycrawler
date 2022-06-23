@@ -1,7 +1,9 @@
+import pathlib
 import re
 from typing import Optional
 
 import tld
+from playwright.sync_api import Page
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
 
@@ -20,12 +22,10 @@ def get_url_etldp1(url: tld.utils.Result) -> str:
     return url.parsed_url.scheme + '://' + url.fld
 
 
-# TODO return full url
 def get_url_full(url: tld.utils.Result) -> str:
     return url.parsed_url.scheme + '://' + url.parsed_url.netloc + url.parsed_url.path
 
 
-# TODO return full url
 def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils.Result]:
     if re.match('^http', href) is not None:
         res: Optional[tld.utils.Result] = get_tld_object(href)
@@ -43,7 +43,13 @@ def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils
         res: Optional[tld.utils.Result] = get_tld_object(
             origin.parsed_url.scheme + "://" + origin.parsed_url.netloc + path + href)
 
+    # Try to ignore URLs that are not documents
     if res is not None and re.match('htm$|html$|^((?!\\.).)*$', res.parsed_url.path) is None:
         return None
 
     return res
+
+
+def get_screenshot(page: Page, path: pathlib.Path) -> None:
+    if not path.exists():
+        page.screenshot(path=path)
