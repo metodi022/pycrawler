@@ -36,7 +36,8 @@ class Postgres:
 
         for entry in loader:
             cur.execute("INSERT INTO URLS VALUES (%s, %s, %s, %s);",
-                        (entry[0], job_id, (entry[0] % crawlers) + 1, entry[1].strip()))
+                        (entry[0], job_id, (entry[0] % crawlers) + 1,
+                         ('https://' if 'http' not in entry[1] else '') + entry[1]))
 
         self._conn.commit()
         cur.close()
