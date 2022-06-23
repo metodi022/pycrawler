@@ -72,7 +72,7 @@ class ChromiumCrawler:
 
             # Wait after page is loaded
             page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
-            get_screenshot(page, (self._config.LOG / f"screenshots/job{self.job_id}crawler{self.crawler_id}rank{url[2]}.png"))
+            get_screenshot(page, (self._config.LOG / f"screenshots/job{self.job_id}rank{url[2]}.png"))
 
             # Run module response handler and exit if errors occur
             self._invoke_response_handler(context, page, [response] if response is not None else [],
@@ -95,9 +95,8 @@ class ChromiumCrawler:
                 page = context.new_page()
                 self._log.debug('New context')
 
-                # Run module and exit if errors occur
-                if not self._invoke_page_handler(context, page, url, context_database):
-                    break
+                # Run module
+                self._invoke_page_handler(context, page, url, context_database)
 
         context.close()
 

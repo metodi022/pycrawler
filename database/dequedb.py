@@ -30,3 +30,6 @@ class DequeDB:
 
         self.add_seen(url)
         self._data.append((url, depth, rank))
+
+    def clear_urls(self) -> None:
+        self._seen.clear()

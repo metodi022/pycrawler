@@ -37,6 +37,8 @@ class CollectUrls(Module):
 
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
+        if response is None and url == self._url:
+            context_database.clear_urls()
         if response is None or response.status >= 400:
             return
 

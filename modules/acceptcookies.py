@@ -18,9 +18,9 @@ class AcceptCookies(Module):
                      '|backdrop|accept|law|cookiebar|cookieconsent|dismissible|compliance' \
                      '|agreement|notify|legal|tracking|GDPR'
 
-    CHECK_ENG: str = 'accept|okay|ok|consent|agree|allow|understand|continue|yes'
-    CHECK_GER: str = "stimm|verstanden|versteh|akzeptier|ja|weiter|annehm"
-    CHECK_TEX: str = CHECK_ENG + '|' + CHECK_GER
+    CHECK_ENG: str = 'accept|okay|\\Wok|^ok|consent|agree|allow|understand|continue|yes'
+    CHECK_GER: str = 'stimm|verstanden|versteh|akzeptier|ja|weiter|annehm'
+    CHECK_TEX: str = '(' + CHECK_ENG + '|' + CHECK_GER + ')'
 
     def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres,
                  log: Logger) -> None:
@@ -54,13 +54,16 @@ class AcceptCookies(Module):
         # Check for buttons with certain keywords
         check: Locator = page.locator(f"text=/{AcceptCookies.CHECK_SEL}/i",
                                       has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
-        buttons: Locator = page.locator('button:visible', has=check)
+        buttons: Locator = page.locator(
+            'button:visible,a:visible,div[role="button"]:visible,input[type="button"]:visible',
+            has=check)
         button_nth: int = 0
 
         # Check for topmost z-index button with less restrictive keywords
         if buttons.count() == 0:
-            buttons: Locator = page.locator('button:visible',
-                                            has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
+            buttons: Locator = page.locator(
+                'button:visible,a:visible,div[role="button"]:visible,input[type="button"]:visible',
+                has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
 
             z_max: int = 0
             for i in range(buttons.count()):
@@ -91,7 +94,10 @@ class AcceptCookies(Module):
         response = page.goto(url, timeout=self._config.LOAD_TIMEOUT,  # type: ignore
                              wait_until=self._config.WAIT_LOAD_UNTIL)
         page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
-        get_screenshot(page, (self._config.LOG / f"screenshots/job{self.job_id}crawler{self.crawler_id}rank{self._rank}cookie.png"))
+
+        get_screenshot(page, (
+                self._config.LOG / f"screenshots/job{self.job_id}rank{self._rank}cookie.png"))
+
         if response is not None:
             start.append(temp)
             responses.append(response)

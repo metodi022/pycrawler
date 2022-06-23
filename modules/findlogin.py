@@ -55,7 +55,7 @@ class FindLogin(Module):
         if 'google.com/search' in final_url:
             return
 
-        forms: Locator = page.locator('form')
+        forms: Locator = page.locator('form,div', has=page.locator('input[type]:visible'))
         for i in range(forms.count()):
             if FindLogin._find_login_form(forms.nth(i), url, page.url):
                 self._database.invoke_transaction(

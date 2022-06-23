@@ -53,7 +53,8 @@ class Postgres:
 
         # Get a URL with no crawler and lock row to avoid race conditions
         cur.execute(
-            "SELECT url, rank FROM URLS WHERE job=%s AND crawler=%s LIMIT 1;", (job_id, crawler_id))
+            "SELECT url, rank FROM URLS WHERE job=%s AND crawler=%s AND code IS NULL LIMIT 1;",
+            (job_id, crawler_id))
         url: Optional[Tuple[str, int]] = cur.fetchone()
 
         # Check if there is a URL returned
