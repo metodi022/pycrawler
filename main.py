@@ -79,7 +79,7 @@ def main() -> int:
         log = Logger(f"Job {job_id} Crawler {i}")
         log.setLevel(Config.LOG_LEVEL)
         log.addHandler(handler)
-        process = Process(target=_start_crawler(job_id, i, log_path, modules))
+        process = Process(target=_start_crawler, args=(job_id, i, log_path, modules))
         crawlers.append(process)
 
     for crawler in crawlers:
@@ -120,7 +120,7 @@ def _start_crawler(job_id: int, crawler_id: int, log_path: pathlib.Path,
     database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
                                   Config.PORT)
 
-    crawler: ChromiumCrawler = ChromiumCrawler(1, 1, Config, database, log, _initialize_modules(modules, job_id, crawler_id, database, log))
+    crawler: ChromiumCrawler = ChromiumCrawler(job_id, crawler_id, Config, database, log, _initialize_modules(modules, job_id, crawler_id, database, log))
     crawler.start_crawl_chromium()
     crawler.stop_crawl_chromium()
     database.disconnect()
