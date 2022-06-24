@@ -57,27 +57,18 @@ class AcceptCookies(Module):
         buttons: Locator = page.locator(
             'button:visible,a:visible,div[role="button"]:visible,input[type="button"]:visible',
             has=check)
-        button_nth: int = 0
 
         # Check for topmost z-index button with less restrictive keywords
+        z_max: int = 0
         if buttons.count() == 0:
             buttons: Locator = page.locator(
                 'button:visible,a:visible,div[role="button"]:visible,input[type="button"]:visible',
                 has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
 
-            z_max: int = 0
             for i in range(buttons.count()):
                 z_temp = buttons.nth(i).evaluate(
                     "node => getComputedStyle(node).getPropertyValue('z-index')")
                 z_max = max(z_max, 0 if z_temp == 'auto' else int(z_temp))
-
-            for i in range(buttons.count()):
-                z_temp = buttons.nth(i).evaluate(
-                    "node => getComputedStyle(node).getPropertyValue('z-index')")
-                z_temp = 0 if z_temp == 'auto' else int(z_temp)
-                if z_temp >= z_max:
-                    button_nth = i
-                    break
 
         # TODO frame locators if buttons.count() == 0 ?
 
@@ -87,8 +78,21 @@ class AcceptCookies(Module):
         if buttons.count() == 0:
             return
 
-        # Click on cookie button and wait some time
-        buttons.nth(button_nth).click()
+        # Click on first cookie button that works and wait some time
+        for i in range(buttons.count()):
+            z_temp = buttons.nth(i).evaluate(
+                "node => getComputedStyle(node).getPropertyValue('z-index')")
+            if (0 if z_temp == 'auto' else int(z_temp)) < z_max:
+                continue
+
+            try:
+                buttons.nth(i).hover(timeout=self._config.WAIT_AFTER_LOAD)
+                buttons.nth(i).click(timeout=self._config.WAIT_AFTER_LOAD, delay=500)
+                break
+            except Exception:
+                # Empty
+                pass
+
         page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
         temp: datetime = datetime.now()
         response = page.goto(url, timeout=self._config.LOAD_TIMEOUT,  # type: ignore
