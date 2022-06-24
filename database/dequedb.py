@@ -33,3 +33,4 @@ class DequeDB:
 
     def clear_urls(self) -> None:
         self._seen.clear()
+        self._data.clear()
