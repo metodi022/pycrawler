@@ -3,13 +3,14 @@ from logging import Logger
 from typing import Type, Optional, List
 
 import tld
-from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator
+from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
 
 from config import Config
 from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
-from utils import get_tld_object, get_url_from_href, get_url_origin, get_url_full
+from utils import get_tld_object, get_url_from_href, get_url_origin, get_url_full, \
+    get_locator_count, get_locator_nth, get_locator_attribute
 
 
 class CollectUrls(Module):
@@ -51,10 +52,15 @@ class CollectUrls(Module):
             return
 
         # Iterate over each <a> tag and add its href
-        links: Locator = page.locator('a[href]')
-        for i in range(links.count()):
+        try:
+            links: Locator = page.locator('a[href]')
+        except Error:
+            return
+
+        for i in range(get_locator_count(links)):
             # Get href attribute
-            link: Optional[str] = links.nth(i).get_attribute('href')
+            link: Optional[str] = get_locator_attribute(get_locator_nth(links, i), 'href')
+
             if link is None or not link.strip():
                 continue
 

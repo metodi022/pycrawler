@@ -3,7 +3,7 @@ import re
 from typing import Optional
 
 import tld
-from playwright.sync_api import Page
+from playwright.sync_api import Page, Locator, Error
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
 
@@ -53,3 +53,36 @@ def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils
 def get_screenshot(page: Page, path: pathlib.Path) -> None:
     if not path.exists():
         page.screenshot(path=path)
+
+
+def get_locator_count(locator: Optional[Locator]) -> int:
+    if locator is None:
+        return 0
+
+    try:
+        return locator.count()
+    except Error:
+        return 0
+
+
+def get_locator_nth(locator: Optional[Locator], nth: int) -> Optional[Locator]:
+    if locator is None:
+        return None
+
+    if nth >= get_locator_count(locator):
+        return None
+
+    try:
+        return locator.nth(nth)
+    except Error:
+        return None
+
+
+def get_locator_attribute(locator: Optional[Locator], attribute: str) -> Optional[str]:
+    if locator is None:
+        return None
+
+    try:
+        return locator.get_attribute(attribute)
+    except Error:
+        return None

@@ -2,7 +2,8 @@ from datetime import datetime
 from logging import Logger
 from typing import Type, Optional, Tuple, List
 
-from playwright.sync_api import sync_playwright, Playwright, Browser, BrowserContext, Page, Response
+from playwright.sync_api import sync_playwright, Playwright, Browser, BrowserContext, Page, \
+    Response, Error
 
 from config import Config
 from database.dequedb import DequeDB
@@ -72,7 +73,8 @@ class ChromiumCrawler:
 
             # Wait after page is loaded
             page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
-            get_screenshot(page, (self._config.LOG / f"screenshots/job{self.job_id}rank{url[2]}.png"))
+            get_screenshot(page,
+                           (self._config.LOG / f"screenshots/job{self.job_id}rank{url[2]}.png"))
 
             # Run module response handler and exit if errors occur
             self._invoke_response_handler(context, page, [response] if response is not None else [],
@@ -106,8 +108,8 @@ class ChromiumCrawler:
         try:
             response = page.goto(url[0], timeout=self._config.LOAD_TIMEOUT,
                                  wait_until=self._config.WAIT_LOAD_UNTIL)
-        except Exception as error:
-            self._log.warning(str(error))
+        except Error as error:
+            self._log.warning(str(error.message))
 
         return response
 

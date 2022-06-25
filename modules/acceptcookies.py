@@ -3,13 +3,13 @@ from logging import Logger
 from typing import Type, List, MutableSet, Optional
 
 import tld
-from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator
+from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
 
 from config import Config
 from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
-from utils import get_url_origin, get_tld_object, get_screenshot
+from utils import get_url_origin, get_tld_object, get_screenshot, get_locator_count, get_locator_nth
 
 
 class AcceptCookies(Module):
@@ -35,7 +35,7 @@ class AcceptCookies(Module):
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: str, rank: int) -> None:
-        self._urls = set()
+        self._urls.clear()
         self._rank = rank
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
@@ -52,56 +52,82 @@ class AcceptCookies(Module):
         self._urls.add(get_url_origin(url_origin))
 
         # Check for buttons with certain keywords
-        check: Locator = page.locator(f"text=/{AcceptCookies.CHECK_SEL}/i",
-                                      has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
-        buttons: Locator = page.locator(
-            'button:visible,a:visible,div[role="button"]:visible,input[type="button"]:visible',
-            has=check)
+        try:
+            check: Locator = page.locator(f"text=/{AcceptCookies.CHECK_SEL}/i",
+                                          has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
+            buttons: Locator = page.locator(
+                'button:visible,a:visible,div[role="button"]:visible,input[type="button"]:visible',
+                has=check)
+        except Error:
+            return
 
         # Check for topmost z-index button with less restrictive keywords
         z_max: int = 0
-        if buttons.count() == 0:
-            buttons: Locator = page.locator(
-                'button:visible,a:visible,div[role="button"]:visible,input[type="button"]:visible',
-                has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
+        if get_locator_count(buttons) == 0:
+            try:
+                buttons: Locator = page.locator(
+                    'button:visible,a:visible,div[role="button"]:visible,input[type="button"]:visible',
+                    has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
+            except Error:
+                return
 
-            for i in range(buttons.count()):
-                z_temp = buttons.nth(i).evaluate(
-                    "node => getComputedStyle(node).getPropertyValue('z-index')")
+            for i in range(get_locator_count(buttons)):
+                button: Optional[Locator] = get_locator_nth(buttons, i)
+                if button is None:
+                    continue
+
+                try:
+                    z_temp = button.evaluate(
+                        "node => getComputedStyle(node).getPropertyValue('z-index')")
+                except Error:
+                    continue
+
                 z_max = max(z_max, 0 if z_temp == 'auto' else int(z_temp))
 
         # TODO frame locators if buttons.count() == 0 ?
 
         # If no buttons found -> just exit
-        self._log.info(
-            f"Find {buttons.count()} possible cookie accept buttons")
-        if buttons.count() == 0:
+        self._log.info(f"Find {get_locator_count(buttons)} possible cookie accept buttons")
+        if get_locator_count(buttons) == 0:
             return
 
         # Click on first cookie button that works and wait some time
-        for i in range(buttons.count()):
-            z_temp = buttons.nth(i).evaluate(
-                "node => getComputedStyle(node).getPropertyValue('z-index')")
+        for i in range(get_locator_count(buttons)):
+            button: Optional[Locator] = get_locator_nth(buttons, i)
+            if button is None:
+                continue
+
+            try:
+                z_temp = button.evaluate(
+                    "node => getComputedStyle(node).getPropertyValue('z-index')")
+            except Error:
+                continue
+
             if (0 if z_temp == 'auto' else int(z_temp)) < z_max:
                 continue
 
             try:
-                buttons.nth(i).hover(timeout=self._config.WAIT_AFTER_LOAD)
-                buttons.nth(i).click(timeout=self._config.WAIT_AFTER_LOAD, delay=500)
+                button.hover(timeout=self._config.WAIT_AFTER_LOAD)
+                page.wait_for_timeout(500)
+                button.click(timeout=self._config.WAIT_AFTER_LOAD, delay=500)
                 break
-            except Exception:
+            except Error:
                 # Empty
                 pass
 
         page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
         temp: datetime = datetime.now()
-        response = page.goto(url, timeout=self._config.LOAD_TIMEOUT,  # type: ignore
-                             wait_until=self._config.WAIT_LOAD_UNTIL)
-        page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
+        try:
+            response = page.goto(url, timeout=self._config.LOAD_TIMEOUT,  # type: ignore
+                                 wait_until=self._config.WAIT_LOAD_UNTIL)
+        except Error:
+            return
 
+        if response is None:
+            return
+
+        page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
         get_screenshot(page, (
                 self._config.LOG / f"screenshots/job{self.job_id}rank{self._rank}cookie.png"))
-
-        if response is not None:
-            start.append(temp)
-            responses.append(response)
+        start.append(temp)
+        responses.append(response)
