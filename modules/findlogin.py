@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from logging import Logger
-from typing import Type, List, Optional
+from typing import Type, List, Optional, Tuple
 
 import tld.utils
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
@@ -20,33 +20,39 @@ class FindLogin(Module):
         self._url: str = ''
         self._rank: int = 0
 
+        # TODO add warning if not SAME_CONTEXT
+
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
         database.invoke_transaction(
-            "CREATE TABLE IF NOT EXISTS LOGINFORMS (rank INT NOT NULL, job INT NOT NULL, crawler "
-            "INT NOT NULL, url VARCHAR(255) NOT NULL, loginform TEXT NOT NULL, "
-            "loginformfinal TEXT NOT NULL, depth INT NOT NULL);", None, False)
+            "CREATE TABLE IF NOT EXISTS LOGINFORMS (rank INT NOT NULL, job INT NOT NULL, "
+            "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, loginform TEXT NOT NULL, "
+            "loginformfinal TEXT NOT NULL, depth INT NOT NULL, fromurl TEXT, fromurlfinal TEXT);",
+            None, False)
         log.info('Create LOGINFORMS database IF NOT EXISTS')
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB, url: str, rank: int) -> None:
-        self._rank = rank
-        self._url = url
+                     context_database: DequeDB,
+                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+        self._url = url[0]
+        self._rank = url[2]
 
-        temp: Optional[tld.utils.Result] = get_tld_object(url)
+        temp: Optional[tld.utils.Result] = get_tld_object(self._url)
         if temp is None:
             return
-        url = get_url_origin(temp)
+        url_origin: str = get_url_origin(temp)
 
-        context_database.add_url(url + '/login/', self._config.DEPTH, rank)
-        context_database.add_url(url + '/signin/', self._config.DEPTH, rank)
-        context_database.add_url(url + '/account/', self._config.DEPTH, rank)
-        context_database.add_url(f"https://www.google.com/search?q=site:{url}+login+OR+signin",
-                                 self._config.DEPTH - 1, 0)
+        context_database.add_url((url_origin + '/login/', self._config.DEPTH, self._rank, []))
+        context_database.add_url((url_origin + '/signin/', self._config.DEPTH, self._rank, []))
+        context_database.add_url((url_origin + '/account/', self._config.DEPTH, self._rank, []))
+        context_database.add_url((
+                                 f"https://www.google.com/search?q=site:{url_origin}+login+OR+signin",
+                                 self._config.DEPTH - 1, 0, []))
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         responses: List[Response], context_database: DequeDB, url: str,
-                         final_url: str, depth: int, start: List[datetime]) -> None:
+                         responses: List[Response], context_database: DequeDB,
+                         url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
+                         start: List[datetime]) -> None:
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
@@ -63,12 +69,14 @@ class FindLogin(Module):
         for i in range(get_locator_count(forms)):
             form: Optional[Locator] = get_locator_nth(forms, i)
 
-            if form is None or not FindLogin._find_login_form(form, url, page.url):
+            if form is None or not FindLogin._find_login_form(form, url[0], page.url):
                 continue
 
             self._database.invoke_transaction(
-                "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (self._rank, self.job_id, self.crawler_id, self._url, url, final_url, depth), False)
+                "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (self._rank, self.job_id, self.crawler_id, self._url, url[0], final_url, url[1],
+                 url[3][-1][0] if len(url[3]) > 0 else None,
+                 url[3][-1][1] if len(url[3]) > 0 else None), False)
 
     @staticmethod
     def _find_login_form(form: Locator, url: str, final_url: str) -> bool:

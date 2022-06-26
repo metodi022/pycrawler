@@ -42,7 +42,8 @@ class Postgres:
         self._conn.commit()
         cur.close()
 
-    def get_url(self, job_id: int, crawler_id: int) -> Optional[Tuple[str, int, int]]:
+    def get_url(self, job_id: int, crawler_id: int) -> \
+            Optional[Tuple[str, int, int, List[Tuple[str, str]]]]:
         cur: psycopg2.cursor = self._conn.cursor()
 
         # Check if job exists
@@ -68,7 +69,7 @@ class Postgres:
 
         self._conn.commit()
         cur.close()
-        return url[0], 0, url[1]
+        return url[0], 0, url[1], []
 
     def update_url(self, job_id: int, crawler_id: int, url: str, code: int) -> None:
         cur: psycopg2.cursor = self._conn.cursor()

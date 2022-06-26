@@ -1,6 +1,6 @@
 from datetime import datetime
 from logging import Logger
-from typing import Type, List
+from typing import Type, List, Tuple
 
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
@@ -38,7 +38,8 @@ class Module:
         raise NotImplementedError
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB, url: str, rank: int) -> None:
+                     context_database: DequeDB,
+                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
         """Add event handlers before navigating to a page.
 
         Args:
@@ -46,14 +47,14 @@ class Module:
             context (BrowserContext): context
             page (Page): page
             context_database (DequeDB): context database
-            url (str): URL
-            rank (int): URL rank
+            url (Tuple[str, int, int, List[Tuple[str, str]]]): URL, depth, rank, previous URL
         """
         raise NotImplementedError
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         responses: List[Response], context_database: DequeDB, url: str,
-                         final_url: str, depth: int, start: List[datetime]) -> None:
+                         responses: List[Response], context_database: DequeDB,
+                         url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
+                         start: List[datetime]) -> None:
         """Receive response from server.
 
         Args:
@@ -62,9 +63,8 @@ class Module:
             page (Page): page
             responses (List[Response]): list of responses from crawler and modules
             context_database (DequeDB): context database
-            url (str): url
+            url (Tuple[str, int, int, List[Tuple[str, str]]]): URL, depth, rank, previous URL
             final_url (str): final url after redirections
-            depth (int): url depth
             start (List[datetime]): start times for crawl and for each module response initiation
         """
         raise NotImplementedError

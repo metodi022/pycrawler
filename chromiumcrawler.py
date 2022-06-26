@@ -51,8 +51,9 @@ class ChromiumCrawler:
     def _start_crawl(self):
         start: datetime = datetime.now()
 
-        url: Optional[Tuple[str, int, int]] = self._database.get_url(self.job_id, self.crawler_id)
-        self._log.info(f"Get URL {str(url)}")
+        url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = self._database.get_url(
+            self.job_id, self.crawler_id)
+        self._log.info(f"Get URL {str(url[0]) if url is not None else url}")
 
         if url is None:
             return
@@ -102,7 +103,8 @@ class ChromiumCrawler:
 
         context.close()
 
-    def _open_url(self, page: Page, url: Tuple[str, int, int]) -> Optional[Response]:
+    def _open_url(self, page: Page, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> \
+            Optional[Response]:
         response: Optional[Response] = None
 
         try:
@@ -113,8 +115,8 @@ class ChromiumCrawler:
 
         return response
 
-    def _confirm_response(self, response: Optional[Response], url: Tuple[str, int, int]) -> \
-            Optional[Response]:
+    def _confirm_response(self, response: Optional[Response],
+                          url: Tuple[str, int, int, List[Tuple[str, str]]]) -> Optional[Response]:
         self._database.update_url(self.job_id, self.crawler_id, url[0],
                                   response.status if response is not None else -1)
 
@@ -128,20 +130,22 @@ class ChromiumCrawler:
 
         return response
 
-    def _invoke_page_handler(self, context: BrowserContext, page: Page, url: Tuple[str, int, int],
+    def _invoke_page_handler(self, context: BrowserContext, page: Page,
+                             url: Tuple[str, int, int, List[Tuple[str, str]]],
                              context_database: DequeDB) -> None:
         self._log.debug('Invoke module page handler')
 
         for module in self._modules:
-            module.add_handlers(self._browser, context, page, context_database, url[0], url[2])
+            module.add_handlers(self._browser, context, page, context_database, url)
 
     def _invoke_response_handler(self, context: BrowserContext, page: Page,
-                                 responses: List[Response], url: Tuple[str, int, int],
+                                 responses: List[Response],
+                                 url: Tuple[str, int, int, List[Tuple[str, str]]],
                                  context_database: DequeDB, start: List[datetime]) -> None:
         self._log.debug('Invoke module response handler')
 
         final_url: str = get_url_full(get_tld_object(page.url)) if get_tld_object(  # type: ignore
             page.url) is not None else url[0]
         for module in self._modules:
-            module.receive_response(self._browser, context, page, responses, context_database,
-                                    url[0], final_url, url[1], start)
+            module.receive_response(self._browser, context, page, responses, context_database, url,
+                                    final_url, start)

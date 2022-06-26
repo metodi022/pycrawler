@@ -1,6 +1,6 @@
 from datetime import datetime
 from logging import Logger
-from typing import Type, Optional, List
+from typing import Type, Optional, List, Tuple
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
@@ -26,25 +26,27 @@ class CollectUrls(Module):
         pass
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB, url: str, rank: int) -> None:
-        context_database.add_seen(url)
-        self._url = url
-        self._rank = rank
+                     context_database: DequeDB,
+                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+        context_database.add_seen(url[0])
+        self._url = url[0]
+        self._rank = url[2]
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         responses: List[Response], context_database: DequeDB, url: str,
-                         final_url: str, depth: int, start: List[datetime]) -> None:
+                         responses: List[Response], context_database: DequeDB,
+                         url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
+                         start: List[datetime]) -> None:
         context_database.add_seen(final_url)
 
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
-        if response is None and url == self._url:
+        if response is None and url[0] == self._url:
             context_database.clear_urls()
         if response is None or response.status >= 400:
             return
 
         # Check if depth exceeded
-        if depth >= self._config.DEPTH:
+        if url[1] >= self._config.DEPTH:
             return
 
         parsed_url: Optional[tld.utils.Result] = get_tld_object(self._url)
@@ -82,4 +84,5 @@ class CollectUrls(Module):
             self._log.debug(
                 f"Find {context_database.get_seen(get_url_full(parsed_link))} "
                 f"{get_url_full(parsed_link)}")
-            context_database.add_url(get_url_full(parsed_link), depth + 1, self._rank)
+            context_database.add_url(
+                (get_url_full(parsed_link), url[1] + 1, url[2], url[3] + [(url[0], final_url)]))

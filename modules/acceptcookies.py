@@ -1,6 +1,6 @@
 from datetime import datetime
 from logging import Logger
-from typing import Type, List, MutableSet, Optional
+from typing import Type, List, MutableSet, Optional, Tuple
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
@@ -34,13 +34,15 @@ class AcceptCookies(Module):
         pass
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB, url: str, rank: int) -> None:
+                     context_database: DequeDB,
+                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
         self._urls.clear()
-        self._rank = rank
+        self._rank = url[2]
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         responses: List[Response], context_database: DequeDB, url: str,
-                         final_url: str, depth: int, start: List[datetime]) -> None:
+                         responses: List[Response], context_database: DequeDB,
+                         url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
+                         start: List[datetime]) -> None:
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
             return
@@ -118,7 +120,7 @@ class AcceptCookies(Module):
         page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
         temp: datetime = datetime.now()
         try:
-            response = page.goto(url, timeout=self._config.LOAD_TIMEOUT,  # type: ignore
+            response = page.goto(url[0], timeout=self._config.LOAD_TIMEOUT,  # type: ignore
                                  wait_until=self._config.WAIT_LOAD_UNTIL)
         except Error:
             return
