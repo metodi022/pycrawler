@@ -52,7 +52,10 @@ def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils
 
 def get_screenshot(page: Page, path: pathlib.Path) -> None:
     if not path.exists():
-        page.screenshot(path=path)
+        try:
+            page.screenshot(path=path)
+        except Error:
+            return
 
 
 def get_locator_count(locator: Optional[Locator]) -> int:
