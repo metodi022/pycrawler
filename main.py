@@ -57,12 +57,14 @@ def main() -> int:
     log.addHandler(handler)
 
     # Prepare database
+    log.info('Load database with URLs')
     loader: Loader = CSVLoader(urls_path)
     database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
                                   Config.PORT)
     database.register_job(job_id, (args.get('crawlers') or 0), loader)
-    log.info('Load database with URLs')
 
+    # Prepare modules
+    log.info('Load modules with URLs')
     CollectUrls.register_job(database, log)
     AcceptCookies.register_job(database, log)
     modules: List[Type[Module]] = _get_modules((args.get('modules') or []))
@@ -83,7 +85,8 @@ def main() -> int:
         process = Process(target=_start_crawler, args=(job_id, i, log_path, modules))
         crawlers.append(process)
 
-    for crawler in crawlers:
+    for i, crawler in enumerate(crawlers):
+        log.info(f"Start crawler {i + 1} with PID {crawler.pid}")
         crawler.start()
 
     for crawler in crawlers:

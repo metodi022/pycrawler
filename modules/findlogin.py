@@ -44,9 +44,7 @@ class FindLogin(Module):
         context_database.add_url((url_origin + '/login/', Config.DEPTH, self._rank, []))
         context_database.add_url((url_origin + '/signin/', Config.DEPTH, self._rank, []))
         context_database.add_url((url_origin + '/account/', Config.DEPTH, self._rank, []))
-        context_database.add_url((
-            f"https://www.google.com/search?q=site:{url_origin}+login+OR+signin",
-            Config.DEPTH - 1, 0, []))
+        # TODO search engine fallback ?
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Response], context_database: DequeDB,

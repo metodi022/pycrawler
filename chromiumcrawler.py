@@ -62,7 +62,7 @@ class ChromiumCrawler:
         context: BrowserContext = self._browser.new_context()
         context_database: DequeDB = DequeDB()
         page: Page = context.new_page()
-        self._log.debug('New context')
+        self._log.info('New context')
 
         self._invoke_page_handler(context, page, url, context_database)
 
@@ -97,7 +97,7 @@ class ChromiumCrawler:
                 context.close()
                 context = self._browser.new_context()
                 page = context.new_page()
-                self._log.debug('New context')
+                self._log.info('New context')
 
                 # Run module
                 self._invoke_page_handler(context, page, url, context_database)
@@ -112,7 +112,7 @@ class ChromiumCrawler:
             response = page.goto(url[0], timeout=Config.LOAD_TIMEOUT,
                                  wait_until=Config.WAIT_LOAD_UNTIL)
         except Error as error:
-            self._log.warning(str(error.message))
+            self._log.warning(error.message)
 
         return response
 
