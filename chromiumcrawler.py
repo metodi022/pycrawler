@@ -1,6 +1,6 @@
 from datetime import datetime
 from logging import Logger
-from typing import Type, Optional, Tuple, List
+from typing import Optional, Tuple, List
 
 from playwright.sync_api import sync_playwright, Playwright, Browser, BrowserContext, Page, \
     Response, Error
@@ -17,23 +17,22 @@ from utils import get_tld_object, get_url_full, get_screenshot
 
 class ChromiumCrawler:
     # noinspection PyTypeChecker
-    def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres,
-                 log: Logger, modules: List[Module]) -> None:
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
+                 modules: List[Module]) -> None:
         # Prepare database and log
         self.job_id: int = job_id
         self.crawler_id: int = crawler_id
-        self._config: Type[Config] = config
         self._database: Postgres = database
         self._log: Logger = log
 
         # Prepare modules
         self._modules: List[Module] = []
-        self._modules += [AcceptCookies(job_id, crawler_id, config, database,
-                                        log)] if config.ACCEPT_COOKIES else []
         self._modules += [
-            CollectUrls(job_id, crawler_id, config, database, log)] if config.RECURSIVE else []
+            AcceptCookies(job_id, crawler_id, database, log)] if Config.ACCEPT_COOKIES else []
+        self._modules += [
+            CollectUrls(job_id, crawler_id, database, log)] if Config.RECURSIVE else []
         self._modules += modules
-        self._modules += [SaveStats(job_id, crawler_id, config, database, log)]
+        self._modules += [SaveStats(job_id, crawler_id, database, log)]
 
         # Prepare browser instances
         self._playwright: Playwright = None  # type: ignore
@@ -41,7 +40,7 @@ class ChromiumCrawler:
 
     def start_crawl_chromium(self) -> None:
         self._playwright: Playwright = sync_playwright().start()
-        self._browser: Browser = self._playwright.chromium.launch(headless=self._config.HEADLESS)
+        self._browser: Browser = self._playwright.chromium.launch(headless=Config.HEADLESS)
         self._log.info(f"Start crawl, Chromium {self._browser.version}")
         self._start_crawl()
 
@@ -75,9 +74,9 @@ class ChromiumCrawler:
             response = self._confirm_response(response, url)
 
             # Wait after page is loaded
-            page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
+            page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
             get_screenshot(page,
-                           (self._config.LOG / f"screenshots/job{self.job_id}rank{url[2]}.png"))
+                           (Config.LOG / f"screenshots/job{self.job_id}rank{url[2]}.png"))
 
             # Run module response handler and exit if errors occur
             self._invoke_response_handler(context, page, [response] if response is not None else [],
@@ -86,7 +85,7 @@ class ChromiumCrawler:
             # Get next URL to crawl
             start = datetime.now()
             url = context_database.get_url()
-            context_switch: bool = self._config.SAME_CONTEXT
+            context_switch: bool = Config.SAME_CONTEXT
             if url is None:
                 url = self._database.get_url(self.job_id, self.crawler_id)
                 context_switch = False
@@ -110,8 +109,8 @@ class ChromiumCrawler:
         response: Optional[Response] = None
 
         try:
-            response = page.goto(url[0], timeout=self._config.LOAD_TIMEOUT,
-                                 wait_until=self._config.WAIT_LOAD_UNTIL)
+            response = page.goto(url[0], timeout=Config.LOAD_TIMEOUT,
+                                 wait_until=Config.WAIT_LOAD_UNTIL)
         except Error as error:
             self._log.warning(str(error.message))
 

@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from logging import Logger
-from typing import Type, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import tld.utils
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
@@ -14,9 +14,8 @@ from utils import get_tld_object, get_url_origin, get_locator_count, get_locator
 
 
 class FindLogin(Module):
-    def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres,
-                 log: Logger) -> None:
-        super().__init__(job_id, crawler_id, config, database, log)
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
+        super().__init__(job_id, crawler_id, database, log)
         self._url: str = ''
         self._rank: int = 0
 
@@ -42,12 +41,12 @@ class FindLogin(Module):
             return
         url_origin: str = get_url_origin(temp)
 
-        context_database.add_url((url_origin + '/login/', self._config.DEPTH, self._rank, []))
-        context_database.add_url((url_origin + '/signin/', self._config.DEPTH, self._rank, []))
-        context_database.add_url((url_origin + '/account/', self._config.DEPTH, self._rank, []))
+        context_database.add_url((url_origin + '/login/', Config.DEPTH, self._rank, []))
+        context_database.add_url((url_origin + '/signin/', Config.DEPTH, self._rank, []))
+        context_database.add_url((url_origin + '/account/', Config.DEPTH, self._rank, []))
         context_database.add_url((
-                                 f"https://www.google.com/search?q=site:{url_origin}+login+OR+signin",
-                                 self._config.DEPTH - 1, 0, []))
+            f"https://www.google.com/search?q=site:{url_origin}+login+OR+signin",
+            Config.DEPTH - 1, 0, []))
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Response], context_database: DequeDB,

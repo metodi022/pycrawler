@@ -1,29 +1,25 @@
 from datetime import datetime
 from logging import Logger
-from typing import Type, List, Tuple
+from typing import List, Tuple
 
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
-from config import Config
 from database.dequedb import DequeDB
 from database.postgres import Postgres
 
 
 class Module:
-    def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres,
-                 log: Logger) -> None:
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
         """Initializes module instance.
 
         Args:
             job_id (int): job id
             crawler_id (int): crawler id
-            config (Type[Config]): configuration
             database (Postgres): database
             log (Logger): log
         """
         self.job_id: int = job_id
         self.crawler_id: int = crawler_id
-        self._config: Type[Config] = config
         self._database: Postgres = database
         self._log: Logger = log
 

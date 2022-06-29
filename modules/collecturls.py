@@ -1,6 +1,6 @@
 from datetime import datetime
 from logging import Logger
-from typing import Type, Optional, List, Tuple
+from typing import Optional, List, Tuple
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
@@ -14,9 +14,8 @@ from utils import get_tld_object, get_url_from_href, get_url_origin, get_url_ful
 
 
 class CollectUrls(Module):
-    def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres,
-                 log: Logger) -> None:
-        super().__init__(job_id, crawler_id, config, database, log)
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
+        super().__init__(job_id, crawler_id, database, log)
         self._url: str = ''
         self._rank: int = 0
 
@@ -46,7 +45,7 @@ class CollectUrls(Module):
             return
 
         # Check if depth exceeded
-        if url[1] >= self._config.DEPTH:
+        if url[1] >= Config.DEPTH:
             return
 
         parsed_url: Optional[tld.utils.Result] = get_tld_object(self._url)
@@ -72,12 +71,12 @@ class CollectUrls(Module):
                 continue
 
             # Check for same origin
-            if self._config.SAME_ORIGIN and get_url_origin(parsed_url) != get_url_origin(
+            if Config.SAME_ORIGIN and get_url_origin(parsed_url) != get_url_origin(
                     parsed_link):
                 continue
 
             # Check for same ETLD+1
-            if self._config.SAME_ETLDP1 and parsed_url.fld != parsed_link.fld:
+            if Config.SAME_ETLDP1 and parsed_url.fld != parsed_link.fld:
                 continue
 
             # Add link

@@ -1,19 +1,17 @@
 from datetime import datetime
 from logging import Logger
-from typing import Type, List, Tuple
+from typing import List, Tuple
 
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
-from config import Config
 from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
 
 
 class SaveStats(Module):
-    def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres,
-                 log: Logger) -> None:
-        super().__init__(job_id, crawler_id, config, database, log)
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
+        super().__init__(job_id, crawler_id, database, log)
         self._rank: int = 0
 
     @staticmethod

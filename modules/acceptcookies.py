@@ -1,6 +1,6 @@
 from datetime import datetime
 from logging import Logger
-from typing import Type, List, MutableSet, Optional, Tuple
+from typing import List, MutableSet, Optional, Tuple
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
@@ -19,9 +19,8 @@ class AcceptCookies(Module):
     ELEM_SEL: str = 'button:visible,a:visible,*[role="button"]:visible,*[onclick]:visible,' \
                     'input[type="button"]:visible,input[type="submit"]:visible'
 
-    def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres,
-                 log: Logger) -> None:
-        super().__init__(job_id, crawler_id, config, database, log)
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
+        super().__init__(job_id, crawler_id, database, log)
         self._url: str = ''
         self._urls: MutableSet[str] = set()
         self._rank: int = 0
@@ -102,28 +101,28 @@ class AcceptCookies(Module):
                 continue
 
             try:
-                button.hover(timeout=self._config.WAIT_AFTER_LOAD)
+                button.hover(timeout=Config.WAIT_AFTER_LOAD)
                 page.wait_for_timeout(500)
-                button.click(timeout=self._config.WAIT_AFTER_LOAD, delay=500)
+                button.click(timeout=Config.WAIT_AFTER_LOAD, delay=500)
                 break
             except Error:
                 # Empty
                 pass
 
-        page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
+        page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         temp: datetime = datetime.now()
         try:
-            response = page.goto(url[0], timeout=self._config.LOAD_TIMEOUT,
-                                 wait_until=self._config.WAIT_LOAD_UNTIL)
+            response = page.goto(url[0], timeout=Config.LOAD_TIMEOUT,
+                                 wait_until=Config.WAIT_LOAD_UNTIL)
         except Error:
             return
 
         if response is None:
             return
 
-        page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
+        page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         if self._url == url[0]:
             get_screenshot(page, (
-                    self._config.LOG / f"screenshots/job{self.job_id}rank{self._rank}cookie.png"))
+                    Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}cookie.png"))
         start.append(temp)
         responses.append(response)

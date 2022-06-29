@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from logging import Logger
-from typing import List, Tuple, Type, MutableSet, Optional
+from typing import List, Tuple, MutableSet, Optional
 
 import nostril  # https://github.com/casics/nostril
 import tld.utils
@@ -17,9 +17,8 @@ from utils import get_tld_object, get_url_origin
 class FindContactsEmail(Module):
     EMAILSRE: str = r'[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+'
 
-    def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres,
-                 log: Logger):
-        super().__init__(job_id, crawler_id, config, database, log)
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
+        super().__init__(job_id, crawler_id, database, log)
         self._url: str = ''
         self._rank: int = 0
         self._seen: MutableSet[str] = set()
@@ -45,7 +44,7 @@ class FindContactsEmail(Module):
             return
         url_origin: str = get_url_origin(temp)
         context_database.add_url(
-            (url_origin + '/.well-known/security.txt', self._config.DEPTH, self._rank, []))
+            (url_origin + '/.well-known/security.txt', Config.DEPTH, self._rank, []))
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Response], context_database: DequeDB,
