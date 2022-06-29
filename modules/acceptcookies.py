@@ -115,9 +115,13 @@ class AcceptCookies(Module):
             response = page.goto(url[0], timeout=Config.LOAD_TIMEOUT,
                                  wait_until=Config.WAIT_LOAD_UNTIL)
         except Error:
+            start.append(temp)
+            responses.append(None)
             return
 
         if response is None:
+            start.append(temp)
+            responses.append(None)
             return
 
         page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
