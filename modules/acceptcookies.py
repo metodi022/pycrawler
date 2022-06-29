@@ -13,18 +13,16 @@ from utils import get_url_origin, get_tld_object, get_screenshot, get_locator_co
 
 
 class AcceptCookies(Module):
-    CHECK_SEL: str = 'cookie|cookies|consent|banner|gdpr|modal|popup|policy|overlay|privacy' \
-                     '|notification|notice|info|footer|message|block|disclaimer|dialog|warning' \
-                     '|backdrop|accept|law|cookiebar|cookieconsent|dismissible|compliance' \
-                     '|agreement|notify|legal|tracking|GDPR'
-
-    CHECK_ENG: str = 'accept|okay|\\Wok|^ok|consent|agree|allow|understand|continue|yes'
+    CHECK_ENG: str = 'accept|okay|\\Wok|^ok|consent|agree|allow|understand|continue|yes|got it'
     CHECK_GER: str = 'stimm|verstanden|versteh|akzeptier|ja|weiter|annehm'
     CHECK_TEX: str = '(' + CHECK_ENG + '|' + CHECK_GER + ')'
+    ELEM_SEL: str = 'button:visible,a:visible,*[role="button"]:visible,*[onclick]:visible,' \
+                    'input[type="button"]:visible,input[type="submit"]:visible'
 
     def __init__(self, job_id: int, crawler_id: int, config: Type[Config], database: Postgres,
                  log: Logger) -> None:
         super().__init__(job_id, crawler_id, config, database, log)
+        self._url: str = ''
         self._urls: MutableSet[str] = set()
         self._rank: int = 0
 
@@ -36,8 +34,9 @@ class AcceptCookies(Module):
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB,
                      url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
-        self._urls.clear()
+        self._url = url[0]
         self._rank = url[2]
+        self._urls.clear()
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Response], context_database: DequeDB,
@@ -55,43 +54,37 @@ class AcceptCookies(Module):
 
         # Check for buttons with certain keywords
         try:
-            check: Locator = page.locator(f"text=/{AcceptCookies.CHECK_SEL}/i",
-                                          has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
-            buttons: Locator = page.locator(
-                'button:visible,a:visible,div[role="button"]:visible,input[type="button"]:visible',
-                has=check)
+            check: Locator = page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i")
+            buttons: Locator = page.locator(AcceptCookies.ELEM_SEL, has=check)
         except Error:
             return
 
-        # Check for topmost z-index button with less restrictive keywords
-        z_max: int = 0
-        if get_locator_count(buttons) == 0:
-            try:
-                buttons: Locator = page.locator(
-                    'button:visible,a:visible,div[role="button"]:visible,input[type="button"]:visible',
-                    has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
-            except Error:
-                return
-
-            for i in range(get_locator_count(buttons)):
-                button: Optional[Locator] = get_locator_nth(buttons, i)
-                if button is None:
-                    continue
-
-                try:
-                    z_temp = button.evaluate(
-                        "node => getComputedStyle(node).getPropertyValue('z-index')")
-                except Error:
-                    continue
-
-                z_max = max(z_max, 0 if z_temp == 'auto' else int(z_temp))
-
-        # TODO frame locators if buttons.count() == 0 ?
-
-        # If no buttons found -> just exit
         self._log.info(f"Find {get_locator_count(buttons)} possible cookie accept buttons")
         if get_locator_count(buttons) == 0:
             return
+
+        # Check for topmost z-index button with keywords
+        z_max: int = 0
+        try:
+            buttons: Locator = page.locator(AcceptCookies.ELEM_SEL,
+                                            has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
+        except Error:
+            return
+
+        for i in range(get_locator_count(buttons)):
+            button: Optional[Locator] = get_locator_nth(buttons, i)
+            if button is None:
+                continue
+
+            try:
+                z_temp = button.evaluate(
+                    "node => getComputedStyle(node).getPropertyValue('z-index')")
+            except Error:
+                continue
+
+            z_max = max(z_max, 0 if z_temp == 'auto' else int(z_temp))
+
+        # TODO frame locators if buttons.count() == 0 ?
 
         # Click on first cookie button that works and wait some time
         for i in range(get_locator_count(buttons)):
@@ -120,7 +113,7 @@ class AcceptCookies(Module):
         page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
         temp: datetime = datetime.now()
         try:
-            response = page.goto(url[0], timeout=self._config.LOAD_TIMEOUT,  # type: ignore
+            response = page.goto(url[0], timeout=self._config.LOAD_TIMEOUT,
                                  wait_until=self._config.WAIT_LOAD_UNTIL)
         except Error:
             return
@@ -129,7 +122,8 @@ class AcceptCookies(Module):
             return
 
         page.wait_for_timeout(self._config.WAIT_AFTER_LOAD)
-        get_screenshot(page, (
-                self._config.LOG / f"screenshots/job{self.job_id}rank{self._rank}cookie.png"))
+        if self._url == url[0]:
+            get_screenshot(page, (
+                    self._config.LOG / f"screenshots/job{self.job_id}rank{self._rank}cookie.png"))
         start.append(temp)
         responses.append(response)

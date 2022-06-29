@@ -36,10 +36,12 @@ class ChromiumCrawler:
         self._modules += [SaveStats(job_id, crawler_id, config, database, log)]
 
         # Prepare browser instances
-        self._playwright: Playwright = sync_playwright().start()
-        self._browser: Browser = self._playwright.chromium.launch(headless=self._config.HEADLESS)
+        self._playwright: Playwright = None  # type: ignore
+        self._browser: Browser = None  # type: ignore
 
     def start_crawl_chromium(self) -> None:
+        self._playwright: Playwright = sync_playwright().start()
+        self._browser: Browser = self._playwright.chromium.launch(headless=self._config.HEADLESS)
         self._log.info(f"Start crawl, Chromium {self._browser.version}")
         self._start_crawl()
 

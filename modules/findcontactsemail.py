@@ -40,7 +40,7 @@ class FindContactsEmail(Module):
         self._rank = url[2]
         self._seen.clear()
 
-        temp: Optional[tld.utils.Result] = get_tld_object(self._url)
+        temp: Optional[tld.utils.Result] = get_tld_object(url[0])
         if temp is None:
             return
         url_origin: str = get_url_origin(temp)
