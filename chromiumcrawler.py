@@ -54,7 +54,7 @@ class ChromiumCrawler:
 
         url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = self._database.get_url(
             self.job_id, self.crawler_id)
-        self._log.info(f"Get URL {str(url[0]) if url is not None else url}")
+        self._log.info(f"Get URL {url[0] if url is not None else url}")
 
         if url is None:
             return
@@ -89,7 +89,7 @@ class ChromiumCrawler:
             if url is None:
                 url = self._database.get_url(self.job_id, self.crawler_id)
                 context_switch = False
-            self._log.info(f"Get URL {str(url)}")
+            self._log.info(f"Get URL {url[0] if url is not None else url}")
 
             # Reload context if need be
             if not context_switch and url:

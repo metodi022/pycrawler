@@ -63,9 +63,9 @@ class Postgres:
             cur.close()
             return None
 
-        # Get result from URL and assign crawler to it
-        cur.execute("UPDATE URLS SET crawler=%s WHERE job=%s AND url=%s;",
-                    (crawler_id, job_id, url[0]))
+        # Mark that URL is being crawled
+        cur.execute("UPDATE URLS SET code=%s WHERE job=%s AND rank=%s;",
+                    (-1, job_id, url[1],))
 
         self._conn.commit()
         cur.close()
