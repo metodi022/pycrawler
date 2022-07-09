@@ -2,10 +2,13 @@ import argparse
 import importlib
 import os
 import pathlib
+import signal
 import sys
+import time
+from datetime import datetime
 from logging import Logger, FileHandler, Formatter
 from multiprocessing import Process
-from typing import List, Type
+from typing import List, Type, Tuple, Optional
 
 from chromiumcrawler import ChromiumCrawler
 from config import Config
@@ -76,18 +79,13 @@ def main() -> int:
     # Prepare crawlers
     crawlers: List[Process] = []
     for i in range(1, (args.get('crawlers') or 0) + 1):
-        handler = FileHandler(log_path / f"job{job_id}crawler{i}.log")
-        handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
-        log = Logger(f"Job {job_id} Crawler {i}")
-        log.setLevel(Config.LOG_LEVEL)
-        log.addHandler(handler)
-        # _start_crawler(job_id, i, log_path, modules)
-        process = Process(target=_start_crawler, args=(job_id, i, log_path, modules))
+        # _start_crawler2(job_id, i, log_path, modules)
+        process = Process(target=_start_crawler1, args=(job_id, i, log_path, modules))
         crawlers.append(process)
 
     for i, crawler in enumerate(crawlers):
-        log.info(f"Start crawler {i + 1} with PID {crawler.pid}")
         crawler.start()
+        log.info(f"Start crawler {i + 1} with PID {crawler.pid}")
 
     for crawler in crawlers:
         crawler.join()
@@ -100,21 +98,43 @@ def _get_modules(module_names: List[str]) -> List[Type[Module]]:
     for module_name in module_names:
         module = importlib.import_module('modules.' + module_name.lower())
         result.append(getattr(module, module_name))
-
     return result
 
 
-def _initialize_modules(modules: List[Type[Module]], job_id: int, crawler_id: int,
-                        database: Postgres, log: Logger) -> List[Module]:
-    result: List[Module] = []
-    for module in modules:
-        result.append(module(job_id, crawler_id, database, log))
+def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
+                    modules: List[Type[Module]]) -> None:
+    database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
+                                  Config.PORT)
+    url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = database.get_url(job_id,
+                                                                                  crawler_id)
 
-    return result
+    while url:
+        crawler: Process = Process(target=_start_crawler2,
+                                   args=(job_id, crawler_id, url, log_path, modules))
+        crawler.start()
+
+        while crawler.is_alive():
+            crawler.join(timeout=(Config.RESTART_TIMEOUT * 1000))
+
+            line = _get_line_last(log_path / f"job{job_id}crawler{crawler_id}.log").split()
+            date1: datetime = datetime.today()
+            date2: datetime = datetime.strptime(line[0] + ' ' + line[1], '%Y-%m-%d %H:%M:%S,%f')
+
+            if (date1 - date2).seconds < Config.RESTART_TIMEOUT:
+                continue
+
+            break
+
+        crawler.terminate()
+        crawler.join(timeout=30)
+        crawler.kill()
+        crawler.join(timeout=30)
+        time.sleep(1)
+        url = database.get_url(job_id, crawler_id)
 
 
-def _start_crawler(job_id: int, crawler_id: int, log_path: pathlib.Path,
-                   modules: List[Type[Module]]) -> None:
+def _start_crawler2(job_id: int, crawler_id: int, url: Tuple[str, int, int, List[Tuple[str, str]]],
+                    log_path: pathlib.Path, modules: List[Type[Module]]) -> None:
     handler: FileHandler = FileHandler(log_path / f"job{job_id}crawler{crawler_id}.log")
     handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
     log = Logger(f"Job {job_id} Crawler {crawler_id}")
@@ -123,13 +143,19 @@ def _start_crawler(job_id: int, crawler_id: int, log_path: pathlib.Path,
 
     database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
                                   Config.PORT)
+    signal.signal(signal.SIGTERM, lambda signal_received, frame: database.disconnect())
+    signal.signal(signal.SIGINT, lambda signal_received, frame: database.disconnect())
 
-    crawler: ChromiumCrawler = ChromiumCrawler(job_id, crawler_id, database, log,
-                                               _initialize_modules(modules, job_id, crawler_id,
-                                                                   database, log))
-    crawler.start_crawl_chromium()
-    crawler.stop_crawl_chromium()
-    database.disconnect()
+    ChromiumCrawler(job_id, crawler_id, url, database, log, modules).start_crawl()
+
+
+def _get_line_last(path: str | pathlib.Path) -> str:
+    with open(path, mode='rb') as file:
+        file.seek(-2, 2)
+        while file.read(1) != b'\n':
+            file.seek(-2, 1)
+        line = file.readline()
+    return line.decode("utf-8")
 
 
 if __name__ == '__main__':
