@@ -143,10 +143,14 @@ def _start_crawler2(job_id: int, crawler_id: int, url: Tuple[str, int, int, List
 
     database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
                                   Config.PORT)
-    signal.signal(signal.SIGTERM, lambda signal_received, frame: database.disconnect())
-    signal.signal(signal.SIGINT, lambda signal_received, frame: database.disconnect())
+    signal.signal(signal.SIGTERM, lambda signal_received, frame: (
+        log.error('Close stale crawler'), database.disconnect()))
+    signal.signal(signal.SIGINT, lambda signal_received, frame: (
+        log.error('Close stale crawler'), database.disconnect()))
 
+    log.info('Start crawler')
     ChromiumCrawler(job_id, crawler_id, url, database, log, modules).start_crawl()
+    log.info('Stop crawler')
 
 
 def _get_line_last(path: str | pathlib.Path) -> str:
