@@ -114,7 +114,7 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
         crawler.start()
 
         while crawler.is_alive():
-            crawler.join(timeout=(Config.RESTART_TIMEOUT * 1000))
+            crawler.join(timeout=Config.RESTART_TIMEOUT)
 
             line = _get_line_last(log_path / f"job{job_id}crawler{crawler_id}.log").split()
             date1: datetime = datetime.today()
