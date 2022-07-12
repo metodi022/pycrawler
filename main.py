@@ -2,6 +2,7 @@ import argparse
 import importlib
 import os
 import pathlib
+import re
 import signal
 import sys
 import time
@@ -155,10 +156,14 @@ def _start_crawler2(job_id: int, crawler_id: int, url: Tuple[str, int, int, List
 
 def _get_line_last(path: str | pathlib.Path) -> str:
     with open(path, mode='rb') as file:
+        line: bytes = b''
         file.seek(-2, 2)
-        while file.read(1) != b'\n':
-            file.seek(-2, 1)
-        line = file.readline()
+        while re.match('\\d{4}-\\d{2}-\\d{2}', line.decode("utf-8")) is None:
+            file.seek(-(len(line)+2) if len(line) > 0 else 0, 1)
+            while file.read(1) != b'\n':
+                file.seek(-2, 1)
+            line = file.readline()
+            print(line)
     return line.decode("utf-8")
 
 
