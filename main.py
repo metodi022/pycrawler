@@ -163,7 +163,6 @@ def _get_line_last(path: str | pathlib.Path) -> str:
             while file.read(1) != b'\n':
                 file.seek(-2, 1)
             line = file.readline()
-            print(line)
     return line.decode("utf-8")
 
 
