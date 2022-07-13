@@ -3,7 +3,6 @@ import importlib
 import os
 import pathlib
 import re
-import signal
 import sys
 import time
 from datetime import datetime
@@ -104,6 +103,12 @@ def _get_modules(module_names: List[str]) -> List[Type[Module]]:
 
 def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
                     modules: List[Type[Module]]) -> None:
+    handler: FileHandler = FileHandler(log_path / f"job{job_id}crawler{crawler_id}.log")
+    handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
+    log = Logger(f"Job {job_id} Crawler {crawler_id}")
+    log.setLevel(Config.LOG_LEVEL)
+    log.addHandler(handler)
+
     database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
                                   Config.PORT)
     url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = database.get_url(job_id,
@@ -113,6 +118,7 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
         crawler: Process = Process(target=_start_crawler2,
                                    args=(job_id, crawler_id, url, log_path, modules))
         crawler.start()
+        terminated: bool = False
 
         while crawler.is_alive():
             crawler.join(timeout=Config.RESTART_TIMEOUT)
@@ -124,13 +130,18 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
             if (date1 - date2).seconds < Config.RESTART_TIMEOUT:
                 continue
 
+            terminated = True
             break
 
         crawler.terminate()
         crawler.join(timeout=30)
         crawler.kill()
-        crawler.join(timeout=30)
         time.sleep(1)
+
+        if terminated:
+            log.error('Close stale crawler')
+            database.update_url(job_id, crawler_id, url[0], -2)
+
         url = database.get_url(job_id, crawler_id)
 
 
@@ -144,10 +155,6 @@ def _start_crawler2(job_id: int, crawler_id: int, url: Tuple[str, int, int, List
 
     database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
                                   Config.PORT)
-    signal.signal(signal.SIGTERM, lambda signal_received, frame: (
-        log.error('Close stale crawler'), database.disconnect()))
-    signal.signal(signal.SIGINT, lambda signal_received, frame: (
-        log.error('Close stale crawler'), database.disconnect()))
 
     log.info('Start crawler')
     ChromiumCrawler(job_id, crawler_id, url, database, log, modules).start_crawl()
@@ -159,7 +166,7 @@ def _get_line_last(path: str | pathlib.Path) -> str:
         line: bytes = b''
         file.seek(-2, 2)
         while re.match('\\d{4}-\\d{2}-\\d{2}', line.decode("utf-8")) is None:
-            file.seek(-(len(line)+2) if len(line) > 0 else 0, 1)
+            file.seek(-(len(line) + 2) if len(line) > 0 else 0, 1)
             while file.read(1) != b'\n':
                 file.seek(-2, 1)
             line = file.readline()
