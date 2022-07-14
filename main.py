@@ -33,12 +33,14 @@ def main() -> int:
     args_parser.add_argument("-j", "--job", help="unique job id for crawl", type=int, required=True)
     args_parser.add_argument("-c", "--crawlers", help="how many crawlers will run concurrently",
                              type=int, required=True)
+    args_parser.add_argument("-s", "--setup", help="run setup for DB and modules", type=bool)
 
     # Parse command line arguments
     args = vars(args_parser.parse_args())
     job_id: int = args.get('job') or 0
     log_path: pathlib.Path = args.get('log') or Config.LOG
-    urls_path: pathlib.Path = args.get('urls') or pathlib.Path('.')
+    urls_path: pathlib.Path = args.get('urls') or pathlib.Path('./.logs')
+    setup: bool = args.get('setup') or False
 
     # Verify arguments
     if not log_path.exists() and log_path.is_dir():
@@ -62,19 +64,22 @@ def main() -> int:
     # Prepare database
     log.info('Load database with URLs')
     loader: Loader = CSVLoader(urls_path)
-    database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
-                                  Config.PORT)
-    database.register_job(job_id, (args.get('crawlers') or 0), loader)
 
     # Prepare modules
     log.info('Load modules with URLs')
-    CollectUrls.register_job(database, log)
-    AcceptCookies.register_job(database, log)
     modules: List[Type[Module]] = _get_modules((args.get('modules') or []))
-    for module in modules:
-        module.register_job(database, log)
-    SaveStats.register_job(database, log)
-    database.disconnect()
+
+    # Run setup if needed
+    if setup:
+        database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
+                                      Config.PORT)
+        database.register_job(job_id, (args.get('crawlers') or 0), loader)
+        CollectUrls.register_job(database, log)
+        AcceptCookies.register_job(database, log)
+        for module in modules:
+            module.register_job(database, log)
+        SaveStats.register_job(database, log)
+        database.disconnect()
 
     # Prepare crawlers
     crawlers: List[Process] = []
