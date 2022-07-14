@@ -103,17 +103,12 @@ def _get_modules(module_names: List[str]) -> List[Type[Module]]:
 
 def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
                     modules: List[Type[Module]]) -> None:
-    handler: FileHandler = FileHandler(log_path / f"job{job_id}crawler{crawler_id}.log")
-    handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
-    log = Logger(f"Job {job_id} Crawler {crawler_id}")
-    log.setLevel(Config.LOG_LEVEL)
-    log.addHandler(handler)
-
+    log = _get_logger(job_id, crawler_id, log_path)
     database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
                                   Config.PORT)
+
     url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = database.get_url(job_id,
                                                                                   crawler_id)
-
     while url:
         crawler: Process = Process(target=_start_crawler2,
                                    args=(job_id, crawler_id, url, log_path, modules))
@@ -140,25 +135,29 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
 
         if terminated:
             log.error('Close stale crawler')
-            database.update_url(job_id, crawler_id, url[0], -2)
+            database.update_url(job_id, crawler_id, url[0], Config.ERROR_CODES['browser_error'])
 
         url = database.get_url(job_id, crawler_id)
 
 
 def _start_crawler2(job_id: int, crawler_id: int, url: Tuple[str, int, int, List[Tuple[str, str]]],
                     log_path: pathlib.Path, modules: List[Type[Module]]) -> None:
-    handler: FileHandler = FileHandler(log_path / f"job{job_id}crawler{crawler_id}.log")
-    handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
-    log = Logger(f"Job {job_id} Crawler {crawler_id}")
-    log.setLevel(Config.LOG_LEVEL)
-    log.addHandler(handler)
-
+    log = _get_logger(job_id, crawler_id, log_path)
     database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
                                   Config.PORT)
 
     log.info('Start crawler')
     ChromiumCrawler(job_id, crawler_id, url, database, log, modules).start_crawl()
     log.info('Stop crawler')
+
+
+def _get_logger(job_id: int, crawler_id: int, log_path: pathlib.Path) -> Logger:
+    handler: FileHandler = FileHandler(log_path / f"job{job_id}crawler{crawler_id}.log")
+    handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
+    log = Logger(f"Job {job_id} Crawler {crawler_id}")
+    log.setLevel(Config.LOG_LEVEL)
+    log.addHandler(handler)
+    return log
 
 
 def _get_line_last(path: str | pathlib.Path) -> str:

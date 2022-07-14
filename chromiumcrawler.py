@@ -110,7 +110,8 @@ class ChromiumCrawler:
     def _confirm_response(self, response: Optional[Response],
                           url: Tuple[str, int, int, List[Tuple[str, str]]]) -> Optional[Response]:
         self._database.update_url(self.job_id, self.crawler_id, url[0],
-                                  response.status if response is not None else -1)
+                                  response.status if response is not None else Config.ERROR_CODES[
+                                      'response_error'])
 
         if response is None:
             return None

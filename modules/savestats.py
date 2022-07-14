@@ -4,6 +4,7 @@ from typing import List, Tuple
 
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
+from config import Config
 from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
@@ -37,6 +38,6 @@ class SaveStats(Module):
             self._database.invoke_transaction(
                 "INSERT INTO URLSFEEDBACK VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);", (
                     self._rank, self.job_id, self.crawler_id, url[0], final_url, url[1],
-                    response.status if response is not None else -1,
-                    start[i].strftime('%Y-%m-%d %H:%M:%S'),
+                    response.status if response is not None else Config.ERROR_CODES[
+                        'response_error'], start[i].strftime('%Y-%m-%d %H:%M:%S'),
                     end.strftime('%Y-%m-%d %H:%M:%S')), False)

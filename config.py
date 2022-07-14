@@ -1,6 +1,6 @@
 import pathlib
 from logging import DEBUG
-from typing import Literal
+from typing import Literal, Dict
 
 
 class Config:
@@ -24,7 +24,7 @@ class Config:
     WAIT_LOAD_UNTIL: Literal['commit', 'domcontentloaded', 'load', 'networkidle'] = 'load'
     LOAD_TIMEOUT: int = 30000  # URL page loading timeout in ms (0 = disable timeout)
     WAIT_AFTER_LOAD: int = 5000  # let page execute after loading in ms
-    RESTART_TIMEOUT: int = 300  # restart crawler if it hasn't done anything for ... seconds
+    RESTART_TIMEOUT: int = 60  # restart crawler if it hasn't done anything for ... seconds
 
     ACCEPT_COOKIES: bool = True  # Attempt to find cookie banners and accept them (unreliable)
 
@@ -32,4 +32,6 @@ class Config:
     # OBEY_ROBOTS: bool = False  # crawler should obey robots.txt
     # FOCUS_FILTER: bool = False  # crawler should visit "interesting" URLS (experimental)
 
-    # ERROR_CODES: Dict[str, int] = {'module_error': -1, 'page_load_error': -2}
+    # Usually the code of the response in DB will be the response status (200, 404, etc.); if an
+    # error occurs, for example response is NULL or browser is stuck, use the error codes below
+    ERROR_CODES: Dict[str, int] = {'response_error': -1, 'browser_error': -2}
