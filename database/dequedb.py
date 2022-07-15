@@ -31,6 +31,10 @@ class DequeDB:
         self.add_seen(url[0])
         self._data.append(url)
 
+    def add_url_force(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+        self.add_seen(url[0])
+        self._data.append(url)
+
     def clear_urls(self) -> None:
         self._seen.clear()
         self._data.clear()

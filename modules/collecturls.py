@@ -88,6 +88,7 @@ class CollectUrls(Module):
             parsed_link_full: str = get_url_full(parsed_link)
             if context_database.get_seen(parsed_link_full):
                 continue
+            context_database.add_seen(parsed_link_full)
 
             # Filter out unwanted entries
             filter_out: bool = False
@@ -99,11 +100,11 @@ class CollectUrls(Module):
                 continue
 
             # Add link
-            urls.append(parsed_url)
+            urls.append(parsed_link)
 
-        for parsed_url in urls:
-            context_database.add_url(
-                (get_url_full(parsed_url), url[1] + 1, url[2], url[3] + [(url[0], final_url)]))
+        for parsed_link in urls:
+            context_database.add_url_force(
+                (get_url_full(parsed_link), url[1] + 1, url[2], url[3] + [(url[0], final_url)]))
 
             self._max_urls -= 1
             if self._max_urls < 1:

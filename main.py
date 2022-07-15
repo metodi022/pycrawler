@@ -26,27 +26,30 @@ def main() -> int:
     args_parser = argparse.ArgumentParser()
     args_parser.add_argument("-o", "--log", help="path to directory where output log will be saved",
                              type=pathlib.Path)
-    args_parser.add_argument("-f", "--urls", help="path to file with urls", type=pathlib.Path,
-                             required=True)
+    args_parser.add_argument("-f", "--urls", help="path to file with urls", type=pathlib.Path)
     args_parser.add_argument("-m", "--modules", help="which modules the crawler will run",
                              type=str, required=True, nargs='*')
     args_parser.add_argument("-j", "--job", help="unique job id for crawl", type=int, required=True)
     args_parser.add_argument("-c", "--crawlers", help="how many crawlers will run concurrently",
                              type=int, required=True)
-    args_parser.add_argument("-s", "--setup", help="run setup for DB and modules", type=bool)
+    args_parser.add_argument("-s", "--setup", help="run setup for DB and modules",
+                             action='store_true')
 
     # Parse command line arguments
     args = vars(args_parser.parse_args())
     job_id: int = args.get('job') or 0
     log_path: pathlib.Path = args.get('log') or Config.LOG
-    urls_path: pathlib.Path = args.get('urls') or pathlib.Path('./.logs')
+    urls_path: pathlib.Path = args.get('urls')
     setup: bool = args.get('setup') or False
 
     # Verify arguments
     if not log_path.exists() and log_path.is_dir():
         raise RuntimeError('Path to directory for log output is incorrect')
 
-    if not urls_path.exists() and not urls_path.is_dir():
+    if setup and not urls_path:
+        raise RuntimeError('Setup without path to urls file')
+
+    if setup and not urls_path.exists() and not urls_path.is_dir():
         raise RuntimeError('Path to file with urls is incorrect')
 
     if (args.get('crawlers') or 0) <= 0:
@@ -63,7 +66,6 @@ def main() -> int:
 
     # Prepare database
     log.info('Load database with URLs')
-    loader: Loader = CSVLoader(urls_path)
 
     # Prepare modules
     log.info('Load modules with URLs')
@@ -71,6 +73,7 @@ def main() -> int:
 
     # Run setup if needed
     if setup:
+        loader: Loader = CSVLoader(urls_path)
         database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
                                       Config.PORT)
         database.register_job(job_id, (args.get('crawlers') or 0), loader)
@@ -84,7 +87,6 @@ def main() -> int:
     # Prepare crawlers
     crawlers: List[Process] = []
     for i in range(1, (args.get('crawlers') or 0) + 1):
-        # _start_crawler2(job_id, i, log_path, modules)
         process = Process(target=_start_crawler1, args=(job_id, i, log_path, modules))
         crawlers.append(process)
 
