@@ -1,7 +1,8 @@
 from datetime import datetime
 from logging import Logger
-from typing import List, Tuple
+from typing import List, Tuple, Callable
 
+import tld.utils
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
 from database.dequedb import DequeDB
@@ -64,3 +65,7 @@ class Module:
             start (List[datetime]): start times for crawl and for each module response initiation
         """
         raise NotImplementedError
+
+    @staticmethod
+    def add_url_filter_out(filters: List[Callable[[tld.utils.Result], bool]]):
+        pass

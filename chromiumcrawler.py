@@ -1,7 +1,8 @@
 from datetime import datetime
 from logging import Logger
-from typing import Optional, Tuple, List, Type
+from typing import Optional, Tuple, List, Type, Callable
 
+import tld
 from playwright.sync_api import sync_playwright, Playwright, Browser, BrowserContext, Page, \
     Response, Error
 
@@ -27,12 +28,18 @@ class ChromiumCrawler:
         self._database: Postgres = database
         self._log: Logger = log
 
+        # Prepare filters
+        url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
+        urls_filter: List[Callable[[List[tld.utils.Result]], List[tld.utils.Result]]] = []
+        for module in modules:
+            module.add_url_filter_out(url_filter_out)
+
         # Prepare modules
         self._modules: List[Module] = []
         self._modules += [
             AcceptCookies(job_id, crawler_id, database, log)] if Config.ACCEPT_COOKIES else []
-        self._modules += [
-            CollectUrls(job_id, crawler_id, database, log)] if Config.RECURSIVE else []
+        self._modules += [CollectUrls(job_id, crawler_id, database, log,
+                                      url_filter_out)] if Config.RECURSIVE else []
         self._modules += self._initialize_modules(modules, job_id, crawler_id, database, log)
         self._modules += [SaveStats(job_id, crawler_id, database, log)]
 

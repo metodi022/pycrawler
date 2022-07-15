@@ -1,6 +1,6 @@
 from datetime import datetime
 from logging import Logger
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Callable
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
@@ -14,10 +14,13 @@ from utils import get_tld_object, get_url_from_href, get_url_origin, get_url_ful
 
 
 class CollectUrls(Module):
-    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
+                 url_filter_out: List[Callable[[tld.utils.Result], bool]]) -> None:
         super().__init__(job_id, crawler_id, database, log)
         self._url: str = ''
         self._rank: int = 0
+        self._max_urls: int = 0
+        self._url_filter_out: List[Callable[[tld.utils.Result], bool]] = url_filter_out
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
@@ -30,6 +33,7 @@ class CollectUrls(Module):
         context_database.add_seen(url[0])
         self._url = url[0]
         self._rank = url[2]
+        self._max_urls = Config.MAX_URLS
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Response], context_database: DequeDB,
@@ -44,8 +48,8 @@ class CollectUrls(Module):
         if response is None or response.status >= 400:
             return
 
-        # Check if depth exceeded
-        if url[1] >= Config.DEPTH:
+        # Check if depth or max URLs exceeded
+        if url[1] >= Config.DEPTH or self._max_urls < 1:
             return
 
         parsed_url: Optional[tld.utils.Result] = get_tld_object(self._url)
@@ -58,6 +62,7 @@ class CollectUrls(Module):
         except Error:
             return
 
+        urls: List[tld.utils.Result] = []
         for i in range(get_locator_count(links)):
             # Get href attribute
             link: Optional[str] = get_locator_attribute(get_locator_nth(links, i), 'href')
@@ -79,9 +84,23 @@ class CollectUrls(Module):
             if Config.SAME_ETLDP1 and parsed_url.fld != parsed_link.fld:
                 continue
 
+            # Check seen
+            parsed_link_full: str = get_url_full(parsed_link)
+            if context_database.get_seen(parsed_link_full):
+                continue
+
+            # Filter out unwanted entries
+            for filt in self._url_filter_out:
+                if filt(parsed_link):
+                    continue
+
             # Add link
-            self._log.debug(
-                f"Find {context_database.get_seen(get_url_full(parsed_link))} "
-                f"{get_url_full(parsed_link)}")
+            urls.append(parsed_url)
+
+        for parsed_url in urls:
             context_database.add_url(
-                (get_url_full(parsed_link), url[1] + 1, url[2], url[3] + [(url[0], final_url)]))
+                (get_url_full(parsed_url), url[1] + 1, url[2], url[3] + [(url[0], final_url)]))
+
+            self._max_urls -= 1
+            if self._max_urls < 1:
+                break

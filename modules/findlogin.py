@@ -55,9 +55,6 @@ class FindLogin(Module):
         if response is None or response.status >= 400:
             return
 
-        if 'google.com/search' in final_url:
-            return
-
         try:
             forms: Locator = page.locator('form', has=page.locator('input[type]:visible'))
         except Error:
@@ -94,7 +91,8 @@ class FindLogin(Module):
         if text_fields != 1:
             return False
 
-        check: str = r"log.?in|sign.?in|passwor|user.?name|account|user|melde|logg|meldung"
+        check: str = r"log.?in|sign.?in|password|passwort|user.?name|account|user|melde|logg" \
+                     r"|meldung"
 
         try:
             result: bool = form.locator(f"text=/{check}/i").count() > 0

@@ -42,6 +42,7 @@ class FindContactsEmail(Module):
         temp: Optional[tld.utils.Result] = get_tld_object(url[0])
         if temp is None:
             return
+
         url_origin: str = get_url_origin(temp)
         context_database.add_url(
             (url_origin + '/.well-known/security.txt', Config.DEPTH, self._rank, []))
@@ -50,6 +51,11 @@ class FindContactsEmail(Module):
                          responses: List[Response], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime]) -> None:
+        # Check if response is valid
+        response: Optional[Response] = responses[-1] if len(responses) > 0 else None
+        if response is None or response.status >= 400:
+            return
+
         try:
             html: str = page.content()
         except Error:

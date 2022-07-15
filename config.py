@@ -1,6 +1,6 @@
 import pathlib
 from logging import DEBUG
-from typing import Literal, Dict
+from typing import Literal, Dict, Optional
 
 
 class Config:
@@ -13,6 +13,7 @@ class Config:
     LOG: pathlib.Path = pathlib.Path('./.logs/')  # path for saving logs
     LOG_LEVEL = DEBUG  # DEBUG|INFO|WARNING|ERROR
 
+    BROWSER: Literal['chromium', 'firefox', 'webkit'] = 'chromium'  # TODO which browser to use
     HEADLESS: bool = True  # Headless browser
 
     RECURSIVE: bool = True  # Discover additional URLs while crawling
@@ -20,6 +21,7 @@ class Config:
     SAME_ETLDP1: bool = True  # URL discovery for same ETLD+1 only
     DEPTH: int = 0  # URL discovery limit; 0 (initial URL only), 1, 2, etc.
     SAME_CONTEXT: bool = True  # crawl additional URLs in the same context
+    MAX_URLS: int = 100  # limit number of URLs gathered for a domain
 
     WAIT_LOAD_UNTIL: Literal['commit', 'domcontentloaded', 'load', 'networkidle'] = 'load'
     LOAD_TIMEOUT: int = 30000  # URL page loading timeout in ms (0 = disable timeout)
