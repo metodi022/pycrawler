@@ -90,9 +90,13 @@ class CollectUrls(Module):
                 continue
 
             # Filter out unwanted entries
+            filter_out: bool = False
             for filt in self._url_filter_out:
                 if filt(parsed_link):
-                    continue
+                    filter_out = True
+                    break
+            if filter_out:
+                continue
 
             # Add link
             urls.append(parsed_url)

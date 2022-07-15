@@ -25,12 +25,12 @@ class ChromiumCrawler:
         self.job_id: int = job_id
         self.crawler_id: int = crawler_id
         self._url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = url
+        self._response: int = Config.ERROR_CODES['browser_error']
         self._database: Postgres = database
         self._log: Logger = log
 
         # Prepare filters
         url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
-        urls_filter: List[Callable[[List[tld.utils.Result]], List[tld.utils.Result]]] = []
         for module in modules:
             module.add_url_filter_out(url_filter_out)
 
@@ -96,6 +96,10 @@ class ChromiumCrawler:
                 # Run module
                 self._invoke_page_handler(browser, context, page, url, context_database)
 
+        # Finally, update that URL crawl was successful
+        self._database.update_url(self.job_id, self.crawler_id, self._url[0], self._response)
+
+        # Close everything
         page.close()
         context.close()
         browser.close()
@@ -117,16 +121,15 @@ class ChromiumCrawler:
     def _confirm_response(self, response: Optional[Response],
                           url: Tuple[str, int, int, List[Tuple[str, str]]]) -> Optional[Response]:
         self._database.update_url(self.job_id, self.crawler_id, url[0],
-                                  response.status if response is not None else Config.ERROR_CODES[
-                                      'response_error'])
+                                  Config.ERROR_CODES['browser_error'] if response is not None else
+                                  Config.ERROR_CODES['response_error'])
 
         if response is None:
+            self._response = Config.ERROR_CODES['response_error']
             return None
 
+        self._response = response.status
         self._log.info(f"Receive response status {response.status}")
-
-        if response.status < 400:
-            return response
 
         return response
 

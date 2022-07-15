@@ -118,7 +118,6 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
         crawler: Process = Process(target=_start_crawler2,
                                    args=(job_id, crawler_id, url, log_path, modules))
         crawler.start()
-        terminated: bool = False
 
         while crawler.is_alive():
             crawler.join(timeout=Config.RESTART_TIMEOUT)
@@ -130,17 +129,13 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
             if (date1 - date2).seconds < Config.RESTART_TIMEOUT:
                 continue
 
-            terminated = True
+            log.error('Close stale crawler')
             break
 
         crawler.terminate()
         crawler.join(timeout=30)
         crawler.kill()
         time.sleep(1)
-
-        if terminated:
-            log.error('Close stale crawler')
-            database.update_url(job_id, crawler_id, url[0], Config.ERROR_CODES['browser_error'])
 
         url = database.get_url(job_id, crawler_id)
 
