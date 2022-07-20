@@ -48,7 +48,7 @@ class FindContactsEmail(Module):
             (url_origin + '/.well-known/security.txt', Config.DEPTH, self._rank, []))
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         responses: List[Response], context_database: DequeDB,
+                         responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime]) -> None:
         # Check if response is valid

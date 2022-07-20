@@ -38,7 +38,7 @@ class AcceptCookies(Module):
         self._urls.clear()
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         responses: List[Response], context_database: DequeDB,
+                         responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime]) -> None:
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None

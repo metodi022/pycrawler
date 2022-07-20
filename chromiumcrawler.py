@@ -24,7 +24,7 @@ class ChromiumCrawler:
         # Prepare database and log
         self.job_id: int = job_id
         self.crawler_id: int = crawler_id
-        self._url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = url
+        self._url: Tuple[str, int, int, List[Tuple[str, str]]] = url
         self._response: int = Config.ERROR_CODES['browser_error']
         self._database: Postgres = database
         self._log: Logger = log
@@ -72,7 +72,7 @@ class ChromiumCrawler:
             get_screenshot(page,
                            (Config.LOG / f"screenshots/job{self.job_id}rank{url[2]}.png"))
 
-            # Run module response handler and exit if errors occur
+            # Run module response handler
             self._invoke_response_handler(browser, context, page,
                                           [response] if response is not None else [], url,
                                           context_database, [start])
@@ -126,10 +126,10 @@ class ChromiumCrawler:
 
         if response is None:
             self._response = Config.ERROR_CODES['response_error']
-            return None
+        else:
+            self._response = response.status
 
-        self._response = response.status
-        self._log.info(f"Receive response status {response.status}")
+        self._log.info(f"Receive response status {self._response}")
 
         return response
 
@@ -142,7 +142,7 @@ class ChromiumCrawler:
             module.add_handlers(browser, context, page, context_database, url)
 
     def _invoke_response_handler(self, browser: Browser, context: BrowserContext, page: Page,
-                                 responses: List[Response],
+                                 responses: List[Optional[Response]],
                                  url: Tuple[str, int, int, List[Tuple[str, str]]],
                                  context_database: DequeDB, start: List[datetime]) -> None:
         self._log.debug('Invoke module response handler')

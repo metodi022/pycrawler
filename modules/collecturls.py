@@ -36,7 +36,7 @@ class CollectUrls(Module):
         self._max_urls = Config.MAX_URLS
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         responses: List[Response], context_database: DequeDB,
+                         responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime]) -> None:
         context_database.add_seen(final_url)

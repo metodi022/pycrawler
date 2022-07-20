@@ -39,7 +39,7 @@ def main() -> int:
     args = vars(args_parser.parse_args())
     job_id: int = args.get('job') or 0
     log_path: pathlib.Path = args.get('log') or Config.LOG
-    urls_path: pathlib.Path = args.get('urls')
+    urls_path: Optional[pathlib.Path] = args.get('urls')
     setup: bool = args.get('setup') or False
 
     # Verify arguments
@@ -72,7 +72,7 @@ def main() -> int:
     modules: List[Type[Module]] = _get_modules((args.get('modules') or []))
 
     # Run setup if needed
-    if setup:
+    if setup and urls_path:
         loader: Loader = CSVLoader(urls_path)
         database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
                                       Config.PORT)

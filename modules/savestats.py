@@ -1,6 +1,6 @@
 from datetime import datetime
 from logging import Logger
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
@@ -30,7 +30,7 @@ class SaveStats(Module):
         self._rank = url[2]
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         responses: List[Response], context_database: DequeDB,
+                         responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime]) -> None:
         end: datetime = datetime.now()

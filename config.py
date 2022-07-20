@@ -26,7 +26,7 @@ class Config:
     WAIT_LOAD_UNTIL: Literal['commit', 'domcontentloaded', 'load', 'networkidle'] = 'load'
     LOAD_TIMEOUT: int = 30000  # URL page loading timeout in ms (0 = disable timeout)
     WAIT_AFTER_LOAD: int = 5000  # let page execute after loading in ms
-    RESTART_TIMEOUT: int = 90  # restart crawler if it hasn't done anything for ... seconds
+    RESTART_TIMEOUT: int = 300  # restart crawler if it hasn't done anything for ... seconds
 
     ACCEPT_COOKIES: bool = True  # Attempt to find cookie banners and accept them (unreliable)
 
