@@ -13,9 +13,9 @@ from utils import get_url_origin, get_tld_object, get_screenshot, get_locator_co
 
 
 class AcceptCookies(Module):
-    CHECK_ENG: str = 'accept|okay|\\Wok|^ok|consent|agree|allow|understand|continue|yes|got it'
-    CHECK_GER: str = 'stimm|verstanden|versteh|akzeptier|ja|weiter|annehm'
-    CHECK_TEX: str = '(' + CHECK_ENG + '|' + CHECK_GER + ')'
+    CHECK_ENG: str = '(accept|okay|ok|consent|agree|allow|understand|continue|yes|got it)'
+    CHECK_GER: str = '(stimm|verstanden|versteh|akzeptier|ja|weiter|annehm)'
+    CHECK_TEX: str = f"^{CHECK_ENG}|\\W{CHECK_ENG}|^{CHECK_GER}|\\W{CHECK_GER}"
     ELEM_SEL: str = 'button:visible,a:visible,*[role="button"]:visible,*[onclick]:visible,' \
                     'input[type="button"]:visible,input[type="submit"]:visible'
 
@@ -64,12 +64,6 @@ class AcceptCookies(Module):
 
         # Check for topmost z-index button with keywords
         z_max: int = 0
-        try:
-            buttons: Locator = page.locator(AcceptCookies.ELEM_SEL,
-                                            has=page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i"))
-        except Error:
-            return
-
         for i in range(get_locator_count(buttons)):
             button: Optional[Locator] = get_locator_nth(buttons, i)
             if button is None:

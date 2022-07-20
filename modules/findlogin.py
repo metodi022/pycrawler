@@ -44,6 +44,7 @@ class FindLogin(Module):
         context_database.add_url((url_origin + '/login/', Config.DEPTH, self._rank, []))
         context_database.add_url((url_origin + '/signin/', Config.DEPTH, self._rank, []))
         context_database.add_url((url_origin + '/account/', Config.DEPTH, self._rank, []))
+        context_database.add_url((url_origin + '/profile/', Config.DEPTH, self._rank, []))
         # TODO search engine fallback ?
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
@@ -82,23 +83,17 @@ class FindLogin(Module):
         except Error:
             return False
 
+        if password_fields > 1 or text_fields != 1:
+            return False
+
         if password_fields == 1:
             return True
 
-        if password_fields > 1:
-            return False
+        check_login: str = r"(log.?in|sign.?in|account|profile)"
+        check_register: str = r"(sign.?up|register)"
 
-        if text_fields != 1:
-            return False
-
-        check: str = r"log.?in|sign.?in|password|passwort|user.?name|account|user|melde|logg" \
-                     r"|meldung"
-
-        try:
-            result: bool = form.locator(f"text=/{check}/i").count() > 0
-        except Error:
-            return False
-
-        result = result or re.search(check, url, re.I) is not None
-        result = result or re.search(check, final_url, re.I) is not None
+        result: bool = ((re.search(check_login, url, re.I) is not None) and (
+                re.search(check_register, url, re.I) is None))
+        result = result or ((re.search(check_login, final_url, re.I) is not None) and (
+                re.search(check_register, final_url, re.I) is None))
         return result
