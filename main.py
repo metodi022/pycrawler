@@ -121,6 +121,7 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
                                    args=(job_id, crawler_id, url, log_path, modules))
         crawler.start()
 
+        stale: bool = False
         while crawler.is_alive():
             crawler.join(timeout=Config.RESTART_TIMEOUT)
 
@@ -132,12 +133,17 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
                 continue
 
             log.error('Close stale crawler')
+            stale = True
             break
 
         crawler.terminate()
         crawler.join(timeout=30)
         crawler.kill()
         time.sleep(1)
+
+        if stale:
+            database.update_url(job_id, crawler_id, url[0], Config.ERROR_CODES['browser_error'],
+                                None)
 
         url = database.get_url(job_id, crawler_id)
 

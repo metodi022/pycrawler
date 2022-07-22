@@ -34,7 +34,7 @@ class Postgres:
         # Create table for URLs if such a table does not exist already
         cur.execute(
             "CREATE TABLE IF NOT EXISTS URLS (rank INT NOT NULL, job INT NOT NULL, "
-            "crawler INT NOT NULL, url VARCHAR(255) NOT NULL UNIQUE, code INT);")
+            "crawler INT NOT NULL, url VARCHAR(255) NOT NULL UNIQUE, code INT, error TEXT);")
 
         # Check if job already exists
         if Postgres._job_exists(cur, job_id):
@@ -83,7 +83,8 @@ class Postgres:
         self.disconnect()
         return url[0], 0, url[1], []
 
-    def update_url(self, job_id: int, crawler_id: int, url: str, code: int) -> None:
+    def update_url(self, job_id: int, crawler_id: int, url: str, code: int,
+                   error: Optional[str]) -> None:
         self.connect()
         cur: psycopg2.cursor = self._conn.cursor()
 
@@ -93,8 +94,8 @@ class Postgres:
             self.disconnect()
             raise RuntimeError('Job does not exists.')
 
-        cur.execute("UPDATE URLS SET code=%s WHERE job=%s AND url=%s AND crawler=%s;",
-                    (code, job_id, url, crawler_id,))
+        cur.execute("UPDATE URLS SET code=%s, error=%s WHERE job=%s AND url=%s AND crawler=%s;",
+                    (code, error, job_id, url, crawler_id))
 
         self._conn.commit()
         cur.close()

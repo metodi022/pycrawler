@@ -28,7 +28,7 @@ class FindLogin(Module):
             "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, loginform TEXT NOT NULL, "
             "loginformfinal TEXT NOT NULL, depth INT NOT NULL, fromurl TEXT, fromurlfinal TEXT);",
             None, False)
-        log.info('Create LOGINFORMS database IF NOT EXISTS')
+        log.info('Create LOGINFORMS table IF NOT EXISTS')
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB,
@@ -57,7 +57,7 @@ class FindLogin(Module):
             return
 
         try:
-            forms: Locator = page.locator('form', has=page.locator('input[type]:visible'))
+            forms: Locator = page.locator('form:visible', has=page.locator('input[type]:visible'))
         except Error:
             return
 

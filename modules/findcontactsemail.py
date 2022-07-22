@@ -30,7 +30,7 @@ class FindContactsEmail(Module):
             "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, emailurl TEXT NOT NULL, "
             "emailurlfinal TEXT NOT NULL, depth INT NOT NULL, email TEXT NOT NULL, "
             "gibberish BOOLEAN NOT NULL, fromurl TEXT, fromurlfinal TEXT)", None, False)
-        log.info('Create CONTACTSEMAIL database IF NOT EXISTS')
+        log.info('Create CONTACTSEMAIL table IF NOT EXISTS')
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]]) \

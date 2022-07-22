@@ -25,7 +25,6 @@ class ChromiumCrawler:
         self.job_id: int = job_id
         self.crawler_id: int = crawler_id
         self._url: Tuple[str, int, int, List[Tuple[str, str]]] = url
-        self._response: int = Config.ERROR_CODES['browser_error']
         self._database: Postgres = database
         self._log: Logger = log
 
@@ -64,9 +63,6 @@ class ChromiumCrawler:
             # Navigate to page
             response: Optional[Response] = self._open_url(page, url)
 
-            # Check response status
-            response = self._confirm_response(response, url)
-
             # Wait after page is loaded
             page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
             get_screenshot(page,
@@ -96,9 +92,6 @@ class ChromiumCrawler:
                 # Run module
                 self._invoke_page_handler(browser, context, page, url, context_database)
 
-        # Finally, update that URL crawl was successful
-        self._database.update_url(self.job_id, self.crawler_id, self._url[0], self._response)
-
         # Close everything
         page.close()
         context.close()
@@ -109,27 +102,20 @@ class ChromiumCrawler:
     def _open_url(self, page: Page, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> \
             Optional[Response]:
         response: Optional[Response] = None
+        error_message: Optional[str] = None
 
+        error: Error
         try:
             response = page.goto(url[0], timeout=Config.LOAD_TIMEOUT,
                                  wait_until=Config.WAIT_LOAD_UNTIL)
         except Error as error:
-            self._log.warning(error.message)
+            error_message = error.message
+            self._log.warning(error_message)
 
-        return response
-
-    def _confirm_response(self, response: Optional[Response],
-                          url: Tuple[str, int, int, List[Tuple[str, str]]]) -> Optional[Response]:
-        self._database.update_url(self.job_id, self.crawler_id, url[0],
-                                  Config.ERROR_CODES['browser_error'] if response is not None else
-                                  Config.ERROR_CODES['response_error'])
-
-        if response is None:
-            self._response = Config.ERROR_CODES['response_error']
-        else:
-            self._response = response.status
-
-        self._log.info(f"Receive response status {self._response}")
+        if url[1] == 0:
+            self._database.update_url(self.job_id, self.crawler_id, url[0],
+                                      response.status if response is not None else
+                                      Config.ERROR_CODES['response_error'], error_message)
 
         return response
 

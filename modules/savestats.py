@@ -22,7 +22,7 @@ class SaveStats(Module):
             "crawler INT NOT NULL, url TEXT NOT NULL, finalurl TEXT NOT NULL, depth INT NOT NULL, "
             "code INT NOT NULL, started TIMESTAMP NOT NULL, ended TIMESTAMP NOT NULL);",
             None, False)
-        log.info('Create URLSFEEDBACK database IF NOT EXISTS')
+        log.info('Create URLSFEEDBACK table IF NOT EXISTS')
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB,
