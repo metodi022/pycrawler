@@ -35,6 +35,7 @@ class FindLogin(Module):
     @staticmethod
     def add_url_filter_out(filters: List[Callable[[tld.utils.Result], bool]]):
         def filt(url: tld.utils.Result) -> bool:
-            return re.match(r'log.?out|sign.?out', get_url_full(url), re.I) is not None
+            return re.match(r'log.?out|sign.?out|log.?off|sign.?off|exit|quit|invalidate',
+                            get_url_full(url), re.I) is not None
 
         filters.append(filt)

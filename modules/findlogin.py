@@ -92,6 +92,8 @@ class FindLogin(Module):
         check_login: str = r"(log.?in|sign.?in|account|profile)"
         check_register: str = r"(sign.?up|register)"
 
+        # TODO login keywords in form HTML
+
         result: bool = ((re.search(check_login, url, re.I) is not None) and (
                 re.search(check_register, url, re.I) is None))
         result = result or ((re.search(check_login, final_url, re.I) is not None) and (

@@ -43,10 +43,6 @@ def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils
         res: Optional[tld.utils.Result] = get_tld_object(
             origin.parsed_url.scheme + "://" + origin.parsed_url.netloc + path + href)
 
-    # Try to ignore URLs that are not documents
-    if res is not None and re.match('htm$|html$|^((?!\\.).)*$', res.parsed_url.path) is None:
-        return None
-
     return res
 
 

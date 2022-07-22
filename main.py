@@ -172,12 +172,12 @@ def _get_line_last(path: str | pathlib.Path) -> str:
     with open(path, mode='rb') as file:
         line: bytes = b''
         file.seek(-2, 2)
-        while re.match('\\d{4}-\\d{2}-\\d{2}', line.decode("utf-8")) is None:
+        while re.match('\\d{4}-\\d{2}-\\d{2}', line.decode("utf-8", errors="ignore")) is None:
             file.seek(-(len(line) + 2) if len(line) > 0 else 0, 1)
             while file.read(1) != b'\n':
                 file.seek(-2, 1)
             line = file.readline()
-    return line.decode("utf-8")
+    return line.decode("utf-8", errors="ignore")
 
 
 if __name__ == '__main__':
