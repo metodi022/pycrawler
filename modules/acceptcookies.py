@@ -14,7 +14,8 @@ from utils import get_url_origin, get_tld_object, get_screenshot, get_locator_co
 
 class AcceptCookies(Module):
     CHECK_ENG: str = '(accept|okay|ok|consent|agree|allow|understand|continue|yes|got it)'
-    CHECK_GER: str = '(stimm|verstanden|versteh|akzeptier|ja|weiter|annehm)'
+    CHECK_GER: str = '(stimm|verstanden|versteh|akzeptier|ja|weiter|annehm|bestätig|willig|' \
+                     'zulassen|lasse) '
     CHECK_TEX: str = f"^{CHECK_ENG}|\\W{CHECK_ENG}|^{CHECK_GER}|\\W{CHECK_GER}"
     ELEM_SEL: str = 'button:visible,a:visible,*[role="button"]:visible,*[onclick]:visible,' \
                     'input[type="button"]:visible,input[type="submit"]:visible'

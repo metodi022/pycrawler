@@ -73,13 +73,16 @@ class FindLogin(Module):
                  url[3][-1][0] if len(url[3]) > 0 else None,
                  url[3][-1][1] if len(url[3]) > 0 else None), False)
 
+            break
+
     @staticmethod
     def _find_login_form(form: Locator, url: str, final_url: str) -> bool:
         try:
-            password_fields: int = form.locator('input[type="password"]').count()
+            password_fields: int = form.locator('input[type="password"]:visible').count()
             text_fields: int = form.locator('input[type="email"]:visible').count() + form.locator(
                 'input[type="text"]:visible').count() + form.locator(
-                'input[type="tel"]:visible').count()
+                'input[type="tel"]:visible').count() + form.locator(
+                'input:not([type]):visible').count()
         except Error:
             return False
 
@@ -89,13 +92,12 @@ class FindLogin(Module):
         if password_fields == 1:
             return True
 
-        check_login: str = r"(log.?in|sign.?in|account|profile)"
-        check_register: str = r"(sign.?up|register)"
+        check1 = r"(log.?in|sign.?in|account|profile|auth|connect)"
+
+        result: bool = re.search(check1, url, re.I) is not None
+        result = result or re.search(check1, final_url, re.I) is not None
 
         # TODO login keywords in form HTML
+        # TODO login button check
 
-        result: bool = ((re.search(check_login, url, re.I) is not None) and (
-                re.search(check_register, url, re.I) is None))
-        result = result or ((re.search(check_login, final_url, re.I) is not None) and (
-                re.search(check_register, final_url, re.I) is None))
         return result
