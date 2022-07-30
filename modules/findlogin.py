@@ -19,8 +19,6 @@ class FindLogin(Module):
         self._url: str = ''
         self._rank: int = 0
 
-        # TODO add warning if not SAME_CONTEXT
-
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
         database.invoke_transaction(
@@ -92,12 +90,17 @@ class FindLogin(Module):
         if password_fields == 1:
             return True
 
-        check1 = r"(log.?in|sign.?in|account|profile|auth|connect)"
+        check1: str = r"(log.?in|sign.?in|account|profile|auth|connect)"
 
         result: bool = re.search(check1, url, re.I) is not None
         result = result or re.search(check1, final_url, re.I) is not None
 
-        # TODO login keywords in form HTML
-        # TODO login button check
+        try:
+            check2: Locator = form.locator("text=/(log.?in|sign.?in|continue|weiter|melde|logge)/i")
+            button: Locator = form.locator(
+                'button:visible,a:visible,*[role="button"]:visible,*[onclick]:visible,'
+                'input[type="button"]:visible,input[type="submit"]:visible', has=check2)
+        except Error:
+            return result
 
-        return result
+        return result or button.count() > 0
