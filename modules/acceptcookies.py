@@ -78,8 +78,6 @@ class AcceptCookies(Module):
 
             z_max = max(z_max, 0 if z_temp == 'auto' else int(z_temp))
 
-        # TODO frame locators if buttons.count() == 0 ?
-
         # Click on first cookie button that works and wait some time
         for i in range(get_locator_count(buttons)):
             button: Optional[Locator] = get_locator_nth(buttons, i)

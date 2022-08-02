@@ -13,7 +13,7 @@ from modules.module import Module
 from utils import get_tld_object, get_url_origin, get_locator_count, get_locator_nth
 
 
-class FindLogin(Module):
+class FindLoginForms(Module):
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
         super().__init__(job_id, crawler_id, database, log)
         self._url: str = ''
@@ -43,7 +43,6 @@ class FindLogin(Module):
         context_database.add_url((url_origin + '/signin/', Config.DEPTH, self._rank, []))
         context_database.add_url((url_origin + '/account/', Config.DEPTH, self._rank, []))
         context_database.add_url((url_origin + '/profile/', Config.DEPTH, self._rank, []))
-        # TODO search engine fallback ?
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
@@ -62,7 +61,7 @@ class FindLogin(Module):
         for i in range(get_locator_count(forms)):
             form: Optional[Locator] = get_locator_nth(forms, i)
 
-            if form is None or not FindLogin._find_login_form(form, url[0], page.url):
+            if form is None or not FindLoginForms._find_login_form(form, url[0], page.url):
                 continue
 
             self._database.invoke_transaction(
@@ -72,6 +71,10 @@ class FindLogin(Module):
                  url[3][-1][1] if len(url[3]) > 0 else None), False)
 
             break
+
+        # TODO and no entries for login for Web site
+        if len(context_database) == 0:
+            pass
 
     @staticmethod
     def _find_login_form(form: Locator, url: str, final_url: str) -> bool:

@@ -12,7 +12,7 @@ from modules.module import Module
 from utils import get_url_full
 
 
-class FindLogin(Module):
+class Login(Module):
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
         super().__init__(job_id, crawler_id, database, log)
         pass

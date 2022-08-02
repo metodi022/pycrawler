@@ -115,7 +115,15 @@ def similar_urls(url1: tld.utils.Result, url2: tld.utils.Result) -> bool:
     if get_url_origin(url1) != get_url_origin(url2):
         return False
 
-    # path1: list[str] = url1.parsed_url.path.split('/')
-    # path2: list[str] = url2.parsed_url.path.split('/')
+    if string_distance(url1.parsed_url.path, url2.parsed_url.path, normalize=True) < 0.45:
+        return True
 
-    return string_distance(url1.parsed_url.path, url2.parsed_url.path, normalize=True) < 0.45
+    path1: list[str] = list(filter(''.__ne__, url1.parsed_url.path.split('/')))
+    path2: list[str] = list(filter(''.__ne__, url2.parsed_url.path.split('/')))
+
+    if len(path1) > 1 and len(path1) == len(path2):
+        return string_distance(path1[-2], path2[-2], normalize=True) < 0.45 if (
+                len(path1[-1]) > 15 or len(path2[-1]) >= 15) \
+            else string_distance(path1[-2], path2[-2], normalize=True) < 0.45
+
+    return False
