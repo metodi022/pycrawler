@@ -2,6 +2,7 @@ import pathlib
 import re
 from typing import Optional
 
+import numpy
 import tld
 from playwright.sync_api import Page, Locator, Error
 from tld.exceptions import TldBadUrl, TldDomainNotFound
@@ -85,3 +86,36 @@ def get_locator_attribute(locator: Optional[Locator], attribute: str) -> Optiona
         return locator.get_attribute(attribute)
     except Error:
         return None
+
+
+def string_distance(str1: str, str2: str, transposition: bool = False,
+                    normalize: bool = False) -> float:
+    track = numpy.zeros((len(str1) + 1, len(str2) + 1))
+
+    for i in range(len(str1) + 1):
+        track[i][0] = i
+
+    for j in range(len(str2) + 1):
+        track[0][j] = j
+
+    for i in range(1, len(str1) + 1):
+        for j in range(1, len(str2) + 1):
+            cost: int = str1[i - 1] != str2[j - 1]
+            track[i][j] = min(track[i - 1][j] + 1, track[i][j - 1] + 1, track[i - 1][j - 1] + cost)
+
+            if transposition:
+                if i > 1 and j > 1 and str1[i] == str2[j - 1] and str1[i - 1] == str2[j]:
+                    track[i][j] = min(track[i][j], track[i - 2][j - 2] + 1)
+
+    result: float = float(track[len(str1)][len(str2)])
+    return (2 * result) / (len(str1) + len(str2) + result) if normalize else result
+
+
+def similar_urls(url1: tld.utils.Result, url2: tld.utils.Result) -> bool:
+    if get_url_origin(url1) != get_url_origin(url2):
+        return False
+
+    # path1: list[str] = url1.parsed_url.path.split('/')
+    # path2: list[str] = url2.parsed_url.path.split('/')
+
+    return string_distance(url1.parsed_url.path, url2.parsed_url.path, normalize=True) < 0.45

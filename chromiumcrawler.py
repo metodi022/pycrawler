@@ -69,9 +69,8 @@ class ChromiumCrawler:
                            (Config.LOG / f"screenshots/job{self.job_id}rank{url[2]}.png"))
 
             # Run module response handler
-            self._invoke_response_handler(browser, context, page,
-                                          [response] if response is not None else [], url,
-                                          context_database, [start])
+            self._invoke_response_handler(browser, context, page, [response], url, context_database,
+                                          [start])
 
             # Get next URL to crawl
             start = datetime.now()
