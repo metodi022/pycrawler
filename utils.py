@@ -5,6 +5,7 @@ from typing import Optional
 import numpy
 import tld
 from playwright.sync_api import Page, Locator, Error
+from sklearn.cluster import dbscan
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
 
@@ -88,8 +89,7 @@ def get_locator_attribute(locator: Optional[Locator], attribute: str) -> Optiona
         return None
 
 
-def string_distance(str1: str, str2: str, transposition: bool = False,
-                    normalize: bool = False) -> float:
+def get_string_distance(str1: str, str2: str, normalize: bool = False) -> float:
     track = numpy.zeros((len(str1) + 1, len(str2) + 1))
 
     for i in range(len(str1) + 1):
@@ -103,27 +103,35 @@ def string_distance(str1: str, str2: str, transposition: bool = False,
             cost: int = str1[i - 1] != str2[j - 1]
             track[i][j] = min(track[i - 1][j] + 1, track[i][j - 1] + 1, track[i - 1][j - 1] + cost)
 
-            if transposition:
-                if i > 1 and j > 1 and str1[i] == str2[j - 1] and str1[i - 1] == str2[j]:
-                    track[i][j] = min(track[i][j], track[i - 2][j - 2] + 1)
+            if i > 1 and j > 1 and str1[i - 1] == str2[j - 2] and str1[i - 2] == str2[j - 1]:
+                track[i][j] = min(track[i][j], track[i - 2][j - 2] + 1)
 
     result: float = float(track[len(str1)][len(str2)])
-    return (2 * result) / (len(str1) + len(str2) + result) if normalize else result
+    return (2 * result) / (len(str1) + len(str2) + result) if normalize and (
+            len(str1) + len(str2) + result) != 0.0 else result
 
 
-def similar_urls(url1: tld.utils.Result, url2: tld.utils.Result) -> bool:
+def get_urls_distance(url1: tld.utils.Result, url2: tld.utils.Result,
+                      normalize: bool = False) -> float:
     if get_url_origin(url1) != get_url_origin(url2):
-        return False
-
-    if string_distance(url1.parsed_url.path, url2.parsed_url.path, normalize=True) < 0.45:
-        return True
+        return 1.0 if normalize else float(len(url1.parsed_url.path) + len(url2.parsed_url.path))
 
     path1: list[str] = list(filter(''.__ne__, url1.parsed_url.path.split('/')))
     path2: list[str] = list(filter(''.__ne__, url2.parsed_url.path.split('/')))
 
-    if len(path1) > 1 and len(path1) == len(path2):
-        return string_distance(path1[-2], path2[-2], normalize=True) < 0.45 if (
-                len(path1[-1]) > 15 or len(path2[-1]) >= 15) \
-            else string_distance(path1[-2], path2[-2], normalize=True) < 0.45
+    if len(path1) > 1 and len(path1) == len(path2) and (
+            len(path1[-1]) >= 25 or len(path2[-1]) >= 25):
+        return get_string_distance(path1[-2], path2[-2], normalize=True)
 
-    return False
+    return get_string_distance(url1.parsed_url.path, url2.parsed_url.path, normalize=normalize)
+
+
+def get_urls_cluster(urls: list[tld.utils.Result], threshold: float):
+    cluster = dbscan(numpy.arange(len(urls)).reshape(-1, 1),
+                     metric=lambda x, y: get_urls_distance(urls[int(x[0])], urls[int(y[0])],
+                                                           normalize=True), eps=threshold,
+                     min_samples=2)
+
+    # TODO finish
+
+    return cluster
