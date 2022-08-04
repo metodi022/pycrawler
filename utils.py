@@ -8,6 +8,9 @@ from playwright.sync_api import Page, Locator, Error
 from sklearn.cluster import dbscan
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
+CLICKABLES: str = r'button:visible,a:visible,*[role="button"]:visible,*[onclick]:visible,' \
+                  r'input[type="button"]:visible,input[type="submit"]:visible '
+
 
 def get_tld_object(url: str) -> Optional[tld.utils.Result]:
     try:
@@ -135,3 +138,12 @@ def get_urls_cluster(urls: list[tld.utils.Result], threshold: float):
     # TODO finish
 
     return cluster
+
+
+def invoke_click(page: Page, clickable: Optional[Locator]) -> None:
+    if clickable is None:
+        return
+
+    clickable.hover()
+    page.wait_for_timeout(500)
+    clickable.click(delay=500)

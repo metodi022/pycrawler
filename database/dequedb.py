@@ -38,3 +38,6 @@ class DequeDB:
     def clear_urls(self) -> None:
         self._seen.clear()
         self._data.clear()
+
+    def __len__(self):
+        return len(self._data)

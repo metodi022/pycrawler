@@ -132,8 +132,8 @@ class ChromiumCrawler:
                                  context_database: DequeDB, start: List[datetime]) -> None:
         self._log.debug('Invoke module response handler')
 
-        final_url: str = get_url_full(get_tld_object(page.url)) if get_tld_object(  # type: ignore
-            page.url) is not None else url[0]
+        final_url_object: Optional[tld.utils.Result] = get_tld_object(page.url)
+        final_url: str = get_url_full(final_url_object) if final_url_object is not None else url[0]
         for module in self._modules:
             module.receive_response(browser, context, page, responses, context_database, url,
                                     final_url, start)

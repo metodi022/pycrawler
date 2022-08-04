@@ -9,16 +9,15 @@ from config import Config
 from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
-from utils import get_url_origin, get_tld_object, get_screenshot, get_locator_count, get_locator_nth
+from utils import get_url_origin, get_tld_object, get_screenshot, get_locator_count, \
+    get_locator_nth, invoke_click, CLICKABLES
 
 
 class AcceptCookies(Module):
-    CHECK_ENG: str = '(accept|okay|ok|consent|agree|allow|understand|continue|yes|got it)'
+    CHECK_ENG: str = '(accept|okay|ok|consent|agree|allow|understand|continue|yes|got it|fine)'
     CHECK_GER: str = '(stimm|verstanden|versteh|akzeptier|ja|weiter|annehm|bestätig|willig|' \
                      'zulassen|lasse) '
-    CHECK_TEX: str = f"^{CHECK_ENG}|\\W{CHECK_ENG}|^{CHECK_GER}|\\W{CHECK_GER}"
-    ELEM_SEL: str = 'button:visible,a:visible,*[role="button"]:visible,*[onclick]:visible,' \
-                    'input[type="button"]:visible,input[type="submit"]:visible'
+    CHECK_TEX: str = f"/^{CHECK_ENG}|\\W{CHECK_ENG}|^{CHECK_GER}|\\W{CHECK_GER}/i"
 
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
         super().__init__(job_id, crawler_id, database, log)
@@ -54,8 +53,10 @@ class AcceptCookies(Module):
 
         # Check for buttons with certain keywords
         try:
-            check: Locator = page.locator(f"text=/{AcceptCookies.CHECK_TEX}/i")
-            buttons: Locator = page.locator(AcceptCookies.ELEM_SEL, has=check)
+            check: Locator = page.locator(f"text={AcceptCookies.CHECK_TEX}")
+            buttons: Locator = page.locator(CLICKABLES, has=check)
+            buttons = page.locator(
+                f"{CLICKABLES} >> text={AcceptCookies.CHECK_TEX}") if buttons.count() == 0 else buttons
         except Error:
             return
 
@@ -94,9 +95,7 @@ class AcceptCookies(Module):
                 continue
 
             try:
-                button.hover(timeout=Config.WAIT_AFTER_LOAD)
-                page.wait_for_timeout(500)
-                button.click(timeout=Config.WAIT_AFTER_LOAD, delay=500)
+                invoke_click(page, button)
                 break
             except Error:
                 # Empty
