@@ -56,12 +56,14 @@ class AcceptCookies(Module):
             check: Locator = page.locator(f"text={AcceptCookies.CHECK_TEX}")
             buttons: Locator = page.locator(CLICKABLES, has=check)
             buttons = page.locator(
-                f"{CLICKABLES} >> text={AcceptCookies.CHECK_TEX}") if buttons.count() == 0 else buttons
+                f"{CLICKABLES} >> text={AcceptCookies.CHECK_TEX}") if get_locator_count(
+                buttons) == 0 else buttons
         except Error:
             return
 
         self._log.info(f"Find {get_locator_count(buttons)} possible cookie accept buttons")
         if get_locator_count(buttons) == 0:
+            # TODO search frames
             return
 
         # Check for topmost z-index button with keywords

@@ -136,7 +136,6 @@ def get_urls_cluster(urls: list[tld.utils.Result], threshold: float):
                      min_samples=2)
 
     # TODO finish
-
     return cluster
 
 

@@ -81,28 +81,31 @@ class FindLoginForms(Module):
 
             break
 
-        if found_page:
+        check1: str = r"(log.?in|sign.?in|account|profile|auth|connect)"
+        if found_page or (url[0] != self._url and re.search(check1, url[0], re.I) is None
+                          and re.search(check1, page.url, re.I) is None):
             return
 
         buttons: Optional[Locator] = None
         try:
-            check_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer.?name/i'
-            check: Locator = page.locator(f"text={check_str}")
-            buttons = page.locator(CLICKABLES, has=check)
+            check2_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer.?name/i'
+            check2: Locator = page.locator(f"text={check2_str}")
+            buttons = page.locator(CLICKABLES, has=check2)
             buttons = page.locator(
-                f"{CLICKABLES} >> text={check_str}") if buttons.count() == 0 else buttons
+                f"{CLICKABLES} >> text={check2_str}") if get_locator_count(
+                buttons) == 0 else buttons
         except Error:
             # Ignored
             pass
 
-        if buttons is not None and buttons.count() > 0:
+        if buttons is not None and get_locator_count(buttons) > 0:
             self._found_site = True
             self._log.info(f"Found a possible login button")
 
-            for i in range(buttons.count()):
+            for i in range(get_locator_count(buttons)):
                 button: Optional[Locator] = get_locator_nth(buttons, i)
 
-                if button is None or re.match(
+                if button is None or re.search(
                         r"Facebook|Twitter|Google|Yahoo|Windows.?Live|LinkedIn|GitHub|PayPal|Amazon|vKontakte|Yandex|37signals|Box|Salesforce|Fitbit|Baidu|RenRen|Weibo|AOL|Shopify|WordPress|Dwolla|miiCard|Yammer|SoundCloud|Instagram|The City|Planning Center|Evernote|Exact",
                         button.text_content(), flags=re.I) is not None:
                     continue
@@ -144,11 +147,12 @@ class FindLoginForms(Module):
     @staticmethod
     def _find_login_form(form: Locator, url: str, final_url: str) -> bool:
         try:
-            password_fields: int = form.locator('input[type="password"]:visible').count()
-            text_fields: int = form.locator('input[type="email"]:visible').count() + form.locator(
-                'input[type="text"]:visible').count() + form.locator(
-                'input[type="tel"]:visible').count() + form.locator(
-                'input:not([type]):visible').count()
+            password_fields: int = get_locator_count(form.locator('input[type="password"]:visible'))
+            text_fields: int = get_locator_count(
+                form.locator('input[type="email"]:visible')) + get_locator_count(
+                form.locator('input[type="text"]:visible')) + get_locator_count(
+                form.locator('input[type="tel"]:visible')) + get_locator_count(
+                form.locator('input:not([type]):visible'))
         except Error:
             return False
 
@@ -168,8 +172,11 @@ class FindLoginForms(Module):
             check2: Locator = form.locator(f"text={check2_str}")
             button: Locator = form.locator(CLICKABLES, has=check2)
             button = form.locator(
-                f"{CLICKABLES} >> text={check2_str}") if button.count() == 0 else button
+                f"{CLICKABLES} >> text={check2_str}") if get_locator_count(button) == 0 else button
         except Error:
             return result
 
-        return result or button.count() > 0
+        check3: str = r"search|feedback"
+
+        return (result or get_locator_count(button) > 0) and re.search(check3, form.inner_html(),
+                                                                       re.I) is None
