@@ -39,7 +39,9 @@ class CollectUrls(Module):
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime]) -> None:
-        context_database.add_seen(final_url)
+        final_url_object: Optional[tld.utils.Result] = get_tld_object(final_url)
+        context_database.add_seen(
+            get_url_full(final_url_object) if final_url_object is not None else final_url)
 
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None

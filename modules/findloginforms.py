@@ -11,7 +11,7 @@ from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
 from utils import get_tld_object, get_url_origin, get_locator_count, get_locator_nth, \
-    invoke_click, get_url_full, CLICKABLES
+    invoke_click, CLICKABLES
 
 
 class FindLoginForms(Module):
@@ -68,15 +68,14 @@ class FindLoginForms(Module):
             if form is None or not FindLoginForms._find_login_form(form, url[0], page.url):
                 continue
 
-            found_page = True
-            self._found_site = True
-
             self._database.invoke_transaction(
                 "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (self._rank, self.job_id, self.crawler_id, self._url, url[0], final_url, url[1],
                  url[3][-1][0] if len(url[3]) > 0 else None,
                  url[3][-1][1] if len(url[3]) > 0 else None), False)
 
+            found_page = True
+            self._found_site = True
             self._log.info(f"Found a possible login form")
 
             break
@@ -122,11 +121,7 @@ class FindLoginForms(Module):
 
                 break
 
-            final_url_object: Optional[tld.utils.Result] = get_tld_object(page.url)
-            final_url_new: str = get_url_full(
-                final_url_object) if final_url_object is not None else page.url
-
-            if final_url_new == final_url:
+            if page.url == final_url:
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
                     (self._rank, self.job_id, self.crawler_id, self._url, url[0], final_url, url[1],
@@ -135,8 +130,8 @@ class FindLoginForms(Module):
             else:
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (self._rank, self.job_id, self.crawler_id, self._url, final_url_new,
-                     final_url_new, url[1] + 1, url[0], final_url), False)
+                    (self._rank, self.job_id, self.crawler_id, self._url, page.url,
+                     page.url, url[1] + 1, url[0], final_url), False)
 
         if self._found_site or len(context_database) > 0:
             return

@@ -13,7 +13,7 @@ from modules.acceptcookies import AcceptCookies
 from modules.collecturls import CollectUrls
 from modules.module import Module
 from modules.savestats import SaveStats
-from utils import get_tld_object, get_url_full, get_screenshot
+from utils import get_screenshot
 
 
 class ChromiumCrawler:
@@ -132,11 +132,9 @@ class ChromiumCrawler:
                                  context_database: DequeDB, start: List[datetime]) -> None:
         self._log.debug('Invoke module response handler')
 
-        final_url_object: Optional[tld.utils.Result] = get_tld_object(page.url)
-        final_url: str = get_url_full(final_url_object) if final_url_object is not None else url[0]
         for module in self._modules:
             module.receive_response(browser, context, page, responses, context_database, url,
-                                    final_url, start)
+                                    page.url, start)
 
     def _initialize_modules(self, modules: List[Type[Module]], job_id: int, crawler_id: int,
                             database: Postgres, log: Logger) -> List[Module]:
