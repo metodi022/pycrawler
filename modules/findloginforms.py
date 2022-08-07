@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from logging import Logger
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Callable
 
 import tld.utils
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
@@ -11,7 +11,7 @@ from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
 from utils import get_tld_object, get_url_origin, get_locator_count, get_locator_nth, \
-    invoke_click, CLICKABLES
+    invoke_click, CLICKABLES, get_url_full
 
 
 class FindLoginForms(Module):
@@ -171,7 +171,19 @@ class FindLoginForms(Module):
         except Error:
             return result
 
-        check3: str = r"search|feedback"
+        check3: str = r"search|feedback|subscribe|contact"
 
         return (result or get_locator_count(button) > 0) and re.search(check3, form.inner_html(),
                                                                        re.I) is None
+
+    @staticmethod
+    def add_url_filter_out(filters: List[Callable[[tld.utils.Result], bool]]) -> None:
+        def filt(url: tld.utils.Result) -> bool:
+            return re.match(
+                r'(\.js|\.mp3|\.wav|\.aif|\.aiff|\.wma|\.csv|\.pdf|\.jpg|\.png|\.gif|\.tif|\.svg'
+                r'|\.bmp|\.psd|\.tiff|\.ai|\.lsm|\.3gp|\.avi|\.flv|\.gvi|\.m2v|\.m4v|\.mkv|\.mov'
+                r'|\.mp4|\.mpg|\.ogv|\.wmv|\.xml|\.otf|\.ttf|\.css|\.rss|\.ico|\.cfg|\.ogg|\.mpa'
+                r'|\.jpeg|\.webm|\.mpeg|\.webp)$',
+                get_url_full(url), re.I) is not None
+
+        filters.append(filt)

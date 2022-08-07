@@ -67,5 +67,5 @@ class Module:
         raise NotImplementedError
 
     @staticmethod
-    def add_url_filter_out(filters: List[Callable[[tld.utils.Result], bool]]):
+    def add_url_filter_out(filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         pass
