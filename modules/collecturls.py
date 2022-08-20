@@ -10,7 +10,7 @@ from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
 from utils import get_tld_object, get_url_from_href, get_url_origin, get_url_full, \
-    get_locator_count, get_locator_nth, get_locator_attribute
+    get_locator_count, get_locator_nth, get_locator_attribute, get_url_full_with_query_fragment
 
 
 class CollectUrls(Module):
@@ -30,6 +30,7 @@ class CollectUrls(Module):
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB,
                      url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+        context_database.clear_urls()
         context_database.add_seen(url[0])
         self._url = url[0]
         self._rank = url[2]
@@ -39,14 +40,12 @@ class CollectUrls(Module):
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime]) -> None:
-        final_url_object: Optional[tld.utils.Result] = get_tld_object(final_url)
+        parsed_url_final: Optional[tld.utils.Result] = get_tld_object(final_url)
         context_database.add_seen(
-            get_url_full(final_url_object) if final_url_object is not None else final_url)
+            get_url_full(parsed_url_final) if parsed_url_final is not None else final_url)
 
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
-        if response is None and url[0] == self._url:
-            context_database.clear_urls()
         if response is None or response.status >= 400:
             return
 
@@ -55,7 +54,7 @@ class CollectUrls(Module):
             return
 
         parsed_url: Optional[tld.utils.Result] = get_tld_object(self._url)
-        if parsed_url is None:
+        if parsed_url is None or parsed_url_final is None:
             return
 
         # Iterate over each <a> tag and add its href
@@ -73,7 +72,8 @@ class CollectUrls(Module):
                 continue
 
             # Parse attribute
-            parsed_link: Optional[tld.utils.Result] = get_url_from_href(link.strip(), parsed_url)
+            parsed_link: Optional[tld.utils.Result] = get_url_from_href(link.strip(),
+                                                                        parsed_url_final)
             if parsed_link is None:
                 continue
 
@@ -105,8 +105,8 @@ class CollectUrls(Module):
             urls.append(parsed_link)
 
         for parsed_link in urls:
-            context_database.add_url_force(
-                (get_url_full(parsed_link), url[1] + 1, url[2], url[3] + [(url[0], final_url)]))
+            context_database.add_url_force((get_url_full_with_query_fragment(parsed_link),
+                                            url[1] + 1, url[2], url[3] + [(url[0], final_url)]))
 
             self._max_urls -= 1
             if self._max_urls < 1:

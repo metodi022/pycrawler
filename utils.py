@@ -9,7 +9,12 @@ from sklearn.cluster import dbscan
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
 CLICKABLES: str = r'button:visible,a:visible,*[role="button"]:visible,*[onclick]:visible,' \
-                  r'input[type="button"]:visible,input[type="submit"]:visible '
+                  r'input[type="button"]:visible,input[type="submit"]:visible'
+
+SSO: str = r'Facebook|Twitter|Google|Yahoo|Windows.?Live|Linked.?In|Git.?Hub|Pay.?Pal|Amazon|' \
+           r'v.?Kontakte|Yandex|37.?signals|Box|Salesforce|Fitbit|Baidu|Ren.?Ren|Weibo|AOL|' \
+           r'Shopify|Word.?Press|Dwolla|miiCard|Yammer|Sound.?Cloud|Instagram|The.?City|Planning|' \
+           r'Center|Evernote|Exact|Apple'
 
 
 def get_tld_object(url: str) -> Optional[tld.utils.Result]:
@@ -29,6 +34,11 @@ def get_url_etldp1(url: tld.utils.Result) -> str:
 
 def get_url_full(url: tld.utils.Result) -> str:
     return url.parsed_url.scheme + '://' + url.parsed_url.netloc + url.parsed_url.path
+
+
+def get_url_full_with_query_fragment(url: tld.utils.Result) -> str:
+    return get_url_full(url) + ('?' if url.parsed_url.query else '') + url.parsed_url.query + (
+        '#' if url.parsed_url.fragment else '') + url.parsed_url.fragment
 
 
 def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils.Result]:
@@ -90,6 +100,51 @@ def get_locator_attribute(locator: Optional[Locator], attribute: str) -> Optiona
         return locator.get_attribute(attribute)
     except Error:
         return None
+
+
+def get_outer_html(locator: Optional[Locator]) -> Optional[str]:
+    if locator is None:
+        return None
+
+    try:
+        return locator.evaluate("node => node.outerHTML;")
+    except Error:
+        return None
+
+
+def get_label_for(locator: Locator, element_id: str) -> Locator:
+    return locator.locator(f"label[for=\"{element_id}\"]")
+
+
+def get_highest_z_index(locator: Locator) -> Locator:
+    z_max: int = 0
+    for i in range(get_locator_count(locator)):
+        entry: Optional[Locator] = get_locator_nth(locator, i)
+        if entry is None:
+            continue
+
+        try:
+            z_temp = entry.evaluate("node => getComputedStyle(node).getPropertyValue('z-index')")
+        except Error:
+            continue
+
+        z_max = max(z_max, 0 if z_temp == 'auto' else int(z_temp))
+
+    for i in range(get_locator_count(locator)):
+        entry: Optional[Locator] = get_locator_nth(locator, i)
+        if entry is None:
+            continue
+
+        try:
+            z_temp = entry.evaluate(
+                "node => getComputedStyle(node).getPropertyValue('z-index')")
+        except Error:
+            continue
+
+        if (0 if z_temp == 'auto' else int(z_temp)) >= z_max:
+            return entry
+
+    return locator
 
 
 def get_string_distance(str1: str, str2: str, normalize: bool = False) -> float:

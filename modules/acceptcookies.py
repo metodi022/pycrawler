@@ -61,9 +61,10 @@ class AcceptCookies(Module):
         except Error:
             return
 
+        # TODO search frames if no buttons were found
+
         self._log.info(f"Find {get_locator_count(buttons)} possible cookie accept buttons")
         if get_locator_count(buttons) == 0:
-            # TODO search frames
             return
 
         # Check for topmost z-index button with keywords
@@ -100,7 +101,7 @@ class AcceptCookies(Module):
                 invoke_click(page, button)
                 break
             except Error:
-                # Empty
+                # Ignored
                 pass
 
         page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
@@ -113,7 +114,7 @@ class AcceptCookies(Module):
             responses.append(None)
             return
 
-        if response is None:
+        if response is None or response.status >= 400:
             start.append(temp)
             responses.append(None)
             return
