@@ -11,7 +11,7 @@ from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
 from utils import get_tld_object, get_url_origin, get_locator_count, get_locator_nth, \
-    invoke_click, CLICKABLES, get_url_full
+    invoke_click, CLICKABLES, get_url_full, SSO, get_outer_html
 
 
 class FindLoginForms(Module):
@@ -61,11 +61,10 @@ class FindLoginForms(Module):
         except Error:
             return
 
-        found_page: bool = False
         for i in range(get_locator_count(forms)):
             form: Optional[Locator] = get_locator_nth(forms, i)
 
-            if form is None or not FindLoginForms._find_login_form(form, url[0], page.url):
+            if form is None or not FindLoginForms._find_login_form(form):
                 continue
 
             self._database.invoke_transaction(
@@ -74,28 +73,23 @@ class FindLoginForms(Module):
                  url[3][-1][0] if len(url[3]) > 0 else None,
                  url[3][-1][1] if len(url[3]) > 0 else None), False)
 
-            found_page = True
             self._found_site = True
             self._log.info(f"Found a possible login form")
 
-            break
-
-        check1: str = r"(log.?in|sign.?in|account|profile|auth|connect)"
-        if found_page or (url[0] != self._url and re.search(check1, url[0], re.I) is None
-                          and re.search(check1, page.url, re.I) is None):
             return
 
         buttons: Optional[Locator] = None
         try:
-            check2_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer.?name/i'
-            check2: Locator = page.locator(f"text={check2_str}")
-            buttons = page.locator(CLICKABLES, has=check2)
+            check1_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|next|' \
+                              r'continue|proceed/i'
+            check1: Locator = page.locator(f"text={check1_str}")
+            buttons = page.locator(CLICKABLES, has=check1)
             buttons = page.locator(
-                f"{CLICKABLES} >> text={check2_str}") if get_locator_count(
+                f"{CLICKABLES} >> text={check1_str}") if get_locator_count(
                 buttons) == 0 else buttons
         except Error:
             # Ignored
-            pass
+            return
 
         if buttons is not None and get_locator_count(buttons) > 0:
             self._found_site = True
@@ -104,9 +98,7 @@ class FindLoginForms(Module):
             for i in range(get_locator_count(buttons)):
                 button: Optional[Locator] = get_locator_nth(buttons, i)
 
-                if button is None or re.search(
-                        r"Facebook|Twitter|Google|Yahoo|Windows.?Live|LinkedIn|GitHub|PayPal|Amazon|vKontakte|Yandex|37signals|Box|Salesforce|Fitbit|Baidu|RenRen|Weibo|AOL|Shopify|WordPress|Dwolla|miiCard|Yammer|SoundCloud|Instagram|The City|Planning Center|Evernote|Exact",
-                        button.text_content(), flags=re.I) is not None:
+                if button is None or re.search(SSO, get_outer_html(button), flags=re.I) is not None:
                     continue
 
                 try:
@@ -117,7 +109,7 @@ class FindLoginForms(Module):
                     page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
                 except Error:
                     # Ignored
-                    continue
+                    pass
 
                 break
 
@@ -137,10 +129,9 @@ class FindLoginForms(Module):
             return
 
         # TODO and no entries for login for Web site
-        pass
 
     @staticmethod
-    def _find_login_form(form: Locator, url: str, final_url: str) -> bool:
+    def _find_login_form(form: Locator) -> bool:
         try:
             password_fields: int = get_locator_count(form.locator('input[type="password"]:visible'))
             text_fields: int = get_locator_count(
@@ -151,30 +142,24 @@ class FindLoginForms(Module):
         except Error:
             return False
 
-        if password_fields > 1 or text_fields != 1:
+        if password_fields > 1 or text_fields == 0 or text_fields > 2:
             return False
 
         if password_fields == 1:
             return True
 
-        check1: str = r"(log.?in|sign.?in|account|profile|auth|connect)"
-
-        result: bool = re.search(check1, url, re.I) is not None
-        result = result or re.search(check1, final_url, re.I) is not None
-
         try:
-            check2_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge)/i'
-            check2: Locator = form.locator(f"text={check2_str}")
-            button: Locator = form.locator(CLICKABLES, has=check2)
+            check1_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|proceed)/i'
+            check1: Locator = form.locator(f"text={check1_str}")
+            button: Locator = form.locator(CLICKABLES, has=check1)
             button = form.locator(
-                f"{CLICKABLES} >> text={check2_str}") if get_locator_count(button) == 0 else button
+                f"{CLICKABLES} >> text={check1_str}") if get_locator_count(button) == 0 else button
         except Error:
-            return result
+            return False
 
-        check3: str = r"search|feedback|subscribe|contact"
+        # TODO can also check HTML for keywords or ignore certain keywords
 
-        return (result or get_locator_count(button) > 0) and re.search(check3, form.inner_html(),
-                                                                       re.I) is None
+        return get_locator_count(button) > 0
 
     @staticmethod
     def add_url_filter_out(filters: List[Callable[[tld.utils.Result], bool]]) -> None:
