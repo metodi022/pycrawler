@@ -19,6 +19,7 @@ class FindLoginForms(Module):
         super().__init__(job_id, crawler_id, database, log)
         self._url: str = ''
         self._rank: int = 0
+        self._landing_page: bool = True
         self._found_site: bool = False
 
     @staticmethod
@@ -35,6 +36,7 @@ class FindLoginForms(Module):
                      url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
         self._url = url[0]
         self._rank = url[2]
+        self._landing_page = True
         self._found_site = False
 
         temp: Optional[tld.utils.Result] = get_tld_object(self._url)
@@ -64,7 +66,7 @@ class FindLoginForms(Module):
         for i in range(get_locator_count(forms)):
             form: Optional[Locator] = get_locator_nth(forms, i)
 
-            if form is None or not FindLoginForms._find_login_form(form):
+            if form is None or not FindLoginForms.find_login_form(form):
                 continue
 
             self._database.invoke_transaction(
@@ -73,10 +75,15 @@ class FindLoginForms(Module):
                  url[3][-1][0] if len(url[3]) > 0 else None,
                  url[3][-1][1] if len(url[3]) > 0 else None), False)
 
+            self._landing_page = False
             self._found_site = True
             self._log.info(f"Found a possible login form")
 
             return
+
+        if not self._landing_page:
+            return
+        self._landing_page = False
 
         buttons: Optional[Locator] = None
         try:
@@ -88,7 +95,6 @@ class FindLoginForms(Module):
                 f"{CLICKABLES} >> text={check1_str}") if get_locator_count(
                 buttons) == 0 else buttons
         except Error:
-            # Ignored
             return
 
         if buttons is not None and get_locator_count(buttons) > 0:
@@ -112,6 +118,8 @@ class FindLoginForms(Module):
                     pass
 
                 break
+            else:
+                return
 
             if page.url == final_url:
                 self._database.invoke_transaction(
@@ -128,10 +136,10 @@ class FindLoginForms(Module):
         if self._found_site or len(context_database) > 0:
             return
 
-        # TODO and no entries for login for Web site
+        # TODO no entries for login for Web site -> search engine
 
     @staticmethod
-    def _find_login_form(form: Locator) -> bool:
+    def find_login_form(form: Locator) -> bool:
         try:
             password_fields: int = get_locator_count(form.locator('input[type="password"]:visible'))
             text_fields: int = get_locator_count(
@@ -169,6 +177,6 @@ class FindLoginForms(Module):
                 r'|\.bmp|\.psd|\.tiff|\.ai|\.lsm|\.3gp|\.avi|\.flv|\.gvi|\.m2v|\.m4v|\.mkv|\.mov'
                 r'|\.mp4|\.mpg|\.ogv|\.wmv|\.xml|\.otf|\.ttf|\.css|\.rss|\.ico|\.cfg|\.ogg|\.mpa'
                 r'|\.jpeg|\.webm|\.mpeg|\.webp)$',
-                get_url_full(url), re.I) is not None
+                get_url_full(url), flags=re.I) is not None
 
         filters.append(filt)
