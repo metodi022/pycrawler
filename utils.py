@@ -24,19 +24,31 @@ def get_tld_object(url: str) -> Optional[tld.utils.Result]:
         return None
 
 
-def get_url_origin(url: tld.utils.Result) -> str:
+def get_url_origin(url: Optional[tld.utils.Result]) -> str:
+    if url is None:
+        return ''
+
     return url.parsed_url.scheme + '://' + url.parsed_url.netloc
 
 
-def get_url_etldp1(url: tld.utils.Result) -> str:
+def get_url_etldp1(url: Optional[tld.utils.Result]) -> str:
+    if url is None:
+        return ''
+
     return url.parsed_url.scheme + '://' + url.fld
 
 
-def get_url_full(url: tld.utils.Result) -> str:
+def get_url_full(url: Optional[tld.utils.Result]) -> str:
+    if url is None:
+        return ''
+
     return url.parsed_url.scheme + '://' + url.parsed_url.netloc + url.parsed_url.path
 
 
-def get_url_full_with_query_fragment(url: tld.utils.Result) -> str:
+def get_url_full_with_query_fragment(url: Optional[tld.utils.Result]) -> str:
+    if url is None:
+        return ''
+
     return get_url_full(url) + ('?' if url.parsed_url.query else '') + url.parsed_url.query + (
         '#' if url.parsed_url.fragment else '') + url.parsed_url.fragment
 
