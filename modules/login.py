@@ -13,10 +13,15 @@ from modules.findloginforms import FindLoginForms
 from modules.module import Module
 from utils import get_locator_count, get_locator_nth, CLICKABLES, \
     get_locator_attribute, get_outer_html, invoke_click, SSO, get_label_for, get_screenshot, \
-    get_url_full_with_query_fragment
+    get_url_full_with_query_fragment, get_tld_object, get_url_full
 
 
 class Login(Module):
+    ERROR_MESSAGE: str = r"incorrect|wrong|falsch|fehlerhaft|ungültig|ungueltig|not match|stimmt " \
+                         r"nicht|existiert nicht|doesn't match|doesn't exist|not exist|isn't " \
+                         r"right|not right|nicht richtig|fail|fehlgeschlagen|wasn't right|not " \
+                         r"right"
+
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
         super().__init__(job_id, crawler_id, database, log)
         self.success = False
@@ -42,8 +47,8 @@ class Login(Module):
 
         # Get account details from database
         self._account = self._database.invoke_transaction(
-            "SELECT email, username, password FROM accounts WHERE rank=%s and (registration=2 or "
-            "registration = 3)", (self._rank,), True)
+            "SELECT email, username, password, first_name, last_name FROM accounts WHERE rank=%s "
+            "and (registration=2 or registration = 3)", (self._rank,), True)
 
         # Check if we got credentials for the given site
         if self._account is None or len(self._account) == 0:
@@ -76,6 +81,7 @@ class Login(Module):
             if response is None or response.status >= 400:
                 continue
 
+            url_form_final: str = get_url_full(get_tld_object(page.url)) or page.url
             page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
             # Get all forms
@@ -86,7 +92,7 @@ class Login(Module):
                 continue
 
             # Iterate over all forms and get the login form
-            form: Optional[Locator] = None
+            form: Optional[Locator]
             for i in range(get_locator_count(forms)):
                 form = get_locator_nth(forms, i)
 
@@ -146,16 +152,32 @@ class Login(Module):
                     continue
 
             # If filling of login form fails, continue to next login form URL
-            if form is None or self._fill_login_form(page, form):
+            if form is None or not self._fill_login_form(page, form):
                 continue
 
             # If posting login form fails, continue to next login form URL
             if not self._post_login_form(page, form):
+                get_screenshot(page,
+                               Config.LOG /
+                               f"screenshots/job{self.job_id}rank{self._rank}afterlogin.png")
                 continue
 
-            # If login is not successful, continue to next login form URL
-            if not self._verify_login(page, form):
+            # Sometimes login forms require two clicks to send, if not redirected, try posting again
+            if get_url_full(get_tld_object(page.url)) == url_form_final and \
+                    not self._post_login_form(page, form):
+                get_screenshot(page,
+                               Config.LOG /
+                               f"screenshots/job{self.job_id}rank{self._rank}afterlogin.png")
                 continue
+
+            get_screenshot(page,
+                           Config.LOG /
+                           f"screenshots/job{self.job_id}rank{self._rank}afterlogin.png")
+
+            # If login is successful, end
+            if self._verify_login(page, form, url_form[0], url_form_final):
+                self.success = True
+                break
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
@@ -174,34 +196,15 @@ class Login(Module):
     def _fill_login_form(self, page: Page, form: Locator) -> bool:
         try:
             password_field: Locator = form.locator('input[type="password"]:visible')
-            text_field: Locator = form.locator(
+            text_fields: Locator = form.locator(
                 'input[type="email"],input[type="text"],input:not([type]):visible')
         except Error:
             return False
 
-        if get_locator_count(password_field) > 1 or get_locator_count(
-                text_field) < 1 or get_locator_count(text_field) > 2:
-            return False
-
-        try:
-            check1_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|e.?mail|' \
-                              r'user.?name|nutzer.?name)/i'
-            check1: Locator = form.locator(f"text={check1_str}")
-
-            buttons: Optional[Locator] = form.locator(CLICKABLES, has=check1)
-            buttons = form.locator(f"{CLICKABLES} >> text={check1_str}") if get_locator_count(
-                buttons) == 0 else buttons
-        except Error:
-            return False
-
-        if get_locator_count(buttons) == 0:
-            return False
-
-        for i in range(get_locator_count(text_field)):
-            text_type: Optional[str] = get_locator_attribute(get_locator_nth(text_field, i), 'type')
-            label: Locator = get_label_for(form,
-                                           get_locator_attribute(get_locator_nth(text_field, i),
-                                                                 'id'))
+        for i in range(get_locator_count(text_fields)):
+            text_field: Locator = get_locator_nth(text_fields, i) or text_fields
+            text_type: Optional[str] = get_locator_attribute(text_field, 'type')
+            label: Locator = get_label_for(form, get_locator_attribute(text_field, 'id'))
             try:
                 if (text_type is not None and text_type == 'email') or \
                         re.search(r'e.?mail', get_outer_html(text_field) or '', flags=re.I):
@@ -223,8 +226,9 @@ class Login(Module):
                 # Ignored
                 pass
         else:
-            for i in range(get_locator_count(text_field)):
+            for i in range(get_locator_count(text_fields)):
                 try:
+                    text_field: Locator = get_locator_nth(text_fields, i) or text_fields
                     text_field.type(self._account[0][0], delay=100)
                 except Error:
                     return False
@@ -318,16 +322,57 @@ class Login(Module):
         else:
             return False
 
-        get_screenshot(page,
-                       (Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}afterlogin.png"))
-
         return True
 
     # TODO check oracle
-    # 1 - Am I on the same page as the login form? Is there a captcha or a message with invalid
-    # credentials? Are the login details still written in the login form? Is the login form
-    # still accessible through the API?
     # 2 - Is the login page still accessible?
-    # 3 - Are there any username/email indicators on the landing page?
-    def _verify_login(self, page: Page, form: Locator) -> bool:
-        return True
+    def _verify_login(self, page: Page, form: Locator, url: str, final_url: str) -> bool:
+        # Check if page is redirected or there are username/email indicators
+        redirected: bool = get_url_full(get_tld_object(page.url)) != final_url
+        indicators: bool = re.search(
+            f"{self._account[0][0]}|{self._account[0][1]}|"
+            f"{self._account[0][3]}.?.?{self._account[0][4]}|"
+            f"{self._account[0][4]}.?.?{self._account[0][3]}",
+            page.content()) is not None
+
+        if redirected and indicators:
+            return True
+
+        # Check if there are error messages or captcha in the login form
+        if not redirected:
+            try:
+                error_message: bool = re.search(Login.ERROR_MESSAGE, form.inner_html(),
+                                                flags=re.I) is not None
+                captcha: bool = re.search(r'captcha', form.inner_html(), flags=re.I) is not None
+
+                if error_message or captcha:
+                    return False
+            except Error:
+                # Ignored
+                pass
+
+        # Check if page is still accessible
+        try:
+            response = page.goto(url, timeout=Config.LOAD_TIMEOUT,
+                                 wait_until=Config.WAIT_LOAD_UNTIL)
+        except Error:
+            # Ignored
+            return True
+
+        if response is None or response.status >= 400:
+            return True
+
+        page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+
+        try:
+            forms: Locator = page.locator('form:visible',
+                                          has=page.locator('input[type]:visible'))
+        except Error:
+            return True
+
+        for i in range(get_locator_count(forms)):
+            form = get_locator_nth(forms, i)
+            if form is not None and FindLoginForms.find_login_form(form):
+                return False
+
+        return redirected
