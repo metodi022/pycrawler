@@ -28,8 +28,8 @@ class CollectUrls(Module):
         pass
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB,
-                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+                     context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
+                     modules: List[Module]) -> None:
         context_database.clear_urls()
         context_database.add_seen(url[0])
         self._url = url[0]
@@ -39,7 +39,7 @@ class CollectUrls(Module):
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime]) -> None:
+                         start: List[datetime], modules: List[Module]) -> None:
         parsed_url_final: Optional[tld.utils.Result] = get_tld_object(final_url)
         context_database.add_seen(
             get_url_full(parsed_url_final) if parsed_url_final is not None else final_url)

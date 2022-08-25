@@ -124,7 +124,7 @@ class ChromiumCrawler:
         self._log.debug('Invoke module page handler')
 
         for module in self._modules:
-            module.add_handlers(browser, context, page, context_database, url)
+            module.add_handlers(browser, context, page, context_database, url, self._modules)
 
     def _invoke_response_handler(self, browser: Browser, context: BrowserContext, page: Page,
                                  responses: List[Optional[Response]],
@@ -134,7 +134,7 @@ class ChromiumCrawler:
 
         for module in self._modules:
             module.receive_response(browser, context, page, responses, context_database, url,
-                                    page.url, start)
+                                    page.url, start, self._modules)
 
     def _initialize_modules(self, modules: List[Type[Module]], job_id: int, crawler_id: int,
                             database: Postgres, log: Logger) -> List[Module]:

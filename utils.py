@@ -12,9 +12,9 @@ CLICKABLES: str = r'button:visible,a:visible,*[role="button"]:visible,*[onclick]
                   r'input[type="button"]:visible,input[type="submit"]:visible'
 
 SSO: str = r'Facebook|Twitter|Google|Yahoo|Windows.?Live|Linked.?In|Git.?Hub|Pay.?Pal|Amazon|' \
-           r'v.?Kontakte|Yandex|37.?signals|Box|Salesforce|Fitbit|Baidu|Ren.?Ren|Weibo|AOL|' \
-           r'Shopify|Word.?Press|Dwolla|miiCard|Yammer|Sound.?Cloud|Instagram|The.?City|Planning|' \
-           r'Center|Evernote|Exact|Apple'
+           r'v.?Kontakte|Yandex|37.?signals|Salesforce|Fitbit|Baidu|Ren.?Ren|Weibo|AOL|Shopify|' \
+           r'Word.?Press|Dwolla|miiCard|Yammer|Sound.?Cloud|Instagram|The.?City|Apple|Slack|' \
+           r'Evernote'
 
 
 def get_tld_object(url: str) -> Optional[tld.utils.Result]:

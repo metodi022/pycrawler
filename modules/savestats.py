@@ -25,14 +25,14 @@ class SaveStats(Module):
         log.info('Create URLSFEEDBACK table IF NOT EXISTS')
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB,
-                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+                     context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
+                     modules: List[Module]) -> None:
         self._rank = url[2]
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime]) -> None:
+                         start: List[datetime], modules: List[Module]) -> None:
         end: datetime = datetime.now()
         for i, response in enumerate((responses if len(responses) > 0 else [None])):
             self._database.invoke_transaction(

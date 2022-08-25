@@ -33,8 +33,8 @@ class FindContactsEmail(Module):
         log.info('Create CONTACTSEMAIL table IF NOT EXISTS')
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]]) \
-            -> None:
+                     context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
+                     modules: List[Module]) -> None:
         self._url = url[0]
         self._rank = url[2]
         self._seen.clear()
@@ -50,7 +50,7 @@ class FindContactsEmail(Module):
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime]) -> None:
+                         start: List[datetime], modules: List[Module]) -> None:
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
