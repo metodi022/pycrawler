@@ -162,6 +162,8 @@ class FindLoginForms(Module):
             button: Locator = form.locator(CLICKABLES, has=check1)
             button = form.locator(
                 f"{CLICKABLES} >> text={check1_str}") if get_locator_count(button) == 0 else button
+            button = form.locator(f'input[type="submit"]:visible') if get_locator_count(
+                button) == 0 else button
         except Error:
             return False
 
