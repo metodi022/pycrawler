@@ -14,10 +14,10 @@ from utils import get_url_origin, get_tld_object, get_screenshot, get_locator_co
 
 
 class AcceptCookies(Module):
-    CHECK_ENG: str = '(accept|okay|ok|consent|agree|allow|understand|continue|yes|got it|fine)'
-    CHECK_GER: str = '(stimm|verstanden|versteh|akzeptier|ja|weiter|annehm|bestätig|willig|' \
-                     'zulassen|lasse) '
-    CHECK_TEX: str = f"/^{CHECK_ENG}|\\W{CHECK_ENG}|^{CHECK_GER}|\\W{CHECK_GER}/i"
+    CHECK_ENG: str = '/(\\W|^)(accept|okay|ok|consent|agree|allow|understand|continue|yes|' \
+                     'got it|fine)(\\W|$)/i'
+    CHECK_GER: str = '/(\\W|^)(stimm|verstanden|versteh|akzeptier|ja(\\W|$)|weiter(\\W|$)|' \
+                     'annehm|bestätig|willig|zulassen|lasse)/i'
 
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
         super().__init__(job_id, crawler_id, database, log)
@@ -31,8 +31,8 @@ class AcceptCookies(Module):
         pass
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB,
-                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+                     context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
+                     modules: List[Module]) -> None:
         self._url = url[0]
         self._rank = url[2]
         self._urls.clear()
@@ -40,7 +40,7 @@ class AcceptCookies(Module):
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime]) -> None:
+                         start: List[datetime], modules: List[Module]) -> None:
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
             return
@@ -53,11 +53,18 @@ class AcceptCookies(Module):
 
         # Check for buttons with certain keywords
         try:
-            check: Locator = page.locator(f"text={AcceptCookies.CHECK_TEX}")
+            check: Locator = page.locator(f"text={AcceptCookies.CHECK_ENG}")
             buttons: Locator = page.locator(CLICKABLES, has=check)
             buttons = page.locator(
-                f"{CLICKABLES} >> text={AcceptCookies.CHECK_TEX}") if get_locator_count(
+                f"{CLICKABLES} >> text={AcceptCookies.CHECK_ENG}") if get_locator_count(
                 buttons) == 0 else buttons
+
+            if get_locator_count(buttons) == 0:
+                check = page.locator(f"text={AcceptCookies.CHECK_GER}")
+                buttons = page.locator(CLICKABLES, has=check)
+                buttons = page.locator(
+                    f"{CLICKABLES} >> text={AcceptCookies.CHECK_ENG}") if get_locator_count(
+                    buttons) == 0 else buttons
         except Error:
             return
 
