@@ -124,7 +124,7 @@ def get_outer_html(locator: Optional[Locator]) -> Optional[str]:
         return None
 
 
-def get_label_for(locator: Locator, element_id: str) -> Locator:
+def get_label_for(locator: Locator | Page, element_id: str) -> Locator:
     return locator.locator(f"label[for=\"{element_id}\"]")
 
 

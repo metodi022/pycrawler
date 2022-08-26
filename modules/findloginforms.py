@@ -169,7 +169,8 @@ class FindLoginForms(Module):
 
         # TODO can also check HTML for keywords or ignore certain keywords
 
-        return get_locator_count(button) > 0
+        return get_locator_count(button) > 0 and re.search(r'search', get_outer_html(form),
+                                                           flags=re.I) is None
 
     @staticmethod
     def add_url_filter_out(filters: List[Callable[[tld.utils.Result], bool]]) -> None:
