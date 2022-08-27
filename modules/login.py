@@ -17,17 +17,17 @@ from utils import get_locator_count, get_locator_nth, CLICKABLES, \
 
 
 class Login(Module):
-    ERROR_MESSAGE: str = r"incorrect|wrong|falsch|fehlerhaft|ungültig|ungueltig|not match|stimmt " \
-                         r"nicht|existiert nicht|doesn't match|doesn't exist|not exist|isn't " \
-                         r"right|not right|nicht richtig|fail|fehlgeschlagen|wasn't right|not " \
-                         r"right"
+    ERROR_MESSAGE: str = r"(\W|^)(incorrect|wrong|falsch|fehlerhaft|ungültig|ungueltig|" \
+                         r"not match|stimmt nicht|existiert nicht|doesn't match|doesn't exist|" \
+                         r"not exist|isn't right|not right|nicht richtig|fail|fehlgeschlagen|" \
+                         r"wasn't right|not right)(\W|$)"
 
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
         super().__init__(job_id, crawler_id, database, log)
         self.success = False
         self._url: str = ''
         self._rank: int = 0
-        self._account: Optional[List[Tuple[str]]] = None
+        self._account: List[Tuple[str, str, str, str, str]] = []
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
@@ -39,8 +39,8 @@ class Login(Module):
         log.info('Create LOGINS table IF NOT EXISTS')
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB,
-                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+                     context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
+                     modules: List[Module]) -> None:
         self._url = url[0]
         self._rank = url[2]
         self.success = False
@@ -48,12 +48,12 @@ class Login(Module):
         # Get account details from database
         self._account = self._database.invoke_transaction(
             "SELECT email, username, password, first_name, last_name FROM accounts WHERE rank=%s "
-            "and (registration=2 or registration = 3)", (self._rank,), True)
+            "and (registration=2 or registration = 3)", (self._rank,), True) or []
 
         # Check if we got credentials for the given site
         if self._account is None or len(self._account) == 0:
             self._log.info(f"Found no credentials for {self._url}")
-            self._account = ('email@email.com', 'username', 'Passw0rd!')
+            self._account = [('email@email.com', 'username', 'Passw0rd!', 'FirstName', 'LastName')]
 
         # Get URLs with login forms for given site
         url_forms: Optional[List[Tuple[str]]] = self._database.invoke_transaction(
@@ -70,7 +70,7 @@ class Login(Module):
 
             response: Optional[Response] = None
 
-            # Navigate to login form URL
+            # Navigate to log in form URL
             try:
                 response = page.goto(url_form[0], timeout=Config.LOAD_TIMEOUT,
                                      wait_until=Config.WAIT_LOAD_UNTIL)
@@ -84,10 +84,15 @@ class Login(Module):
             url_form_final: str = get_url_full(get_tld_object(page.url)) or page.url
             page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
+            # Accept cookie banners, sometimes they block login forms
+            if Config.ACCEPT_COOKIES:
+                modules[0].receive_response(browser, context, page, [response], context_database,
+                                            (url_form[0], 0, self._rank, []), page.url, [], modules)
+
             # Get all forms
             try:
                 forms: Locator = page.locator('form:visible',
-                                              has=page.locator('input[type]:visible'))
+                                              has=page.locator('input:visible'))
             except Error:
                 continue
 
@@ -103,7 +108,7 @@ class Login(Module):
                 # Find login buttons
                 try:
                     check_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|' \
-                                     r'next|continue/i'
+                                     r'next|continue|fortfahren/i'
                     check: Locator = page.locator(f"text={check_str}")
                     buttons = page.locator(CLICKABLES, has=check)
                     buttons = page.locator(
@@ -137,7 +142,7 @@ class Login(Module):
                 # Get all forms again
                 try:
                     forms = page.locator('form:visible',
-                                         has=page.locator('input[type]:visible'))
+                                         has=page.locator('input:visible'))
                 except Error:
                     continue
 
@@ -162,17 +167,14 @@ class Login(Module):
                                f"screenshots/job{self.job_id}rank{self._rank}afterlogin.png")
                 continue
 
-            # Sometimes login forms require two clicks to send, if not redirected, try posting again
-            if get_url_full(get_tld_object(page.url)) == url_form_final and \
-                    not self._post_login_form(page, form):
-                get_screenshot(page,
-                               Config.LOG /
-                               f"screenshots/job{self.job_id}rank{self._rank}afterlogin.png")
-                continue
-
             get_screenshot(page,
                            Config.LOG /
                            f"screenshots/job{self.job_id}rank{self._rank}afterlogin.png")
+
+            # Accept cookie banners, sometimes they block login forms
+            if Config.ACCEPT_COOKIES:
+                modules[0].receive_response(browser, context, page, [response], context_database,
+                                            (page.url, 0, self._rank, []), page.url, [], modules)
 
             # If login is successful, end
             if self._verify_login(page, form, url_form[0], url_form_final):
@@ -182,7 +184,7 @@ class Login(Module):
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime]) -> None:
+                         start: List[datetime], modules: List[Module]) -> None:
         pass
 
     @staticmethod
@@ -204,7 +206,7 @@ class Login(Module):
         for i in range(get_locator_count(text_fields)):
             text_field: Locator = get_locator_nth(text_fields, i) or text_fields
             text_type: Optional[str] = get_locator_attribute(text_field, 'type')
-            label: Locator = get_label_for(form, get_locator_attribute(text_field, 'id'))
+            label: Locator = get_label_for(form, get_locator_attribute(text_field, 'id') or '')
             try:
                 if (text_type is not None and text_type == 'email') or \
                         re.search(r'e.?mail', get_outer_html(text_field) or '', flags=re.I):
@@ -238,7 +240,7 @@ class Login(Module):
         if get_locator_count(password_field) == 0:
             try:
                 check2_str: str = r'/log.?in|sign.?in|continue|next|weiter|melde|logge|e.?mail|' \
-                                  r'user.?name|nutzer.?name/i '
+                                  r'user.?name|nutzer.?name|fortfahren/i'
                 check2: Locator = form.locator(f"text={check2_str}")
                 buttons = form.locator(CLICKABLES, has=check2)
                 buttons = form.locator(
@@ -290,10 +292,12 @@ class Login(Module):
 
     def _post_login_form(self, page: Page, form: Locator) -> bool:
         try:
-            check_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge)/i'
+            check_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|fortfahren)/i'
             check: Locator = form.locator(f"text={check_str}")
             buttons = form.locator(CLICKABLES, has=check)
             buttons = form.locator(f"{CLICKABLES} >> text={check_str}") if get_locator_count(
+                buttons) == 0 else buttons
+            buttons = form.locator(f'input[type="submit"]:visible') if get_locator_count(
                 buttons) == 0 else buttons
         except Error:
             return False
@@ -324,8 +328,6 @@ class Login(Module):
 
         return True
 
-    # TODO check oracle
-    # 2 - Is the login page still accessible?
     def _verify_login(self, page: Page, form: Locator, url: str, final_url: str) -> bool:
         # Check if page is redirected or there are username/email indicators
         redirected: bool = get_url_full(get_tld_object(page.url)) != final_url
@@ -335,21 +337,51 @@ class Login(Module):
             f"{self._account[0][4]}.?.?{self._account[0][3]}",
             page.content()) is not None
 
-        if redirected and indicators:
-            return True
+        # Check if there are error messages, captcha or verifications
+        error_message: bool = False
+        captcha: bool = False
+        verification: bool = False
 
-        # Check if there are error messages or captcha in the login form
+        # Check for verification again
+        inputs: Locator = page.locator('input:visible')
+        for i in range(get_locator_count(inputs)):
+            input_: Optional[Locator] = get_locator_nth(inputs, i)
+            input_label: Locator = get_label_for(page, get_locator_attribute(input_, 'id') or '')
+
+            if input_ is None:
+                continue
+
+            if re.search(r'(\W|^)(verify|verification|code)(\W|$)', get_outer_html(input_) or '',
+                         flags=re.I) is not None:
+                verification = True
+                break
+
+            if input_label.count() == 1 and re.search(r'(\W|^)(verify|verification|code)(\W|$)',
+                                                      get_outer_html(input_label) or '',
+                                                      flags=re.I) is not None:
+                verification = True
+                break
+
+        # Confirm redirection
         if not redirected:
             try:
-                error_message: bool = re.search(Login.ERROR_MESSAGE, form.inner_html(),
-                                                flags=re.I) is not None
-                captcha: bool = re.search(r'captcha', form.inner_html(), flags=re.I) is not None
-
-                if error_message or captcha:
-                    return False
+                error_message = re.search(Login.ERROR_MESSAGE, form.inner_html(),
+                                          flags=re.I) is not None
+                captcha = re.search(r'captcha', form.inner_html(), flags=re.I) is not None
             except Error:
-                # Ignored
-                pass
+                redirected = True
+
+        if indicators and redirected and not verification:
+            return True
+
+        if verification:
+            return False
+
+        if captcha:
+            return False
+
+        if error_message:
+            return False
 
         # Check if page is still accessible
         try:
@@ -366,13 +398,57 @@ class Login(Module):
 
         try:
             forms: Locator = page.locator('form:visible',
-                                          has=page.locator('input[type]:visible'))
+                                          has=page.locator('input:visible'))
         except Error:
             return True
 
+        # Try to find login forms again
         for i in range(get_locator_count(forms)):
             form = get_locator_nth(forms, i)
             if form is not None and FindLoginForms.find_login_form(form):
                 return False
+        else:
+            try:
+                check_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|' \
+                                 r'next|continue|fortfahren/i'
+                check: Locator = page.locator(f"text={check_str}")
+                buttons = page.locator(CLICKABLES, has=check)
+                buttons = page.locator(
+                    f"{CLICKABLES} >> text={check_str}") if get_locator_count(
+                    buttons) == 0 else buttons
+            except Error:
+                return True
 
-        return redirected
+            for i in range(get_locator_count(buttons)):
+                button: Optional[Locator] = get_locator_nth(buttons, i)
+                if button is None or re.search(SSO, button.text_content(),
+                                               flags=re.I) is not None:
+                    continue
+
+                try:
+                    invoke_click(page, get_locator_nth(buttons, i))
+                    page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+                    page.wait_for_load_state(timeout=Config.LOAD_TIMEOUT,
+                                             state=Config.WAIT_LOAD_UNTIL)
+                    page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+                except Error:
+                    # Ignored
+                    pass
+
+                break
+            else:
+                return True
+
+            # Get all forms again
+            try:
+                forms = page.locator('form:visible',
+                                     has=page.locator('input:visible'))
+            except Error:
+                return True
+
+            for i in range(get_locator_count(forms)):
+                form = get_locator_nth(forms, i)
+                if form is not None and FindLoginForms.find_login_form(form):
+                    return False
+
+        return True

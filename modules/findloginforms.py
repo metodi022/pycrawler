@@ -59,7 +59,7 @@ class FindLoginForms(Module):
             return
 
         try:
-            forms: Locator = page.locator('form:visible', has=page.locator('input[type]:visible'))
+            forms: Locator = page.locator('form:visible', has=page.locator('input:visible'))
         except Error:
             return
 
@@ -88,7 +88,7 @@ class FindLoginForms(Module):
         buttons: Optional[Locator] = None
         try:
             check1_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|next|' \
-                              r'continue|proceed/i'
+                              r'continue|proceed|fortfahren/i'
             check1: Locator = page.locator(f"text={check1_str}")
             buttons = page.locator(CLICKABLES, has=check1)
             buttons = page.locator(
@@ -157,7 +157,8 @@ class FindLoginForms(Module):
             return True
 
         try:
-            check1_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|proceed)/i'
+            check1_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|proceed|' \
+                              r'fortfahren)/i'
             check1: Locator = form.locator(f"text={check1_str}")
             button: Locator = form.locator(CLICKABLES, has=check1)
             button = form.locator(
