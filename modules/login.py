@@ -252,8 +252,12 @@ class Login(Module):
             for i in range(get_locator_count(buttons)):
                 button: Optional[Locator] = get_locator_nth(buttons, i)
 
-                if button is None or re.search(SSO, get_outer_html(button) or '',
-                                               flags=re.I) is not None:
+                if button is None:
+                    continue
+                elif re.search(SSO, get_outer_html(button) or '', flags=re.I) is not None:
+                    continue
+                elif re.search(r'help|trouble|regist', get_outer_html(button) or '',
+                               flags=re.I) is not None:
                     continue
 
                 try:
@@ -308,8 +312,12 @@ class Login(Module):
         for i in range(get_locator_count(buttons)):
             button = get_locator_nth(buttons, i)
 
-            if button is None or re.search(SSO, get_outer_html(button) or '',
-                                           flags=re.I) is not None:
+            if button is None:
+                continue
+            elif re.search(SSO, get_outer_html(button) or '', flags=re.I) is not None:
+                continue
+            elif re.search(r'help|trouble|regist', get_outer_html(button) or '',
+                           flags=re.I) is not None:
                 continue
 
             try:
@@ -409,8 +417,8 @@ class Login(Module):
                 return False
         else:
             try:
-                check_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|' \
-                                 r'next|continue|fortfahren/i'
+                check_str: str = r'/log.?in|sign.?in|[^sb]melde|[^sb]logge|user.?name|e.?mail|' \
+                                 r'nutzer|next|continue|fortfahren/i'
                 check: Locator = page.locator(f"text={check_str}")
                 buttons = page.locator(CLICKABLES, has=check)
                 buttons = page.locator(
