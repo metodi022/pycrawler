@@ -91,7 +91,7 @@ class FindLoginForms(Module):
             return
 
         # Get all buttons with login keywords
-        buttons: Optional[Locator] = None
+        buttons: Optional[Locator]
         try:
             check1_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|next|' \
                               r'continue|proceed|fortfahren/i'

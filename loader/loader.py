@@ -9,6 +9,7 @@ class Loader:
         Args:
             source (Path): path of file with URLs
         """
+        self._source: Path = source
 
     def __iter__(self) -> Iterator[Tuple[int, str]]:
         raise NotImplementedError

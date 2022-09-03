@@ -177,7 +177,7 @@ class Login(Module):
                                             (page.url, 0, self._rank, []), page.url, [], modules)
 
             # If login is successful, end
-            if self._verify_login(page, form, url_form[0], url_form_final):
+            if self._verify_login_after_post(page, form, url_form[0], url_form_final):
                 self.success = True
                 break
 
@@ -336,26 +336,24 @@ class Login(Module):
 
         return True
 
-    def _verify_login(self, page: Page, form: Locator, url: str, final_url: str) -> bool:
+    def _verify_login_after_post(self, page: Page, form: Locator, url: str, final_url: str) -> bool:
         # Check if page is redirected or there are username/email indicators
         redirected: bool = get_url_full(get_tld_object(page.url)) != final_url
-        indicators: bool = re.search(
-            f"{self._account[0][0]}|{self._account[0][1]}|"
-            f"{self._account[0][3]}.?.?{self._account[0][4]}|"
-            f"{self._account[0][4]}.?.?{self._account[0][3]}",
-            page.content()) is not None
+        indicators: bool = re.search(f"{self._account[0][0]}|{self._account[0][1]}|"
+                                     f"{self._account[0][3]}.?.?{self._account[0][4]}|"
+                                     f"{self._account[0][4]}.?.?{self._account[0][3]}",
+                                     page.content()) is not None
 
         # Check if there are error messages, captcha or verifications
         error_message: bool = False
         captcha: bool = False
         verification: bool = False
 
-        # Check for verification again
+        # Check for verification
         inputs: Locator = page.locator('input:visible')
         for i in range(get_locator_count(inputs)):
             input_: Optional[Locator] = get_locator_nth(inputs, i)
             input_label: Locator = get_label_for(page, get_locator_attribute(input_, 'id') or '')
-
             if input_ is None:
                 continue
 
@@ -379,8 +377,19 @@ class Login(Module):
             except Error:
                 redirected = True
 
-        if indicators and redirected and not verification:
-            return True
+        if indicators:
+            try:
+                page.goto(page.url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+                page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+                indicators = re.search(f"{self._account[0][0]}|{self._account[0][1]}|"
+                                       f"{self._account[0][3]}.?.?{self._account[0][4]}|"
+                                       f"{self._account[0][4]}.?.?{self._account[0][3]}",
+                                       page.content()) is not None
+                if indicators:
+                    return True
+            except Error:
+                # Ignored
+                pass
 
         if verification:
             return False
@@ -393,10 +402,9 @@ class Login(Module):
 
         # Check if page is still accessible
         try:
-            response = page.goto(url, timeout=Config.LOAD_TIMEOUT,
-                                 wait_until=Config.WAIT_LOAD_UNTIL)
+            response: Optional[Response] = page.goto(url, timeout=Config.LOAD_TIMEOUT,
+                                                     wait_until=Config.WAIT_LOAD_UNTIL)
         except Error:
-            # Ignored
             return True
 
         if response is None or response.status >= 400:

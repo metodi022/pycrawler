@@ -8,7 +8,7 @@ from playwright.sync_api import Page, Locator, Error
 from sklearn.cluster import dbscan
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
-CLICKABLES: str = r'button:visible,a:visible,*[role="button"]:visible,*[onclick]:visible,' \
+CLICKABLES: str = r'button:visible,*[role="button"]:visible,*[onclick]:visible,' \
                   r'input[type="button"]:visible,input[type="submit"]:visible'
 
 SSO: str = r'Facebook|Twitter|Google|Yahoo|Windows.?Live|Linked.?In|Git.?Hub|Pay.?Pal|Amazon|' \

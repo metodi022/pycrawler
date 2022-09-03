@@ -8,7 +8,6 @@ from loader.loader import Loader
 class CSVLoader(Loader):
     def __init__(self, source: Path) -> None:
         super().__init__(source)
-        self.source: Path = source
 
     def __iter__(self) -> Iterator[Tuple[int, str]]:
         def result(source: Path) -> Iterator[Tuple[int, str]]:
@@ -17,7 +16,7 @@ class CSVLoader(Loader):
                 for line in reader:
                     yield int(line[0], 10), line[1]
 
-        return result(self.source)
+        return result(self._source)
 
     def __next__(self) -> Tuple[int, str]:
         raise NotImplementedError
