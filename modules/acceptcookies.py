@@ -14,10 +14,15 @@ from utils import get_url_origin, get_tld_object, get_screenshot, get_locator_co
 
 
 class AcceptCookies(Module):
+    """
+    Module to automatically accepts cookie banners.
+    """
+
+    # Keywords for accept buttons
     CHECK_ENG: str = '/(\\W|^)(accept|okay|ok|consent|agree|allow|understand|continue|yes|' \
                      'got it|fine)(\\W|$)/i'
     CHECK_GER: str = '/(\\W|^)(stimm|verstanden|versteh|akzeptier|ja(\\W|$)|weiter(\\W|$)|' \
-                     'annehm|bestätig|willig|zulassen|lasse)/i'
+                     'annehm|bestätig|willig|zulassen(\\W|$)|lasse)/i'
 
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
         super().__init__(job_id, crawler_id, database, log)
@@ -27,7 +32,6 @@ class AcceptCookies(Module):
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
-        # Empty
         pass
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
@@ -41,6 +45,7 @@ class AcceptCookies(Module):
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module]) -> None:
+        # Verify that response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
             return
@@ -53,12 +58,14 @@ class AcceptCookies(Module):
 
         # Check for buttons with certain keywords
         try:
+            # First check for english keywords
             check: Locator = page.locator(f"text={AcceptCookies.CHECK_ENG}")
             buttons: Locator = page.locator(CLICKABLES, has=check)
             buttons = page.locator(
                 f"{CLICKABLES} >> text={AcceptCookies.CHECK_ENG}") if get_locator_count(
                 buttons) == 0 else buttons
 
+            # Then check for german keywords
             if get_locator_count(buttons) == 0:
                 check = page.locator(f"text={AcceptCookies.CHECK_GER}")
                 buttons = page.locator(CLICKABLES, has=check)
@@ -70,11 +77,12 @@ class AcceptCookies(Module):
 
         # TODO search frames if no buttons were found
 
+        # If no accept buttons were found -> abort
         self._log.info(f"Find {get_locator_count(buttons)} possible cookie accept buttons")
         if get_locator_count(buttons) == 0:
             return
 
-        # Check for topmost z-index button with keywords
+        # Check for the topmost z-index button
         z_max: int = 0
         for i in range(get_locator_count(buttons)):
             button: Optional[Locator] = get_locator_nth(buttons, i)
@@ -112,6 +120,8 @@ class AcceptCookies(Module):
                 pass
 
         page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+
+        # Refresh the page
         temp: datetime = datetime.now()
         try:
             response = page.goto(url[0], timeout=Config.LOAD_TIMEOUT,
@@ -121,14 +131,20 @@ class AcceptCookies(Module):
             responses.append(None)
             return
 
+        # Verify that response is valid
         if response is None or response.status >= 400:
+            # Make sure to add the new response for the following models
             start.append(temp)
             responses.append(None)
             return
 
         page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+
+        # Make a screenshot if it's the landing page
         if self._url == url[0]:
             get_screenshot(page, (
                     Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}cookie.png"))
+
+        # Make sure to add the new response for the following models
         start.append(temp)
         responses.append(response)

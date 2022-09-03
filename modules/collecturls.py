@@ -14,13 +14,16 @@ from utils import get_tld_object, get_url_from_href, get_url_origin, get_url_ful
 
 
 class CollectUrls(Module):
-    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
-                 url_filter_out: List[Callable[[tld.utils.Result], bool]]) -> None:
+    """
+    Module to automatically collect links to crawl further.
+    """
+
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
         super().__init__(job_id, crawler_id, database, log)
         self._url: str = ''
         self._rank: int = 0
         self._max_urls: int = 0
-        self._url_filter_out: List[Callable[[tld.utils.Result], bool]] = url_filter_out
+        self._url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
@@ -40,6 +43,7 @@ class CollectUrls(Module):
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module]) -> None:
+        # Make sure to add page as seen
         parsed_url_final: Optional[tld.utils.Result] = get_tld_object(final_url)
         context_database.add_seen(
             get_url_full(parsed_url_final) if parsed_url_final is not None else final_url)
@@ -57,12 +61,13 @@ class CollectUrls(Module):
         if parsed_url is None or parsed_url_final is None:
             return
 
-        # Iterate over each <a> tag and add its href
+        # Get all <a> tags with a href
         try:
             links: Locator = page.locator('a[href]')
         except Error:
             return
 
+        # Iterate over each href
         urls: List[tld.utils.Result] = []
         for i in range(get_locator_count(links)):
             # Get href attribute
@@ -104,6 +109,8 @@ class CollectUrls(Module):
             # Add link
             urls.append(parsed_link)
 
+        # For each found URL, add it to the database, while making sure not to exceed the max URL
+        # limit
         for parsed_link in urls:
             context_database.add_url_force((get_url_full_with_query_fragment(parsed_link),
                                             url[1] + 1, url[2], url[3] + [(url[0], final_url)]))
@@ -111,3 +118,6 @@ class CollectUrls(Module):
             self._max_urls -= 1
             if self._max_urls < 1:
                 break
+
+    def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
+        self._url_filter_out = filters

@@ -10,8 +10,13 @@ from database.postgres import Postgres
 
 
 class Module:
+    """
+    A baseclass from which all modules inherit.
+    """
+
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
-        """Initializes module instance.
+        """
+        Initializes module instance.
 
         Args:
             job_id (int): job id
@@ -26,7 +31,8 @@ class Module:
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
-        """Initialize job preparations, for example creation of database.
+        """
+        Initialize job preparations, for example creation of database.
 
         Args:
             database (Postgres): database
@@ -37,7 +43,8 @@ class Module:
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
                      modules: List['Module']) -> None:
-        """Add event handlers before navigating to a page.
+        """
+        Add event handlers before navigating to a page.
 
         Args:
             browser (Browser): browser
@@ -53,7 +60,8 @@ class Module:
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List['Module']) -> None:
-        """Receive response from server.
+        """
+        Receive response from server.
 
         Args:
             browser (Browser): browser
@@ -68,6 +76,12 @@ class Module:
         """
         raise NotImplementedError
 
-    @staticmethod
-    def add_url_filter_out(filters: List[Callable[[tld.utils.Result], bool]]) -> None:
+    def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
+        """
+        Remove certain urls when gethering links. Add a filtering function to the list of existing
+        filters.
+
+        Args:
+            filters (List[Callable[[tld.utils.Result], bool]]): shared list of already existing filters
+        """
         pass

@@ -187,8 +187,8 @@ class Login(Module):
                          start: List[datetime], modules: List[Module]) -> None:
         pass
 
-    @staticmethod
-    def add_url_filter_out(filters: List[Callable[[tld.utils.Result], bool]]) -> None:
+    def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
+        # TODO improve
         def filt(url: tld.utils.Result) -> bool:
             return re.match(r'log.?out|sign.?out|log.?off|sign.?off|exit|quit|invalidate',
                             get_url_full_with_query_fragment(url), flags=re.I) is not None

@@ -28,19 +28,19 @@ class ChromiumCrawler:
         self._database: Postgres = database
         self._log: Logger = log
 
-        # Prepare filters
-        url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
-        for module in modules:
-            module.add_url_filter_out(url_filter_out)
-
         # Prepare modules
         self._modules: List[Module] = []
         self._modules += [
             AcceptCookies(job_id, crawler_id, database, log)] if Config.ACCEPT_COOKIES else []
-        self._modules += [CollectUrls(job_id, crawler_id, database, log,
-                                      url_filter_out)] if Config.RECURSIVE else []
+        self._modules += [
+            CollectUrls(job_id, crawler_id, database, log, )] if Config.RECURSIVE else []
         self._modules += self._initialize_modules(modules, job_id, crawler_id, database, log)
         self._modules += [SaveStats(job_id, crawler_id, database, log)]
+
+        # Prepare filters
+        url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
+        for module in self._modules:
+            module.add_url_filter_out(url_filter_out)
 
     def start_crawl(self):
         url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = self._url
