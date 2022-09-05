@@ -129,6 +129,8 @@ class FindLoginForms(Module):
                 # Ignored
                 pass
 
+            # TODO here I can search again for forms before adding
+
             # Add url to database
             if page.url == final_url:
                 self._database.invoke_transaction(
@@ -195,9 +197,10 @@ class FindLoginForms(Module):
         except Error:
             return False
 
-        # Return true if there is at least one login button in the form, and it is not a search form
-        return get_locator_count(button) > 0 and re.search(r'search', get_outer_html(form),
-                                                           flags=re.I) is None
+        # Return true if there is at least one login button in the form
+        return get_locator_count(button) > 0 and re.search(
+            r'search|news.?letter|subscribe|contact|feedback', get_outer_html(form),
+            flags=re.I) is None
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         def filt(url: tld.utils.Result) -> bool:
