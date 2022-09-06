@@ -34,9 +34,9 @@ class Login(Module):
     def register_job(database: Postgres, log: Logger) -> None:
         database.invoke_transaction(
             "CREATE TABLE IF NOT EXISTS LOGINS (rank INT NOT NULL, job INT NOT NULL, "
-            "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, loginform TEXT NOT NULL, "
-            "loginformfinal TEXT NOT NULL, success BOOLEAN, captcha BOOLEAN);",
-            None, False)
+            "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, loginform TEXT, "
+            "loginformfinal TEXT, success BOOLEAN NOT NULL, captcha BOOLEAN NOT NULL, "
+            "error BOOLEAN NOT NULL, verification BOOLEAN NOT NULL);", None, False)
         log.info('Create LOGINS table IF NOT EXISTS')
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
@@ -54,7 +54,11 @@ class Login(Module):
         # Check if we got credentials for the given site
         if self._account is None or len(self._account) == 0:
             self._log.info(f"Found no credentials for {self._url}")
-            self._account = [('email@email.com', 'username', 'Passw0rd!', 'FirstName', 'LastName')]
+            self._database.invoke_transaction(
+                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                    self._rank, self.job_id, self.crawler_id, self._url, None, None, False, False,
+                    False, False), False)
+            return
 
         # Get URLs with login forms for given site
         url_forms: Optional[List[Tuple[str]]] = self._database.invoke_transaction(
@@ -63,6 +67,10 @@ class Login(Module):
         # Check if we got URLs with login forms
         if url_forms is None or len(url_forms) == 0:
             self._log.info(f"Found no login forms for {self._url}")
+            self._database.invoke_transaction(
+                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                    self._rank, self.job_id, self.crawler_id, self._url, None, None, False, False,
+                    False, False), False)
             return
 
         # Iterate over login form URLs
@@ -80,6 +88,10 @@ class Login(Module):
 
             # Check if response status is valid
             if response is None or response.status >= 400:
+                self._database.invoke_transaction(
+                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                        self._rank, self.job_id, self.crawler_id, self._url, url_form, url_form,
+                        False, False, False, False), False)
                 continue
 
             url_form_final: str = get_url_full(get_tld_object(page.url)) or page.url
@@ -95,6 +107,10 @@ class Login(Module):
                 forms: Locator = page.locator('form:visible',
                                               has=page.locator('input:visible'))
             except Error:
+                self._database.invoke_transaction(
+                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                        self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
+                        False, False, False, False), False)
                 continue
 
             # Iterate over all forms and get the login form
@@ -116,6 +132,10 @@ class Login(Module):
                         f"{CLICKABLES} >> text={check_str}") if get_locator_count(
                         buttons) == 0 else buttons
                 except Error:
+                    self._database.invoke_transaction(
+                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                            self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
+                            False, False, False, False), False)
                     continue
 
                 # Iterate over buttons and click on correct login button
@@ -138,6 +158,10 @@ class Login(Module):
 
                     break
                 else:
+                    self._database.invoke_transaction(
+                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                            self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
+                            False, False, False, False), False)
                     continue
 
                 # Get all forms again
@@ -145,6 +169,10 @@ class Login(Module):
                     forms = page.locator('form:visible',
                                          has=page.locator('input:visible'))
                 except Error:
+                    self._database.invoke_transaction(
+                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                            self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
+                            False, False, False, False), False)
                     continue
 
                 # Iterate over all forms again and get the correct login form
@@ -155,10 +183,18 @@ class Login(Module):
                         break
                 # If no login form is found this time, continue to next login form URL
                 else:
+                    self._database.invoke_transaction(
+                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                            self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
+                            False, False, False, False), False)
                     continue
 
             # If filling of login form fails, continue to next login form URL
             if form is None or not self._fill_login_form(page, form):
+                self._database.invoke_transaction(
+                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                        self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
+                        False, False, False, False), False)
                 continue
 
             # If posting login form fails, continue to next login form URL
@@ -166,6 +202,10 @@ class Login(Module):
                 get_screenshot(page,
                                Config.LOG /
                                f"screenshots/job{self.job_id}rank{self._rank}afterlogin.png")
+                self._database.invoke_transaction(
+                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                        self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
+                        False, False, False, False), False)
                 continue
 
             get_screenshot(page,
@@ -174,7 +214,7 @@ class Login(Module):
 
             # Accept cookie banners, sometimes they block login forms
             if Config.ACCEPT_COOKIES:
-                module: AcceptCookies = module[0]
+                module: AcceptCookies = modules[0]
                 module.receive_response(browser, context, page, [response], context_database,
                                         (page.url, 0, self._rank, []), page.url, [], modules)
                 module._urls.clear()
@@ -182,6 +222,10 @@ class Login(Module):
             # If login is successful, end
             if self._verify_login_after_post(page, form, url_form[0], url_form_final):
                 self.success = True
+                self._database.invoke_transaction(
+                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                        self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
+                        True, False, False, False), False)
                 break
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
@@ -395,12 +439,24 @@ class Login(Module):
                 pass
 
         if verification:
+            self._database.invoke_transaction(
+                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                    self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
+                    False, False, False, True), False)
             return False
 
         if captcha:
+            self._database.invoke_transaction(
+                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                    self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
+                    False, True, False, False), False)
             return False
 
         if error_message:
+            self._database.invoke_transaction(
+                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                    self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
+                    False, False, True, False), False)
             return False
 
         # Check if page is still accessible
@@ -425,6 +481,10 @@ class Login(Module):
         for i in range(get_locator_count(forms)):
             form = get_locator_nth(forms, i)
             if form is not None and FindLoginForms.find_login_form(form):
+                self._database.invoke_transaction(
+                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                        self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
+                        False, False, False, False), False)
                 return False
         else:
             try:
@@ -468,6 +528,10 @@ class Login(Module):
             for i in range(get_locator_count(forms)):
                 form = get_locator_nth(forms, i)
                 if form is not None and FindLoginForms.find_login_form(form):
+                    self._database.invoke_transaction(
+                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                            self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
+                            False, False, False, False), False)
                     return False
 
         return True
