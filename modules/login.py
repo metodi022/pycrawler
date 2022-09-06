@@ -9,6 +9,7 @@ from playwright.sync_api import Browser, BrowserContext, Page, Response, Error, 
 from config import Config
 from database.dequedb import DequeDB
 from database.postgres import Postgres
+from modules.acceptcookies import AcceptCookies
 from modules.findloginforms import FindLoginForms
 from modules.module import Module
 from utils import get_locator_count, get_locator_nth, CLICKABLES, \
@@ -48,7 +49,7 @@ class Login(Module):
         # Get account details from database
         self._account = self._database.invoke_transaction(
             "SELECT email, username, password, first_name, last_name FROM accounts WHERE rank=%s "
-            "and (registration=2 or registration = 3)", (self._rank,), True) or []
+            "and (registration=2 or registration=3)", (self._rank,), True) or []
 
         # Check if we got credentials for the given site
         if self._account is None or len(self._account) == 0:
@@ -173,8 +174,10 @@ class Login(Module):
 
             # Accept cookie banners, sometimes they block login forms
             if Config.ACCEPT_COOKIES:
-                modules[0].receive_response(browser, context, page, [response], context_database,
-                                            (page.url, 0, self._rank, []), page.url, [], modules)
+                module: AcceptCookies = module[0]
+                module.receive_response(browser, context, page, [response], context_database,
+                                        (page.url, 0, self._rank, []), page.url, [], modules)
+                module._urls.clear()
 
             # If login is successful, end
             if self._verify_login_after_post(page, form, url_form[0], url_form_final):

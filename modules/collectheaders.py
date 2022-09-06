@@ -37,10 +37,10 @@ class CollectHeaders(Module):
             except ValueError:
                 headers = None
 
-            self._database.invoke_transaction("INSERT INTO HEADERS VALUES (%s, %s, %s, %s, %s, %s, "
-                                              "%s, %s)", (self._rank, self.job_id, self.crawler_id,
-                                                          self._url, page.url, response.url,
-                                                          response.status, headers), False)
+            self._database.invoke_transaction(
+                "INSERT INTO HEADERS VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (
+                    self._rank, self.job_id, self.crawler_id, self._url, page.url, response.url,
+                    response.status, headers), False)
 
         page.on('response', handler)
 
