@@ -34,6 +34,9 @@ class CollectLoginHeaders(Login):
                      modules: List[Module]) -> None:
         super().add_handlers(browser, context, page, context_database, url, modules)
 
+        if not self.success:
+            browser.close()
+
         def handler(login: bool) -> Callable[[Response], None]:
             def helper(response: Response):
                 headers: Optional[str]
@@ -49,26 +52,21 @@ class CollectLoginHeaders(Login):
 
             return helper
 
-        page.on('response', handler(self.success))
+        page.on('response', handler(True))
+        self._context_alt = browser.new_context()
+        self._page_alt = self._context_alt.new_page()
+        self._page_alt.on('response', handler(False))
 
-        if self.success:
-            if Config.ACCEPT_COOKIES:
-                self._cookies_alt = AcceptCookies(self.job_id, self.crawler_id, self._database,
-                                                  self._log)
-                self._cookies_alt.add_handlers(browser, context, self._page_alt, context_database,
-                                               url, [])
-
-            self._context_alt = browser.new_context()
-            self._page_alt = self._context_alt.new_page()
-            self._page_alt.on('response', handler(False))
+        if Config.ACCEPT_COOKIES:
+            self._cookies_alt = AcceptCookies(self.job_id, self.crawler_id, self._database,
+                                              self._log)
+            self._cookies_alt.add_handlers(browser, context, self._page_alt, context_database,
+                                           url, [])
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module]) -> None:
-        if not self.success:
-            return
-
         response: Optional[Response] = None
         try:
             response = self._page_alt.goto(url[0], timeout=Config.LOAD_TIMEOUT,
