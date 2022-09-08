@@ -9,7 +9,7 @@ from config import Config
 from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
-from utils import get_url_origin, get_tld_object, get_screenshot, get_locator_count, \
+from utils import get_url_origin, get_tld_object, get_locator_count, \
     get_locator_nth, invoke_click, CLICKABLES
 
 
@@ -139,11 +139,6 @@ class AcceptCookies(Module):
             return
 
         page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-
-        # Make a screenshot if it's the landing page
-        if self._url == url[0]:
-            get_screenshot(page, (
-                    Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}cookie.png"))
 
         # Make sure to add the new response for the following models
         start.append(temp)

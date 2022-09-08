@@ -48,8 +48,8 @@ class Login(Module):
 
         # Get account details from database
         self._account = self._database.invoke_transaction(
-            "SELECT email, username, password, first_name, last_name FROM accounts WHERE rank=%s "
-            "and (registration=2 or registration=3)", (self._rank,), True) or []
+            "SELECT email, username, password, first_name, last_name FROM accounts WHERE rank=%s",
+            (self._rank,), True) or []
 
         # Check if we got credentials for the given site
         if self._account is None or len(self._account) == 0:
@@ -66,7 +66,6 @@ class Login(Module):
 
         # Check if we got URLs with login forms
         if url_forms is None or len(url_forms) == 0:
-            self._log.info(f"Found no login forms for {self._url}")
             self._database.invoke_transaction(
                 "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
                     self._rank, self.job_id, self.crawler_id, self._url, None, None, False, False,
@@ -197,11 +196,14 @@ class Login(Module):
                         False, False, False, False), False)
                 continue
 
+            get_screenshot(page,
+                           Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}login1.png")
+
             # If posting login form fails, continue to next login form URL
             if not self._post_login_form(page, form):
                 get_screenshot(page,
                                Config.LOG /
-                               f"screenshots/job{self.job_id}rank{self._rank}afterlogin.png")
+                               f"screenshots/job{self.job_id}rank{self._rank}login2.png")
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
                         self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
@@ -210,7 +212,7 @@ class Login(Module):
 
             get_screenshot(page,
                            Config.LOG /
-                           f"screenshots/job{self.job_id}rank{self._rank}afterlogin.png")
+                           f"screenshots/job{self.job_id}rank{self._rank}login2.png")
 
             # Accept cookie banners, sometimes they block login forms
             if Config.ACCEPT_COOKIES:
@@ -337,7 +339,7 @@ class Login(Module):
         page.wait_for_timeout(500)
 
         get_screenshot(page,
-                       (Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}loginform.png"))
+                       (Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}login3.png"))
 
         return True
 
@@ -386,9 +388,8 @@ class Login(Module):
     def _verify_login_after_post(self, page: Page, form: Locator, url: str, final_url: str) -> bool:
         # Check if page is redirected or there are username/email indicators
         redirected: bool = get_url_full(get_tld_object(page.url)) != final_url
-        indicators: bool = re.search(f"{self._account[0][0]}|{self._account[0][1]}|"
-                                     f"{self._account[0][3]}.?.?{self._account[0][4]}|"
-                                     f"{self._account[0][4]}.?.?{self._account[0][3]}",
+        indicators: bool = re.search(f"(^|\\W)({self._account[0][0]}|{self._account[0][1]}|"
+                                     f"{self._account[0][3]}|{self._account[0][4]})($|\\W)",
                                      page.content()) is not None
 
         # Check if there are error messages, captcha or verifications
@@ -428,9 +429,8 @@ class Login(Module):
             try:
                 page.goto(page.url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
                 page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                indicators = re.search(f"{self._account[0][0]}|{self._account[0][1]}|"
-                                       f"{self._account[0][3]}.?.?{self._account[0][4]}|"
-                                       f"{self._account[0][4]}.?.?{self._account[0][3]}",
+                indicators = re.search(f"(^|\\W)({self._account[0][0]}|{self._account[0][1]}|"
+                                       f"{self._account[0][3]}|{self._account[0][4]})($|\\W)",
                                        page.content()) is not None
                 if indicators:
                     return True

@@ -22,6 +22,8 @@ class CollectLoginHeaders(Login):
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
+        Login.register_job(database, log)
+
         database.invoke_transaction(
             "CREATE TABLE IF NOT EXISTS LOGINHEADERS (rank INT NOT NULL, job INT NOT NULL,"
             "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, fromurl TEXT NOT NULL, "
@@ -36,6 +38,10 @@ class CollectLoginHeaders(Login):
 
         if not self.success:
             browser.close()
+            self._log.info('Login failed, closing browser')
+            return
+
+        self._log.info('Login success')
 
         def handler(login: bool) -> Callable[[Response], None]:
             def helper(response: Response):
@@ -51,6 +57,8 @@ class CollectLoginHeaders(Login):
                         response.status, headers, login), False)
 
             return helper
+
+        self._log.info('Register page handlers CollectLoginHeaders')
 
         page.on('response', handler(True))
         self._context_alt = browser.new_context()

@@ -45,6 +45,8 @@ class FindLoginForms(Module):
         if temp is None:
             return
 
+        self._log.info('Add common login URLs FindLoginForms')
+
         # Add common URLs with logins
         url_origin: str = get_url_origin(temp)
         context_database.add_url((url_origin + '/login/', Config.DEPTH, self._rank, []))
