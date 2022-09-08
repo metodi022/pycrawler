@@ -66,6 +66,7 @@ class Login(Module):
 
         # Check if we got URLs with login forms
         if url_forms is None or len(url_forms) == 0:
+            self._log.info(f"Found no login URLs for {self._url}")
             self._database.invoke_transaction(
                 "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
                     self._rank, self.job_id, self.crawler_id, self._url, None, None, False, False,
@@ -74,11 +75,10 @@ class Login(Module):
 
         # Iterate over login form URLs
         for url_form in url_forms:
-            self._log.info(f"Get form URL {url_form}")
-
-            response: Optional[Response] = None
+            self._log.info(f"Get login URL {url_form}")
 
             # Navigate to log in form URL
+            response: Optional[Response] = None
             try:
                 response = page.goto(url_form[0], timeout=Config.LOAD_TIMEOUT,
                                      wait_until=Config.WAIT_LOAD_UNTIL)
@@ -103,8 +103,7 @@ class Login(Module):
 
             # Get all forms
             try:
-                forms: Locator = page.locator('form:visible',
-                                              has=page.locator('input:visible'))
+                forms: Locator = page.locator('form:visible', has=page.locator('input:visible'))
             except Error:
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
@@ -245,6 +244,8 @@ class Login(Module):
         filters.append(filt)
 
     def _fill_login_form(self, page: Page, form: Locator) -> bool:
+        self._log.info('Fill login form')
+
         try:
             password_field: Locator = form.locator('input[type="password"]:visible')
             text_fields: Locator = form.locator(
@@ -344,6 +345,8 @@ class Login(Module):
         return True
 
     def _post_login_form(self, page: Page, form: Locator) -> bool:
+        self._log.info('Post login form')
+
         try:
             check_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|fortfahren)/i'
             check: Locator = form.locator(f"text={check_str}")
@@ -386,6 +389,8 @@ class Login(Module):
         return True
 
     def _verify_login_after_post(self, page: Page, form: Locator, url: str, final_url: str) -> bool:
+        self._log.info('Verify login form')
+
         # Check if page is redirected or there are username/email indicators
         redirected: bool = get_url_full(get_tld_object(page.url)) != final_url
         indicators: bool = re.search(f"(^|\\W)({self._account[0][0]}|{self._account[0][1]}|"

@@ -38,10 +38,8 @@ class CollectLoginHeaders(Login):
 
         if not self.success:
             browser.close()
-            self._log.info('Login failed, closing browser')
+            self._log.info('Login failed')
             return
-
-        self._log.info('Login success')
 
         def handler(login: bool) -> Callable[[Response], None]:
             def helper(response: Response):
@@ -57,8 +55,6 @@ class CollectLoginHeaders(Login):
                         response.status, headers, login), False)
 
             return helper
-
-        self._log.info('Register page handlers CollectLoginHeaders')
 
         page.on('response', handler(True))
         self._context_alt = browser.new_context()

@@ -23,7 +23,7 @@ class FindLoginForms(Module):
         super().__init__(job_id, crawler_id, database, log)
         self._url: str = ''
         self._rank: int = 0
-        self._found: bool = False
+        self._found: int = 0
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
@@ -39,13 +39,11 @@ class FindLoginForms(Module):
                      modules: List[Module]) -> None:
         self._url = url[0]
         self._rank = url[2]
-        self._found = False
+        self._found = 0
 
         temp: Optional[tld.utils.Result] = get_tld_object(self._url)
         if temp is None:
             return
-
-        self._log.info('Add common login URLs FindLoginForms')
 
         # Add common URLs with logins
         url_origin: str = get_url_origin(temp)
@@ -83,13 +81,11 @@ class FindLoginForms(Module):
                  url[3][-1][0] if len(url[3]) > 0 else None,
                  url[3][-1][1] if len(url[3]) > 0 else None), False)
 
-            self._log.info(f"Found possible login form")
-            self._found = True
-
+            self._found += 1
             return
 
         # Next step searches for login buttons, but only do it if we haven't seen a login form
-        if self._found:
+        if self._found > 3:
             return
 
         # Get all buttons with login keywords
@@ -106,7 +102,7 @@ class FindLoginForms(Module):
             return
 
         if buttons is not None and get_locator_count(buttons) > 0:
-            self._found = True
+            self._found += 1
             self._log.info(f"Found a possible login button")
 
         # Iterate over each button
@@ -149,7 +145,7 @@ class FindLoginForms(Module):
             return
 
         # If we already found entries -> finish
-        if self._found or len(context_database) > 0:
+        if self._found > 0 or len(context_database) > 0:
             return
 
         # TODO no entries for login for Web site -> use search engine with login keywords
