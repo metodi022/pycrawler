@@ -73,8 +73,8 @@ def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils
     return res
 
 
-def get_screenshot(page: Page, path: pathlib.Path) -> None:
-    if not path.exists():
+def get_screenshot(page: Page, path: pathlib.Path, force: bool) -> None:
+    if not path.exists() or force:
         try:
             page.screenshot(path=path)
         except Error:

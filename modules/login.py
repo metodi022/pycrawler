@@ -48,8 +48,8 @@ class Login(Module):
 
         # Get account details from database
         self._account = self._database.invoke_transaction(
-            "SELECT email, username, password, first_name, last_name FROM accounts WHERE rank=%s",
-            (self._rank,), True) or []
+            "SELECT email, username, password, first_name, last_name FROM accounts WHERE %s LIKE "
+            "CONCAT(%s, site, %s)", (self._url, '%', '%'), True) or []
 
         # Check if we got credentials for the given site
         if self._account is None or len(self._account) == 0:
@@ -75,7 +75,7 @@ class Login(Module):
 
         # Iterate over login form URLs
         for url_form in url_forms:
-            self._log.info(f"Get login URL {url_form}")
+            self._log.info(f"Get login URL {url_form[0]}")
 
             # Navigate to log in form URL
             response: Optional[Response] = None
@@ -89,8 +89,8 @@ class Login(Module):
             if response is None or response.status >= 400:
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
-                        self._rank, self.job_id, self.crawler_id, self._url, url_form, url_form,
-                        False, False, False, False), False)
+                        self._rank, self.job_id, self.crawler_id, self._url, url_form[0],
+                        url_form[0], False, False, False, False), False)
                 continue
 
             url_form_final: str = get_url_full(get_tld_object(page.url)) or page.url
@@ -107,7 +107,7 @@ class Login(Module):
             except Error:
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
-                        self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
+                        self._rank, self.job_id, self.crawler_id, self._url, url_form[0], page.url,
                         False, False, False, False), False)
                 continue
 
@@ -132,8 +132,8 @@ class Login(Module):
                 except Error:
                     self._database.invoke_transaction(
                         "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
-                            self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
-                            False, False, False, False), False)
+                            self._rank, self.job_id, self.crawler_id, self._url, url_form[0],
+                            page.url, False, False, False, False), False)
                     continue
 
                 # Iterate over buttons and click on correct login button
@@ -158,8 +158,8 @@ class Login(Module):
                 else:
                     self._database.invoke_transaction(
                         "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
-                            self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
-                            False, False, False, False), False)
+                            self._rank, self.job_id, self.crawler_id, self._url, url_form[0],
+                            page.url, False, False, False, False), False)
                     continue
 
                 # Get all forms again
@@ -169,8 +169,8 @@ class Login(Module):
                 except Error:
                     self._database.invoke_transaction(
                         "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
-                            self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
-                            False, False, False, False), False)
+                            self._rank, self.job_id, self.crawler_id, self._url, url_form[0],
+                            page.url, False, False, False, False), False)
                     continue
 
                 # Iterate over all forms again and get the correct login form
@@ -187,22 +187,27 @@ class Login(Module):
                             False, False, False, False), False)
                     continue
 
+            get_screenshot(page,
+                           Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}login1.png",
+                           True)
+
             # If filling of login form fails, continue to next login form URL
             if form is None or not self._fill_login_form(page, form):
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
-                        self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
+                        self._rank, self.job_id, self.crawler_id, self._url, url_form[0], page.url,
                         False, False, False, False), False)
                 continue
 
             get_screenshot(page,
-                           Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}login1.png")
+                           Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}login2.png",
+                           True)
 
             # If posting login form fails, continue to next login form URL
             if not self._post_login_form(page, form):
                 get_screenshot(page,
-                               Config.LOG /
-                               f"screenshots/job{self.job_id}rank{self._rank}login2.png")
+                               Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}login3.png",
+                               True)
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
                         self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
@@ -210,22 +215,21 @@ class Login(Module):
                 continue
 
             get_screenshot(page,
-                           Config.LOG /
-                           f"screenshots/job{self.job_id}rank{self._rank}login2.png")
+                           Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}login3.png",
+                           True)
 
             # Accept cookie banners, sometimes they block login forms
             if Config.ACCEPT_COOKIES:
                 module: AcceptCookies = modules[0]
                 module.receive_response(browser, context, page, [response], context_database,
                                         (page.url, 0, self._rank, []), page.url, [], modules)
-                module._urls.clear()
 
             # If login is successful, end
             if self._verify_login_after_post(page, form, url_form[0], url_form_final):
                 self.success = True
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
-                        self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
+                        self._rank, self.job_id, self.crawler_id, self._url, url_form[0], page.url,
                         True, False, False, False), False)
                 break
 
@@ -339,9 +343,6 @@ class Login(Module):
 
         page.wait_for_timeout(500)
 
-        get_screenshot(page,
-                       (Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}login3.png"))
-
         return True
 
     def _post_login_form(self, page: Page, form: Locator) -> bool:
@@ -430,19 +431,6 @@ class Login(Module):
             except Error:
                 redirected = True
 
-        if indicators:
-            try:
-                page.goto(page.url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
-                page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                indicators = re.search(f"(^|\\W)({self._account[0][0]}|{self._account[0][1]}|"
-                                       f"{self._account[0][3]}|{self._account[0][4]})($|\\W)",
-                                       page.content()) is not None
-                if indicators:
-                    return True
-            except Error:
-                # Ignored
-                pass
-
         if verification:
             self._database.invoke_transaction(
                 "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
@@ -463,6 +451,19 @@ class Login(Module):
                     self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
                     False, False, True, False), False)
             return False
+
+        if indicators:
+            try:
+                page.goto(page.url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+                page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+                indicators = re.search(f"(^|\\W)({self._account[0][0]}|{self._account[0][1]}|"
+                                       f"{self._account[0][3]}|{self._account[0][4]})($|\\W)",
+                                       page.content()) is not None
+                if indicators:
+                    return True
+            except Error:
+                # Ignored
+                pass
 
         # Check if page is still accessible
         try:

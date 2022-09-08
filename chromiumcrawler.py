@@ -65,8 +65,8 @@ class ChromiumCrawler:
 
             # Wait after page is loaded
             page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-            get_screenshot(page,
-                           (Config.LOG / f"screenshots/job{self.job_id}rank{url[2]}.png"))
+            get_screenshot(page, (Config.LOG / f"screenshots/job{self.job_id}rank{url[2]}.png"),
+                           False)
 
             # Run module response handler
             self._invoke_response_handler(browser, context, page, [response], url, context_database,
