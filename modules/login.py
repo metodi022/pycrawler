@@ -261,6 +261,9 @@ class Login(Module):
             text_field: Locator = get_locator_nth(text_fields, i) or text_fields
             text_type: Optional[str] = get_locator_attribute(text_field, 'type')
             label: Locator = get_label_for(form, get_locator_attribute(text_field, 'id') or '')
+            placeholder: Locator = get_label_for(form, get_locator_attribute(text_field,
+                                                                             'placeholder') or '')
+
             try:
                 if (text_type is not None and text_type == 'email') or \
                         re.search(r'e.?mail', get_outer_html(text_field) or '', flags=re.I):
@@ -270,14 +273,13 @@ class Login(Module):
                                                       flags=re.I):
                     text_field.type(self._account[0][0], delay=100)
                     break
-                elif re.search(r'user|nutzer', get_outer_html(text_field) or '',
-                               flags=re.I) is not None:
-                    text_field.type(self._account[0][1], delay=100)
+                elif placeholder.count() == 1 and re.search(r'e.?mail',
+                                                            get_outer_html(placeholder) or '',
+                                                            flags=re.I):
+                    text_field.type(self._account[0][0], delay=100)
                     break
-                elif label.count() == 1 and re.search(r'user|nutzer', get_outer_html(label) or '',
-                                                      flags=re.I):
+                else:
                     text_field.type(self._account[0][1], delay=100)
-                    break
             except Error:
                 # Ignored
                 pass
@@ -431,12 +433,18 @@ class Login(Module):
             except Error:
                 redirected = True
 
-        if verification:
-            self._database.invoke_transaction(
-                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
-                    self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
-                    False, False, False, True), False)
-            return False
+        if indicators:
+            try:
+                page.goto(page.url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+                page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+                indicators = re.search(f"(^|\\W)({self._account[0][0]}|{self._account[0][1]}|"
+                                       f"{self._account[0][3]}|{self._account[0][4]})($|\\W)",
+                                       page.content()) is not None
+                if indicators:
+                    return True
+            except Error:
+                # Ignored
+                pass
 
         if captcha:
             self._database.invoke_transaction(
@@ -452,18 +460,12 @@ class Login(Module):
                     False, False, True, False), False)
             return False
 
-        if indicators:
-            try:
-                page.goto(page.url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
-                page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                indicators = re.search(f"(^|\\W)({self._account[0][0]}|{self._account[0][1]}|"
-                                       f"{self._account[0][3]}|{self._account[0][4]})($|\\W)",
-                                       page.content()) is not None
-                if indicators:
-                    return True
-            except Error:
-                # Ignored
-                pass
+        if verification:
+            self._database.invoke_transaction(
+                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                    self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
+                    False, False, False, True), False)
+            return False
 
         # Check if page is still accessible
         try:
