@@ -14,7 +14,7 @@ from modules.findloginforms import FindLoginForms
 from modules.module import Module
 from utils import get_locator_count, get_locator_nth, CLICKABLES, \
     get_locator_attribute, get_outer_html, invoke_click, SSO, get_label_for, get_screenshot, \
-    get_url_full_with_query_fragment, get_tld_object, get_url_full
+    get_url_full_with_query_fragment, get_tld_object, get_url_full, get_visible_extra
 
 
 class Login(Module):
@@ -258,11 +258,14 @@ class Login(Module):
             return False
 
         for i in range(get_locator_count(text_fields)):
-            text_field: Locator = get_locator_nth(text_fields, i) or text_fields
+            text_field: Optional[Locator] = get_locator_nth(text_fields, i)
             text_type: Optional[str] = get_locator_attribute(text_field, 'type')
             label: Locator = get_label_for(form, get_locator_attribute(text_field, 'id') or '')
             placeholder: Locator = get_label_for(form, get_locator_attribute(text_field,
                                                                              'placeholder') or '')
+
+            if text_field is None or not get_visible_extra(text_field):
+                continue
 
             try:
                 if (text_type is not None and text_type == 'email') or \
@@ -286,15 +289,20 @@ class Login(Module):
                 pass
         else:
             for i in range(get_locator_count(text_fields)):
+                text_field: Optional[Locator] = get_locator_nth(text_fields, i)
+                if text_field is None or not get_visible_extra(text_field):
+                    continue
+
                 try:
-                    text_field: Locator = get_locator_nth(text_fields, i) or text_fields
                     text_field.type(self._account[0][0], delay=100)
                 except Error:
                     return False
+            else:
+                return False
 
         page.wait_for_timeout(500)
 
-        if get_locator_count(password_field) == 0:
+        if get_locator_count(password_field) != 1 or not get_visible_extra(password_field):
             try:
                 check2_str: str = r'/log.?in|sign.?in|continue|next|weiter|melde|logge|e.?mail|' \
                                   r'user.?name|nutzer.?name|fortfahren/i'
@@ -336,7 +344,7 @@ class Login(Module):
             except Error:
                 return False
 
-            if get_locator_count(password_field) == 0:
+            if get_locator_count(password_field) == 0 or not get_visible_extra(password_field):
                 return False
 
         try:

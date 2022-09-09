@@ -184,9 +184,15 @@ def invoke_click(page: Page, clickable: Optional[Locator], timeout=30000) -> Non
     clickable.click(delay=500, timeout=timeout)
 
 
-# TODO finish
-def get_visible(locator: Optional[Locator]) -> bool:
+def get_visible_extra(locator: Optional[Locator]) -> bool:
     if locator is None or get_locator_count(locator) < 1:
         return False
 
-    return locator.is_visible() and True
+    try:
+        locator.click(timeout=2000)
+    except Error:
+        return False
+
+    # TODO more
+
+    return locator.is_visible()
