@@ -92,7 +92,7 @@ def get_locator_count(locator: Optional[Locator]) -> int:
 
 
 def get_locator_nth(locator: Optional[Locator], nth: int) -> Optional[Locator]:
-    if locator is None:
+    if locator is None or get_locator_count(locator) < 1:
         return None
 
     if nth >= get_locator_count(locator):
@@ -105,7 +105,7 @@ def get_locator_nth(locator: Optional[Locator], nth: int) -> Optional[Locator]:
 
 
 def get_locator_attribute(locator: Optional[Locator], attribute: str) -> Optional[str]:
-    if locator is None:
+    if locator is None or get_locator_count(locator) > 1:
         return None
 
     try:
@@ -126,37 +126,6 @@ def get_outer_html(locator: Optional[Locator]) -> Optional[str]:
 
 def get_label_for(locator: Locator | Page, element_id: str) -> Locator:
     return locator.locator(f"label[for=\"{element_id}\"]")
-
-
-def get_highest_z_index(locator: Locator) -> Locator:
-    z_max: int = 0
-    for i in range(get_locator_count(locator)):
-        entry: Optional[Locator] = get_locator_nth(locator, i)
-        if entry is None:
-            continue
-
-        try:
-            z_temp = entry.evaluate("node => getComputedStyle(node).getPropertyValue('z-index')")
-        except Error:
-            continue
-
-        z_max = max(z_max, 0 if z_temp == 'auto' else int(z_temp))
-
-    for i in range(get_locator_count(locator)):
-        entry: Optional[Locator] = get_locator_nth(locator, i)
-        if entry is None:
-            continue
-
-        try:
-            z_temp = entry.evaluate(
-                "node => getComputedStyle(node).getPropertyValue('z-index')")
-        except Error:
-            continue
-
-        if (0 if z_temp == 'auto' else int(z_temp)) >= z_max:
-            return entry
-
-    return locator
 
 
 def get_string_distance(str1: str, str2: str, normalize: bool = False) -> float:
@@ -206,10 +175,18 @@ def get_urls_cluster(urls: list[tld.utils.Result], threshold: float):
     return cluster
 
 
-def invoke_click(page: Page, clickable: Optional[Locator]) -> None:
-    if clickable is None:
+def invoke_click(page: Page, clickable: Optional[Locator], timeout=30000) -> None:
+    if clickable is None or get_locator_count(clickable) > 1:
         return
 
-    clickable.hover()
+    clickable.hover(timeout=timeout)
     page.wait_for_timeout(500)
-    clickable.click(delay=500)
+    clickable.click(delay=500, timeout=timeout)
+
+
+# TODO finish
+def get_visible(locator: Optional[Locator]) -> bool:
+    if locator is None or get_locator_count(locator) < 1:
+        return False
+
+    return locator.is_visible() and True

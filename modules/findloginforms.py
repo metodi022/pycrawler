@@ -118,7 +118,7 @@ class FindLoginForms(Module):
 
             # Click button and wait for some time
             try:
-                invoke_click(page, get_locator_nth(buttons, i))
+                invoke_click(page, get_locator_nth(buttons, i), 5000)
                 page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
                 page.wait_for_load_state(timeout=Config.LOAD_TIMEOUT,
                                          state=Config.WAIT_LOAD_UNTIL)

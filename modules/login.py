@@ -145,7 +145,7 @@ class Login(Module):
 
                     # Click button and wait if redirect
                     try:
-                        invoke_click(page, get_locator_nth(buttons, i))
+                        invoke_click(page, get_locator_nth(buttons, i), 5000)
                         page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
                         page.wait_for_load_state(timeout=Config.LOAD_TIMEOUT,
                                                  state=Config.WAIT_LOAD_UNTIL)
@@ -280,6 +280,7 @@ class Login(Module):
                     break
                 else:
                     text_field.type(self._account[0][1], delay=100)
+                    break
             except Error:
                 # Ignored
                 pass
@@ -317,7 +318,7 @@ class Login(Module):
                     continue
 
                 try:
-                    invoke_click(page, button)
+                    invoke_click(page, button, 5000)
                     page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
                     page.wait_for_load_state(timeout=Config.LOAD_TIMEOUT,
                                              state=Config.WAIT_LOAD_UNTIL)
@@ -376,7 +377,7 @@ class Login(Module):
                 continue
 
             try:
-                invoke_click(page, button)
+                invoke_click(page, button, 5000)
                 page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
                 page.wait_for_load_state(timeout=Config.LOAD_TIMEOUT,
                                          state=Config.WAIT_LOAD_UNTIL)
@@ -513,7 +514,7 @@ class Login(Module):
                     continue
 
                 try:
-                    invoke_click(page, get_locator_nth(buttons, i))
+                    invoke_click(page, get_locator_nth(buttons, i), 5000)
                     page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
                     page.wait_for_load_state(timeout=Config.LOAD_TIMEOUT,
                                              state=Config.WAIT_LOAD_UNTIL)

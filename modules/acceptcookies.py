@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from logging import Logger
 from typing import List, MutableSet, Optional, Tuple
@@ -10,7 +11,7 @@ from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
 from utils import get_url_origin, get_tld_object, get_locator_count, \
-    get_locator_nth, invoke_click, CLICKABLES
+    get_locator_nth, invoke_click, CLICKABLES, get_outer_html, SSO
 
 
 class AcceptCookies(Module):
@@ -44,7 +45,7 @@ class AcceptCookies(Module):
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List[Module]) -> None:
+                         start: List[datetime], modules: List[Module], frames=True) -> None:
         # Verify that response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
@@ -52,9 +53,15 @@ class AcceptCookies(Module):
 
         # Check if we already accepted cookies for origin
         url_origin: Optional[tld.utils.Result] = get_tld_object(final_url)
-        if url_origin is None or get_url_origin(url_origin) in self._urls:
+        if (url_origin is None or get_url_origin(url_origin) in self._urls) and frames:
             return
         self._urls.add(get_url_origin(url_origin))
+
+        # Recursively do the same for all frames found on the page, but only once
+        if frames:
+            for iframe in page.frames[1:]:
+                self.receive_response(browser, context, iframe, [response], context_database,
+                                      (iframe.url, 0, 0, []), iframe.url, [], [], frames=False)
 
         # Check for buttons with certain keywords
         try:
@@ -75,49 +82,24 @@ class AcceptCookies(Module):
         except Error:
             return
 
-        # TODO search frames if no buttons were found
-
         # If no accept buttons were found -> abort
         self._log.info(f"Find {get_locator_count(buttons)} possible cookie accept buttons")
         if get_locator_count(buttons) == 0:
             return
 
-        # Check for the topmost z-index button
-        z_max: int = 0
+        # Click on each possible cookie accept button
         for i in range(get_locator_count(buttons)):
             button: Optional[Locator] = get_locator_nth(buttons, i)
             if button is None:
                 continue
 
-            try:
-                z_temp = button.evaluate(
-                    "node => getComputedStyle(node).getPropertyValue('z-index')")
-            except Error:
-                continue
-
-            z_max = max(z_max, 0 if z_temp == 'auto' else int(z_temp))
-
-        # Click on first cookie button that works and wait some time
-        for i in range(get_locator_count(buttons)):
-            button: Optional[Locator] = get_locator_nth(buttons, i)
-            if button is None:
+            if re.search(SSO, get_outer_html(button) or '', flags=re.I) is not None:
                 continue
 
             try:
-                z_temp = button.evaluate(
-                    "node => getComputedStyle(node).getPropertyValue('z-index')")
+                invoke_click(page, button, timeout=2000)
             except Error:
                 continue
-
-            if (0 if z_temp == 'auto' else int(z_temp)) < z_max:
-                continue
-
-            try:
-                invoke_click(page, button)
-                break
-            except Error:
-                # Ignored
-                pass
 
         page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
