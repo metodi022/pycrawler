@@ -193,6 +193,19 @@ def get_visible_extra(locator: Optional[Locator]) -> bool:
     except Error:
         return False
 
-    # TODO more
+    opacity: str = locator.evaluate("""
+                                    node => {
+                                      var resultOpacity = 1;
+                                    
+                                      while (node) {
+                                        try {
+                                          resultOpacity = Math.min(resultOpacity, window.getComputedStyle(node).getPropertyValue("opacity") || resultOpacity);
+                                        }
+                                        catch { }
+                                        node = node.parentNode;
+                                      }
+                                    
+                                      return resultOpacity;
+                                    }""")
 
-    return locator.is_visible()
+    return locator.is_visible() and float(opacity) > 0.0

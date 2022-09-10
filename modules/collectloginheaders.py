@@ -75,6 +75,7 @@ class CollectLoginHeaders(Login):
         try:
             response = self._page_alt.goto(url[0], timeout=Config.LOAD_TIMEOUT,
                                            wait_until=Config.WAIT_LOAD_UNTIL)
+            page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error:
             # Ignored
             pass
