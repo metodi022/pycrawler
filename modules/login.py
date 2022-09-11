@@ -101,25 +101,10 @@ class Login(Module):
                 modules[0].receive_response(browser, context, page, [response], context_database,
                                             (url_form[0], 0, self._rank, []), page.url, [], modules)
 
-            # Get all forms
-            try:
-                forms: Locator = page.locator('form:visible', has=page.locator('input:visible'))
-            except Error:
-                self._database.invoke_transaction(
-                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
-                        self._rank, self.job_id, self.crawler_id, self._url, url_form[0], page.url,
-                        False, False, False, False), False)
-                continue
-
-            # Iterate over all forms and get the login form
-            form: Optional[Locator]
-            for i in range(get_locator_count(forms)):
-                form = get_locator_nth(forms, i)
-
-                if form is not None and FindLoginForms.get_login_form(form):
-                    break
+            # Find login form
+            form: Optional[Locator] = FindLoginForms.find_login_form(page)
             # If no login form is found, try clicking on a login button
-            else:
+            if form is None:
                 # Find login buttons
                 try:
                     check_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|' \
@@ -162,25 +147,10 @@ class Login(Module):
                             page.url, False, False, False, False), False)
                     continue
 
-                # Get all forms again
-                try:
-                    forms = page.locator('form:visible',
-                                         has=page.locator('input:visible'))
-                except Error:
-                    self._database.invoke_transaction(
-                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
-                            self._rank, self.job_id, self.crawler_id, self._url, url_form[0],
-                            page.url, False, False, False, False), False)
-                    continue
-
-                # Iterate over all forms again and get the correct login form
-                for i in range(get_locator_count(forms)):
-                    form = get_locator_nth(forms, i)
-
-                    if form is not None and FindLoginForms.get_login_form(form):
-                        break
+                # Get login form again
+                form = FindLoginForms.find_login_form(page)
                 # If no login form is found this time, continue to next login form URL
-                else:
+                if form is None:
                     self._database.invoke_transaction(
                         "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
                             self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
@@ -192,7 +162,7 @@ class Login(Module):
                            True)
 
             # If filling of login form fails, continue to next login form URL
-            if form is None or not self._fill_login_form(page, form):
+            if not self._fill_login_form(page, form):
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
                         self._rank, self.job_id, self.crawler_id, self._url, url_form[0], page.url,
@@ -488,21 +458,14 @@ class Login(Module):
 
         page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
-        try:
-            forms: Locator = page.locator('form:visible',
-                                          has=page.locator('input:visible'))
-        except Error:
-            return True
-
         # Try to find login forms again
-        for i in range(get_locator_count(forms)):
-            form = get_locator_nth(forms, i)
-            if form is not None and FindLoginForms.get_login_form(form):
-                self._database.invoke_transaction(
-                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
-                        self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
-                        False, False, False, False), False)
-                return False
+        form = FindLoginForms.find_login_form(page)
+        if form is not None:
+            self._database.invoke_transaction(
+                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                    self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
+                    False, False, False, False), False)
+            return False
         else:
             try:
                 check_str: str = r'/log.?in|sign.?in|[^sb]melde|[^sb]logge|user.?name|e.?mail|' \
@@ -536,19 +499,12 @@ class Login(Module):
                 return True
 
             # Get all forms again
-            try:
-                forms = page.locator('form:visible',
-                                     has=page.locator('input:visible'))
-            except Error:
-                return True
-
-            for i in range(get_locator_count(forms)):
-                form = get_locator_nth(forms, i)
-                if form is not None and FindLoginForms.get_login_form(form):
-                    self._database.invoke_transaction(
-                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
-                            self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
-                            False, False, False, False), False)
-                    return False
+            form = FindLoginForms.find_login_form(page)
+            if form is not None:
+                self._database.invoke_transaction(
+                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
+                        self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
+                        False, False, False, False), False)
+                return False
 
         return True
