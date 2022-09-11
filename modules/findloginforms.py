@@ -61,25 +61,14 @@ class FindLoginForms(Module):
         if response is None or response.status >= 400:
             return
 
-        # Get all visible forms on the page
-        try:
-            forms: Locator = page.locator('form:visible', has=page.locator('input:visible'))
-        except Error:
-            return
-
-        # Iterate over each form
-        for i in range(get_locator_count(forms)):
-            # Get and verify form
-            form: Optional[Locator] = get_locator_nth(forms, i)
-            if form is None or not FindLoginForms.find_login_form(form):
-                continue
-
-            # Add form to the database
+        # Try to find a login form
+        form: Optional[Locator] = FindLoginForms.find_login_form(page)
+        if form is not None:
             self._database.invoke_transaction(
-                "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                (self._rank, self.job_id, self.crawler_id, self._url, url[0], final_url, url[1],
-                 url[3][-1][0] if len(url[3]) > 0 else None,
-                 url[3][-1][1] if len(url[3]) > 0 else None), False)
+                "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (
+                    self._rank, self.job_id, self.crawler_id, self._url, url[0], final_url, url[1],
+                    url[3][-1][0] if len(url[3]) > 0 else None,
+                    url[3][-1][1] if len(url[3]) > 0 else None), False)
 
             self._found += 1
             return
@@ -151,7 +140,7 @@ class FindLoginForms(Module):
         # TODO no entries for login for Web site -> use search engine with login keywords
 
     @staticmethod
-    def find_login_form(form: Locator) -> bool:
+    def get_login_form(form: Locator) -> bool:
         """
         Check if given form is a login form.
 
@@ -200,12 +189,54 @@ class FindLoginForms(Module):
             r'search|news.?letter|subscribe|contact|feedback', get_outer_html(form),
             flags=re.I) is None
 
+    @staticmethod
+    def find_login_form(page: Page) -> Optional[Locator]:
+        forms: Optional[Locator] = None
+        try:
+            forms: Locator = page.locator('form:visible,fieldset:visible',
+                                          has=page.locator('input:visible'))
+        except Error:
+            # Ignored
+            pass
+
+        for i in range(get_locator_count(forms)):
+            form: Optional[Locator] = get_locator_nth(forms, i)
+            if form is None or not FindLoginForms.get_login_form(form):
+                continue
+            return form
+
+        try:
+            form = page.locator('input[type="password"]:visible').locator('..')
+        except Error:
+            return None
+
+        while get_locator_count(form) == 1:
+            passwords: int = get_locator_count(form.locator('input[type="password"]:visible'))
+            text_fields: int = get_locator_count(
+                form.locator('input[type="email"]:visible')) + get_locator_count(
+                form.locator('input[type="text"]:visible')) + get_locator_count(
+                form.locator('input[type="tel"]:visible')) + get_locator_count(
+                form.locator('input:not([type]):visible'))
+
+            if passwords != 1 or text_fields > 2:
+                return None
+
+            if FindLoginForms.get_login_form(form):
+                return form
+
+            try:
+                form = form.locator('..')
+            except Error:
+                return None
+
+        return None
+
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         def filt(url: tld.utils.Result) -> bool:
             url_full: str = get_url_full(url)
 
-            # Ignore URLs which possibly do not lead to HTML pages, because login forms can only be
-            # found on HTML pages
+            # Ignore URLs which possibly do not lead to HTML pages, because login forms should only
+            # be found on HTML pages
             return re.match(
                 r'(\.js|\.mp3|\.wav|\.aif|\.aiff|\.wma|\.csv|\.pdf|\.jpg|\.png|\.gif|\.tif|\.svg'
                 r'|\.bmp|\.psd|\.tiff|\.ai|\.lsm|\.3gp|\.avi|\.flv|\.gvi|\.m2v|\.m4v|\.mkv|\.mov'

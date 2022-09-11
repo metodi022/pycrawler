@@ -116,7 +116,7 @@ class Login(Module):
             for i in range(get_locator_count(forms)):
                 form = get_locator_nth(forms, i)
 
-                if form is not None and FindLoginForms.find_login_form(form):
+                if form is not None and FindLoginForms.get_login_form(form):
                     break
             # If no login form is found, try clicking on a login button
             else:
@@ -177,7 +177,7 @@ class Login(Module):
                 for i in range(get_locator_count(forms)):
                     form = get_locator_nth(forms, i)
 
-                    if form is not None and FindLoginForms.find_login_form(form):
+                    if form is not None and FindLoginForms.get_login_form(form):
                         break
                 # If no login form is found this time, continue to next login form URL
                 else:
@@ -497,7 +497,7 @@ class Login(Module):
         # Try to find login forms again
         for i in range(get_locator_count(forms)):
             form = get_locator_nth(forms, i)
-            if form is not None and FindLoginForms.find_login_form(form):
+            if form is not None and FindLoginForms.get_login_form(form):
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
                         self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
@@ -544,7 +544,7 @@ class Login(Module):
 
             for i in range(get_locator_count(forms)):
                 form = get_locator_nth(forms, i)
-                if form is not None and FindLoginForms.find_login_form(form):
+                if form is not None and FindLoginForms.get_login_form(form):
                     self._database.invoke_transaction(
                         "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
                             self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
