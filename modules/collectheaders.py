@@ -15,6 +15,11 @@ class CollectHeaders(Module):
     Module to automatically collect all headers.
     """
 
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
+        super().__init__(job_id, crawler_id, database, log)
+        self._url: str = ''
+        self._rank: int = 0
+
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
         database.invoke_transaction(

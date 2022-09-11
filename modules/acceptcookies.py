@@ -4,7 +4,7 @@ from logging import Logger
 from typing import List, MutableSet, Optional, Tuple
 
 import tld
-from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
+from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error, Frame
 
 from config import Config
 from database.dequedb import DequeDB
@@ -42,7 +42,7 @@ class AcceptCookies(Module):
         self._rank = url[2]
         self._urls.clear()
 
-    def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
+    def receive_response(self, browser: Browser, context: BrowserContext, page: Page | Frame,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module], frames=True) -> None:

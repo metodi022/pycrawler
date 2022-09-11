@@ -4,7 +4,7 @@ from typing import Optional
 
 import numpy
 import tld
-from playwright.sync_api import Page, Locator, Error
+from playwright.sync_api import Page, Locator, Error, Frame
 from sklearn.cluster import dbscan
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
@@ -175,7 +175,7 @@ def get_urls_cluster(urls: list[tld.utils.Result], threshold: float):
     return cluster
 
 
-def invoke_click(page: Page, clickable: Optional[Locator], timeout=30000) -> None:
+def invoke_click(page: Page | Frame, clickable: Optional[Locator], timeout=30000) -> None:
     if clickable is None or get_locator_count(clickable) > 1:
         return
 

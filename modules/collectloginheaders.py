@@ -1,4 +1,5 @@
 import json
+import sys
 from datetime import datetime
 from logging import Logger
 from typing import List, Optional, Tuple, Callable
@@ -37,8 +38,8 @@ class CollectLoginHeaders(Login):
         super().add_handlers(browser, context, page, context_database, url, modules)
 
         if not self.success:
-            browser.close()
             self._log.info('Login failed')
+            sys.exit()
             return
 
         def handler(login: bool) -> Callable[[Response], None]:
