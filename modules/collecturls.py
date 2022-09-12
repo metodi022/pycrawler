@@ -10,7 +10,8 @@ from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.module import Module
 from utils import get_tld_object, get_url_from_href, get_url_origin, get_url_full, \
-    get_locator_count, get_locator_nth, get_locator_attribute, get_url_full_with_query_fragment
+    get_locator_count, get_locator_nth, get_locator_attribute, get_url_full_with_query_fragment, \
+    get_url_entity
 
 
 class CollectUrls(Module):
@@ -89,6 +90,10 @@ class CollectUrls(Module):
 
             # Check for same ETLD+1
             if Config.SAME_ETLDP1 and parsed_url.fld != parsed_link.fld:
+                continue
+
+            # Check for same entity
+            if Config.SAME_ENTITY and get_url_entity(parsed_url) != get_url_entity(parsed_link):
                 continue
 
             # Check seen

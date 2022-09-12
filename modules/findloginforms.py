@@ -193,8 +193,7 @@ class FindLoginForms(Module):
     def find_login_form(page: Page) -> Optional[Locator]:
         forms: Optional[Locator] = None
         try:
-            forms: Locator = page.locator('form:visible,fieldset:visible',
-                                          has=page.locator('input:visible'))
+            forms = page.locator('form:visible,fieldset:visible', has=page.locator('input:visible'))
         except Error:
             # Ignored
             pass

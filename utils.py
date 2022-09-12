@@ -38,6 +38,25 @@ def get_url_etldp1(url: Optional[tld.utils.Result]) -> str:
     return url.parsed_url.scheme + '://' + url.fld
 
 
+def get_url_entity(url: Optional[tld.utils.Result]) -> str:
+    if url is None:
+        return ''
+
+    etldp1: str = url.fld
+
+    # TODO improve
+    if re.search(r'^(google\.|youtube\.com|blogger\.com|blogspot\.com)', etldp1,
+                 flags=re.I) is not None:
+        return 'Google'
+    elif re.search(r'^(facebook\.com|fb\.com)', etldp1, flags=re.I) is not None:
+        return 'Facebook'
+    elif re.search(r'^(microsoft\.com|msn\.com|live\.com|outlook\.com)', etldp1,
+                   flags=re.I) is not None:
+        return 'Microsoft'
+
+    return etldp1
+
+
 def get_url_full(url: Optional[tld.utils.Result]) -> str:
     if url is None:
         return ''
