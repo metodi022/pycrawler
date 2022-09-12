@@ -209,7 +209,10 @@ class FindLoginForms(Module):
         except Error:
             return None
 
-        while get_locator_count(form) == 1:
+        for _ in range(100):
+            if get_locator_count(form) != 1:
+                break
+            
             passwords: int = get_locator_count(form.locator('input[type="password"]:visible'))
             text_fields: int = get_locator_count(
                 form.locator('input[type="email"]:visible')) + get_locator_count(

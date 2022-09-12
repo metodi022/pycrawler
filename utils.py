@@ -100,11 +100,14 @@ def get_screenshot(page: Page, path: pathlib.Path, force: bool) -> None:
             return
 
 
-def get_locator_count(locator: Optional[Locator]) -> int:
+def get_locator_count(locator: Optional[Locator], page: Optional[Page] = None) -> int:
     if locator is None:
         return 0
 
     try:
+        if page:
+            page.inner_html('*', timeout=5000)
+
         return locator.count()
     except Error:
         return 0
