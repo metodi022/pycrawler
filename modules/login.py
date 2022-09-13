@@ -231,8 +231,7 @@ class Login(Module):
             text_field: Optional[Locator] = get_locator_nth(text_fields, i)
             text_type: Optional[str] = get_locator_attribute(text_field, 'type')
             label: Locator = get_label_for(form, get_locator_attribute(text_field, 'id') or '')
-            placeholder: Locator = get_label_for(form, get_locator_attribute(text_field,
-                                                                             'placeholder') or '')
+            placeholder: str = get_locator_attribute(text_field, 'placeholder') or ''
 
             if text_field is None or not get_visible_extra(text_field):
                 continue
@@ -246,9 +245,7 @@ class Login(Module):
                                                       flags=re.I):
                     text_field.type(self._account[0][0], delay=100)
                     break
-                elif placeholder.count() == 1 and re.search(r'e.?mail',
-                                                            get_outer_html(placeholder) or '',
-                                                            flags=re.I):
+                elif re.search(r'e.?mail', placeholder, flags=re.I):
                     text_field.type(self._account[0][0], delay=100)
                     break
                 else:

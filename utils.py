@@ -100,7 +100,7 @@ def get_screenshot(page: Page, path: pathlib.Path, force: bool) -> None:
             return
 
 
-def get_locator_count(locator: Optional[Locator], page: Optional[Page] = None) -> int:
+def get_locator_count(locator: Optional[Locator], page: Optional[Page | Frame] = None) -> int:
     if locator is None:
         return 0
 
