@@ -108,7 +108,7 @@ class Login(Module):
                 # Find login buttons
                 try:
                     check_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|' \
-                                     r'next|continue|fortfahren/i'
+                                     r'next|continue|fortfahren|anmeldung|einmeldung/i'
                     check: Locator = page.locator(f"text={check_str}")
                     buttons = page.locator(CLICKABLES, has=check)
                     buttons = page.locator(
@@ -210,7 +210,7 @@ class Login(Module):
         pass
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
-        # TODO improve
+        # TODO improve + german
         def filt(url: tld.utils.Result) -> bool:
             return re.match(r'log.?out|sign.?out|log.?off|sign.?off|exit|quit|invalidate',
                             get_url_full_with_query_fragment(url), flags=re.I) is not None
@@ -272,7 +272,7 @@ class Login(Module):
         if get_locator_count(password_field) != 1 or not get_visible_extra(password_field):
             try:
                 check2_str: str = r'/log.?in|sign.?in|continue|next|weiter|melde|logge|e.?mail|' \
-                                  r'user.?name|nutzer.?name|fortfahren/i'
+                                  r'user.?name|nutzer.?name|fortfahren|anmeldung|einmeldung|submit/i'
                 check2: Locator = form.locator(f"text={check2_str}")
                 buttons = form.locator(CLICKABLES, has=check2)
                 buttons = form.locator(
@@ -327,7 +327,8 @@ class Login(Module):
         self._log.info('Post login form')
 
         try:
-            check_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|fortfahren)/i'
+            check_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|fortfahren|' \
+                             r'anmeldung|einmeldung|submit)/i'
             check: Locator = form.locator(f"text={check_str}")
             buttons = form.locator(CLICKABLES, has=check)
             buttons = form.locator(f"{CLICKABLES} >> text={check_str}") if get_locator_count(
@@ -372,9 +373,6 @@ class Login(Module):
 
         # Check if page is redirected or there are username/email indicators
         redirected: bool = get_url_full(get_tld_object(page.url)) != final_url
-        indicators: bool = re.search(f"(^|\\W)({self._account[0][0]}|{self._account[0][1]}|"
-                                     f"{self._account[0][3]}|{self._account[0][4]})($|\\W)",
-                                     page.content()) is not None
 
         # Check if there are error messages, captcha or verifications
         error_message: bool = False
@@ -389,12 +387,12 @@ class Login(Module):
             if input_ is None:
                 continue
 
-            if re.search(r'(\W|^)(verify|verification|code)(\W|$)', get_outer_html(input_) or '',
+            if re.search(r'(\W|^)(verify|verification)(\W|$)', get_outer_html(input_) or '',
                          flags=re.I) is not None:
                 verification = True
                 break
 
-            if input_label.count() == 1 and re.search(r'(\W|^)(verify|verification|code)(\W|$)',
+            if input_label.count() == 1 and re.search(r'(\W|^)(verify|verification)(\W|$)',
                                                       get_outer_html(input_label) or '',
                                                       flags=re.I) is not None:
                 verification = True
@@ -408,19 +406,6 @@ class Login(Module):
                 captcha = re.search(r'captcha', form.inner_html(), flags=re.I) is not None
             except Error:
                 redirected = True
-
-        if indicators:
-            try:
-                page.goto(page.url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
-                page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                indicators = re.search(f"(^|\\W)({self._account[0][0]}|{self._account[0][1]}|"
-                                       f"{self._account[0][3]}|{self._account[0][4]})($|\\W)",
-                                       page.content()) is not None
-                if indicators:
-                    return True
-            except Error:
-                # Ignored
-                pass
 
         if captcha:
             self._database.invoke_transaction(
@@ -443,10 +428,31 @@ class Login(Module):
                     False, False, False, True), False)
             return False
 
+        response: Optional[Response] = None
+        try:
+            response = page.goto(self._url, timeout=Config.LOAD_TIMEOUT,
+                                 wait_until=Config.WAIT_LOAD_UNTIL)
+
+            if response is not None and 400 > response.status >= 200:
+                page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+                if re.search(
+                        f"(^|\\W)({self._account[0][0]}|{self._account[0][1]}|"
+                        f"{self._account[0][3]}|{self._account[0][4]})($|\\W)",
+                        page.content()) is not None:
+                    return True
+
+                # TODO improve with german words
+                if get_locator_count(
+                        page.locator(f"{CLICKABLES + ',a[href]:visible'} >> text=/log.?out/i")) > 0:
+                    return True
+        except Error:
+            # Ignored
+            pass
+
         # Check if page is still accessible
         try:
-            response: Optional[Response] = page.goto(url, timeout=Config.LOAD_TIMEOUT,
-                                                     wait_until=Config.WAIT_LOAD_UNTIL)
+            response = page.goto(url, timeout=Config.LOAD_TIMEOUT,
+                                 wait_until=Config.WAIT_LOAD_UNTIL)
         except Error:
             return True
 
@@ -466,7 +472,7 @@ class Login(Module):
         else:
             try:
                 check_str: str = r'/log.?in|sign.?in|[^sb]melde|[^sb]logge|user.?name|e.?mail|' \
-                                 r'nutzer|next|continue|fortfahren/i'
+                                 r'nutzer|next|continue|fortfahren|anmeldung|einmeldung/i'
                 check: Locator = page.locator(f"text={check_str}")
                 buttons = page.locator(CLICKABLES, has=check)
                 buttons = page.locator(

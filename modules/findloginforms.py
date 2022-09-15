@@ -164,17 +164,13 @@ class FindLoginForms(Module):
 
         # If there is more than one password field -> it's not a login form
         # If there are not one or two text fields -> it's not a login form
-        if password_fields > 1 or text_fields == 0 or text_fields > 2:
+        if password_fields > 1 or text_fields < 1 or text_fields > 2:
             return False
-
-        # If there is exactly one password field -> it's a login form
-        if password_fields == 1:
-            return True
 
         # Find if there are login buttons
         try:
             check1_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|proceed|' \
-                              r'fortfahren)/i'
+                              r'fortfahren|anmeldung|einmeldung|submit)/i'
             check1: Locator = form.locator(f"text={check1_str}")
             button: Locator = form.locator(CLICKABLES, has=check1)
             button = form.locator(
@@ -185,9 +181,8 @@ class FindLoginForms(Module):
             return False
 
         # Return true if there is at least one login button in the form
-        return get_locator_count(button) > 0 and re.search(
-            r'search|news.?letter|subscribe|contact|feedback', get_outer_html(form),
-            flags=re.I) is None
+        return get_locator_count(button) > 0 and re.search(r'search|news.?letter|subscribe',
+                                                           get_outer_html(form), flags=re.I) is None
 
     @staticmethod
     def find_login_form(page: Page) -> Optional[Locator]:
@@ -212,7 +207,7 @@ class FindLoginForms(Module):
         for _ in range(100):
             if get_locator_count(form) != 1:
                 break
-            
+
             passwords: int = get_locator_count(form.locator('input[type="password"]:visible'))
             text_fields: int = get_locator_count(
                 form.locator('input[type="email"]:visible')) + get_locator_count(
