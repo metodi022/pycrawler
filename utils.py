@@ -9,7 +9,7 @@ from sklearn.cluster import dbscan
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
 CLICKABLES: str = r'button:visible,*[role="button"]:visible,*[onclick]:visible,' \
-                  r'input[type="button"]:visible,input[type="submit"]:visible'
+                  r'input[type="button"]:visible,input[type="submit"]:visible,a[href="#"]'
 
 SSO: str = r'Facebook|Twitter|Google|Yahoo|Windows.?Live|Linked.?In|Git.?Hub|Pay.?Pal|Amazon|' \
            r'v.?Kontakte|Yandex|37.?signals|Salesforce|Fitbit|Baidu|Ren.?Ren|Weibo|AOL|Shopify|' \

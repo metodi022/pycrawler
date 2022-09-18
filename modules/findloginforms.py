@@ -114,7 +114,7 @@ class FindLoginForms(Module):
 
             form = FindLoginForms.find_login_form(page)
             if form is None:
-                break
+                continue
 
             self._found += 1
             self._log.info(f"Found a possible login button")
