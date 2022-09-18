@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from logging import Logger
-from typing import List, Tuple, Callable, Optional
+from typing import List, Tuple, Callable, Optional, cast
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Error, Locator
@@ -29,6 +29,7 @@ class Login(Module):
         self._url: str = ''
         self._rank: int = 0
         self._account: List[Tuple[str, str, str, str, str]] = []
+        self._cookies: Optional[AcceptCookies] = None
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
@@ -45,6 +46,9 @@ class Login(Module):
         self._url = url[0]
         self._rank = url[2]
         self.success = False
+
+        if Config.ACCEPT_COOKIES:
+            self._cookies = cast(AcceptCookies, modules.pop(0))
 
         # Get account details from database
         self._account = self._database.invoke_transaction(
@@ -98,8 +102,9 @@ class Login(Module):
 
             # Accept cookie banners, sometimes they block login forms
             if Config.ACCEPT_COOKIES:
-                modules[0].receive_response(browser, context, page, [response], context_database,
-                                            (url_form[0], 0, self._rank, []), page.url, [], modules)
+                self._cookies.receive_response(browser, context, page, [response], context_database,
+                                               (url_form[0], 0, self._rank, []), page.url, [],
+                                               modules, force=True)
 
             # Find login form
             form: Optional[Locator] = FindLoginForms.find_login_form(page)
@@ -188,14 +193,9 @@ class Login(Module):
                            Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}login3.png",
                            True)
 
-            # Accept cookie banners, sometimes they block login forms
-            if Config.ACCEPT_COOKIES:
-                module: AcceptCookies = modules[0]
-                module.receive_response(browser, context, page, [response], context_database,
-                                        (page.url, 0, self._rank, []), page.url, [], modules)
-
             # If login is successful, end
-            if self._verify_login_after_post(page, form, url_form[0], url_form_final):
+            if self._verify_login_after_post(browser, context, page, context_database, form,
+                                             url_form[0], url_form_final, modules):
                 self.success = True
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)", (
@@ -368,7 +368,9 @@ class Login(Module):
 
         return True
 
-    def _verify_login_after_post(self, page: Page, form: Locator, url: str, final_url: str) -> bool:
+    def _verify_login_after_post(self, browser: Browser, context: BrowserContext, page: Page,
+                                 context_database: DequeDB, form: Locator, url: str,
+                                 final_url: str, modules: List[Module]) -> bool:
         self._log.info('Verify login form')
 
         # Check if page is redirected or there are username/email indicators
@@ -401,7 +403,7 @@ class Login(Module):
         # Confirm redirection
         if not redirected:
             try:
-                error_message = re.search(Login.ERROR_MESSAGE, form.inner_html(),
+                error_message = re.search(Login.ERROR_MESSAGE, form.inner_html(timeout=5000),
                                           flags=re.I) is not None
                 captcha = re.search(r'captcha', form.inner_html(), flags=re.I) is not None
             except Error:
@@ -430,11 +432,16 @@ class Login(Module):
 
         response: Optional[Response] = None
         try:
-            response = page.goto(self._url, timeout=Config.LOAD_TIMEOUT,
-                                 wait_until=Config.WAIT_LOAD_UNTIL)
+            responses: List[Optional[Response]] = [page.goto(self._url, timeout=Config.LOAD_TIMEOUT,
+                                                             wait_until=Config.WAIT_LOAD_UNTIL)]
+            page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
-            if response is not None and 400 > response.status >= 200:
-                page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+            if Config.ACCEPT_COOKIES:
+                self._cookies.receive_response(browser, context, page, responses, context_database,
+                                               (page.url, 0, self._rank, []), page.url, [], modules,
+                                               force=True)
+
+            if responses[-1] is not None and 400 > responses[-1].status >= 200:
                 if re.search(
                         f"(^|\\W)({self._account[0][0]}|{self._account[0][1]}|"
                         f"{self._account[0][3]}|{self._account[0][4]})($|\\W)",

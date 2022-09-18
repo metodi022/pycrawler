@@ -90,10 +90,6 @@ class FindLoginForms(Module):
         except Error:
             return
 
-        if buttons is not None and get_locator_count(buttons) > 0:
-            self._found += 1
-            self._log.info(f"Found a possible login button")
-
         # Iterate over each button
         for i in range(get_locator_count(buttons)):
             # Get button and validate
@@ -116,7 +112,12 @@ class FindLoginForms(Module):
                 # Ignored
                 pass
 
-            # TODO here I can search again for forms before adding
+            form = FindLoginForms.find_login_form(page)
+            if form is None:
+                break
+
+            self._found += 1
+            self._log.info(f"Found a possible login button")
 
             # Add url to database
             if page.url == final_url:

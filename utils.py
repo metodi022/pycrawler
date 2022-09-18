@@ -207,11 +207,11 @@ def invoke_click(page: Page | Frame, clickable: Optional[Locator], timeout=30000
 
 
 def get_visible_extra(locator: Optional[Locator]) -> bool:
-    if locator is None or get_locator_count(locator) < 1:
+    if locator is None or get_locator_count(locator) != 1:
         return False
 
     try:
-        locator.click(timeout=2000)
+        locator.click(timeout=2000, trial=True)
     except Error:
         return False
 
@@ -228,6 +228,7 @@ def get_visible_extra(locator: Optional[Locator]) -> bool:
                                       }
                                     
                                       return resultOpacity;
-                                    }""")
+                                    }
+                                    """)
 
     return locator.is_visible() and float(opacity) > 0.0

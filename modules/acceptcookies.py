@@ -45,7 +45,8 @@ class AcceptCookies(Module):
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page | Frame,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List[Module], frames=True) -> None | bool:
+                         start: List[datetime], modules: List[Module], frames=True,
+                         force=False) -> None | bool:
         # Verify that response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
@@ -53,7 +54,8 @@ class AcceptCookies(Module):
 
         # Check if we already accepted cookies for origin
         url_origin: Optional[tld.utils.Result] = get_tld_object(final_url)
-        if (url_origin is None or get_url_origin(url_origin) in self._urls) and frames:
+        if (url_origin is None or get_url_origin(
+                url_origin) in self._urls) and frames and not force:
             return
         self._urls.add(get_url_origin(url_origin))
 
