@@ -92,9 +92,10 @@ class AcceptCookies(Module):
             return
 
         # If no accept buttons were found -> abort
-        self._log.info(f"Find {locator_count} possible cookie accept buttons")
         if locator_count == 0 and not refresh:
             return
+
+        self._log.info(f"Find {locator_count} possible cookie accept buttons")
 
         # Click on each possible cookie accept button
         if locator_count > 0:
