@@ -470,11 +470,6 @@ class Login(Module):
                         f"{self._account[0][3]}|{self._account[0][4]})($|\\W)",
                         page.content()) is not None:
                     return True
-
-                # TODO improve with german words
-                if get_locator_count(
-                        page.locator(f"{CLICKABLES + ',a[href]:visible'} >> text=/log.?out/i")) > 0:
-                    return True
         except Error:
             # Ignored
             pass
