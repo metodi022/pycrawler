@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from logging import Logger
-from typing import List, MutableSet, Optional, Tuple
+from typing import List, MutableSet, Optional, Tuple, cast
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error, Frame
@@ -45,7 +45,7 @@ class AcceptCookies(Module):
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page | Frame,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List[Module], frames=True,
+                         start: List[datetime], modules: List[Module], repetition: int, frames=True,
                          force=False) -> None | bool:
         # Verify that response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
@@ -62,10 +62,12 @@ class AcceptCookies(Module):
         # Recursively do the same for all frames found on the page, but only once
         refresh: bool = False
         if frames:
+            page = cast(Page, page)
             for iframe in page.frames[1:]:
                 refresh = self.receive_response(browser, context, iframe, [response],
                                                 context_database, (iframe.url, 0, 0, []),
-                                                iframe.url, [], [], frames=False) or refresh
+                                                iframe.url, [], [], repetition,
+                                                frames=False) or refresh
 
         # Check for buttons with certain keywords
         locator_count: int = 0

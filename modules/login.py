@@ -103,9 +103,10 @@ class Login(Module):
 
             # Accept cookie banners, sometimes they block login forms
             if Config.ACCEPT_COOKIES:
+                self._cookies = cast(AcceptCookies, self._cookies)
                 self._cookies.receive_response(browser, context, page, [response], context_database,
                                                (url_form[0], 0, self._rank, []), page.url, [],
-                                               modules, force=True)
+                                               modules, 1, force=True)
 
             # Find login form
             form: Optional[Locator] = FindLoginForms.find_login_form(page)
@@ -207,7 +208,7 @@ class Login(Module):
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List[Module]) -> None:
+                         start: List[datetime], modules: List[Module], repetition: int) -> None:
         pass
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
@@ -458,9 +459,10 @@ class Login(Module):
             page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
             if Config.ACCEPT_COOKIES:
+                self._cookies = cast(AcceptCookies, self._cookies)
                 self._cookies.receive_response(browser, context, page, responses, context_database,
                                                (page.url, 0, self._rank, []), page.url, [], modules,
-                                               force=True)
+                                               1, force=True)
 
             if responses[-1] is not None and 400 > responses[-1].status >= 200:
                 if re.search(

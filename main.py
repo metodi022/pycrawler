@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from logging import Logger, FileHandler, Formatter
 from multiprocessing import Process
-from typing import List, Type, Tuple, Optional
+from typing import List, Type, Tuple, Optional, cast
 
 from chromiumcrawler import ChromiumCrawler
 from config import Config
@@ -48,6 +48,8 @@ def main() -> int:
 
     if setup and not urls_path:
         raise RuntimeError('Setup without path to urls file')
+
+    urls_path = cast(pathlib.Path, urls_path)
 
     if setup and not urls_path.exists() and not urls_path.is_dir():
         raise RuntimeError('Path to file with urls is incorrect')

@@ -48,7 +48,6 @@ class ChromiumCrawler:
         if url is None:
             return
 
-        start: datetime = datetime.now()
         playwright: Playwright = sync_playwright().start()
         browser: Browser = playwright.chromium.launch(headless=Config.HEADLESS)
         context: BrowserContext = browser.new_context()
@@ -60,20 +59,21 @@ class ChromiumCrawler:
         self._invoke_page_handler(browser, context, page, url, context_database)
 
         while url is not None:
-            # Navigate to page
-            response: Optional[Response] = self._open_url(page, url)
+            for repetition in range(Config.REPETITIONS):
+                # Navigate to page
+                response: Optional[Response] = self._open_url(page, url)
+                self._log.info(f"Response status {response.status} repetition {repetition}")
 
-            # Wait after page is loaded
-            page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-            get_screenshot(page, (Config.LOG / f"screenshots/job{self.job_id}rank{url[2]}.png"),
-                           False)
+                # Wait after page is loaded
+                page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+                get_screenshot(page, (Config.LOG / f"screenshots/job{self.job_id}rank{url[2]}.png"),
+                               False)
 
-            # Run module response handler
-            self._invoke_response_handler(browser, context, page, [response], url, context_database,
-                                          [start])
+                # Run modules response handler
+                self._invoke_response_handler(browser, context, page, [response], url,
+                                              context_database, [datetime.now()], repetition)
 
             # Get next URL to crawl
-            start = datetime.now()
             url = context_database.get_url()
             self._log.info(f"Get URL {url[0] if url is not None else url}")
 
@@ -129,12 +129,13 @@ class ChromiumCrawler:
     def _invoke_response_handler(self, browser: Browser, context: BrowserContext, page: Page,
                                  responses: List[Optional[Response]],
                                  url: Tuple[str, int, int, List[Tuple[str, str]]],
-                                 context_database: DequeDB, start: List[datetime]) -> None:
+                                 context_database: DequeDB, start: List[datetime],
+                                 repetition: int) -> None:
         self._log.debug('Invoke module response handler')
 
         for module in self._modules:
             module.receive_response(browser, context, page, responses, context_database, url,
-                                    page.url, start, self._modules)
+                                    page.url, start, self._modules, repetition)
 
     def _initialize_modules(self, modules: List[Type[Module]], job_id: int, crawler_id: int,
                             database: Postgres, log: Logger) -> List[Module]:

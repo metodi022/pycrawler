@@ -20,7 +20,8 @@ class SaveStats(Module):
         database.invoke_transaction(
             "CREATE TABLE IF NOT EXISTS URLSFEEDBACK (rank INT NOT NULL, job INT NOT NULL, "
             "crawler INT NOT NULL, url TEXT NOT NULL, finalurl TEXT NOT NULL, depth INT NOT NULL, "
-            "code INT NOT NULL, started TIMESTAMP NOT NULL, ended TIMESTAMP NOT NULL);",
+            "code INT NOT NULL, started TIMESTAMP NOT NULL, ended TIMESTAMP NOT NULL, "
+            "repetition INT NOT NULL);",
             None, False)
         log.info('Create URLSFEEDBACK table IF NOT EXISTS')
 
@@ -32,12 +33,12 @@ class SaveStats(Module):
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List[Module]) -> None:
+                         start: List[datetime], modules: List[Module], repetition: int) -> None:
         end: datetime = datetime.now()
         for i, response in enumerate((responses if len(responses) > 0 else [None])):
             self._database.invoke_transaction(
-                "INSERT INTO URLSFEEDBACK VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);", (
+                "INSERT INTO URLSFEEDBACK VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);", (
                     self._rank, self.job_id, self.crawler_id, url[0], final_url, url[1],
                     response.status if response is not None else Config.ERROR_CODES[
                         'response_error'], start[i].strftime('%Y-%m-%d %H:%M:%S'),
-                    end.strftime('%Y-%m-%d %H:%M:%S')), False)
+                    end.strftime('%Y-%m-%d %H:%M:%S'), repetition), False)

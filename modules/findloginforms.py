@@ -55,7 +55,7 @@ class FindLoginForms(Module):
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List[Module]) -> None:
+                         start: List[datetime], modules: List[Module], repetition: int) -> None:
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:

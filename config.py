@@ -20,9 +20,11 @@ class Config:
     SAME_ORIGIN: bool = False  # URL discovery for same-origin only
     SAME_ETLDP1: bool = False  # URL discovery for same ETLD+1 only
     SAME_ENTITY: bool = True  # URL discovery for same entity only (ETLD+1 or company, owner, etc.)
-    DEPTH: int = 2  # URL discovery limit; 0 (initial URL only), 1, 2, etc.
+    DEPTH: int = 2  # URL discovery limit; 0 (initial URL only), 1 (+ all URLs landing page), etc.
     SAME_CONTEXT: bool = True  # crawl additional URLs in the same context
     MAX_URLS: int = 1000  # limit number of URLs gathered for a domain
+
+    REPETITIONS: int = 1  # how many times to crawl the same URL and invoke module response handlers
 
     WAIT_LOAD_UNTIL: Literal['commit', 'domcontentloaded', 'load', 'networkidle'] = 'load'
     LOAD_TIMEOUT: int = 30000  # URL page loading timeout in ms (0 = disable timeout)

@@ -43,7 +43,7 @@ class CollectUrls(Module):
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List[Module]) -> None:
+                         start: List[datetime], modules: List[Module], repetition: int) -> None:
         # Make sure to add page as seen
         parsed_url_final: Optional[tld.utils.Result] = get_tld_object(final_url)
         context_database.add_seen(

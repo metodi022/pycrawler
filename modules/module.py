@@ -59,7 +59,7 @@ class Module:
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List['Module']) -> None:
+                         start: List[datetime], modules: List['Module'], repetition: int) -> None:
         """
         Receive response from server.
 
@@ -73,6 +73,7 @@ class Module:
             final_url (str): final url after redirections
             start (List[datetime]): start times for crawl and for each module response initiation
             modules (List[Module]): list of modules currently active modules
+            repetition (int): current URL visited repetition
         """
         raise NotImplementedError
 

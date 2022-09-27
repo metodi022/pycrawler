@@ -20,6 +20,7 @@ class CollectLoginHeaders(Login):
         self._context_alt: Optional[BrowserContext] = None
         self._page_alt: Optional[Page] = None
         self._cookies: Optional[AcceptCookies] = None
+        self._repetition: int = 1
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
@@ -28,13 +29,15 @@ class CollectLoginHeaders(Login):
         database.invoke_transaction(
             "CREATE TABLE IF NOT EXISTS LOGINHEADERS (rank INT NOT NULL, job INT NOT NULL,"
             "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, fromurl TEXT NOT NULL, "
-            "tourl TEXT NOT NULL, code INT NOT NULL, headers TEXT, login BOOLEAN NOT NULL)",
+            "tourl TEXT NOT NULL, code INT NOT NULL, headers TEXT, login BOOLEAN NOT NULL, "
+            "repetition INT NOT NULL)",
             None, False)
         log.info('Create LOGINHEADERS table IF NOT EXISTS')
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
                      modules: List[Module]) -> None:
+        self._repetition: int = 1
         if Config.ACCEPT_COOKIES:
             self._cookies = cast(AcceptCookies, modules[0])
 
@@ -57,9 +60,10 @@ class CollectLoginHeaders(Login):
         self._page_alt.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
         if Config.ACCEPT_COOKIES:
+            self._cookies = cast(AcceptCookies, self._cookies)
             self._cookies.receive_response(browser, self._context_alt, self._page_alt,
                                            [response_alt], context_database, url, page.url, [], [],
-                                           force=True)
+                                           1, force=True)
 
         def handler(login: bool) -> Callable[[Response], None]:
             def helper(response: Response):
@@ -70,9 +74,9 @@ class CollectLoginHeaders(Login):
                     headers = None
 
                 self._database.invoke_transaction(
-                    "INSERT INTO LOGINHEADERS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (
+                    "INSERT INTO LOGINHEADERS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (
                         self._rank, self.job_id, self.crawler_id, self._url, page.url, response.url,
-                        response.status, headers, login), False)
+                        response.status, headers, login, self._repetition), False)
 
             return helper
 
@@ -82,7 +86,9 @@ class CollectLoginHeaders(Login):
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List[Module]) -> None:
+                         start: List[datetime], modules: List[Module], repetition: int) -> None:
+        self._repetition = repetition
+        self._page_alt = cast(Page, self._page_alt)
         try:
             self._page_alt.goto(url[0], timeout=Config.LOAD_TIMEOUT,
                                 wait_until=Config.WAIT_LOAD_UNTIL)
