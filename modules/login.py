@@ -441,11 +441,9 @@ class Login(Module):
                         self._rank, self.job_id, self.crawler_id, self._url, url, page.url, False,
                         False, False, False, True), False)
                 page_alt.close()
-                context_alt.close()
                 return False
             else:
                 page_alt.close()
-                context_alt.close()
                 return True
 
         return False

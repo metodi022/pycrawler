@@ -2,7 +2,7 @@ import json
 import sys
 from datetime import datetime
 from logging import Logger
-from typing import List, Optional, Tuple, Callable
+from typing import List, Optional, Tuple, Callable, cast
 
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Error
 
@@ -19,7 +19,7 @@ class CollectLoginHeaders(Login):
         super().__init__(job_id, crawler_id, database, log)
         self._context_alt: Optional[BrowserContext] = None
         self._page_alt: Optional[Page] = None
-        self._cookies_alt: Optional[Module] = None
+        self._cookies: Optional[AcceptCookies] = None
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
@@ -35,12 +35,31 @@ class CollectLoginHeaders(Login):
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
                      modules: List[Module]) -> None:
+        if Config.ACCEPT_COOKIES:
+            self._cookies = cast(AcceptCookies, modules[0])
+
         super().add_handlers(browser, context, page, context_database, url, modules)
 
         if not self.success:
             self._log.info('Login failed')
             sys.exit()
-            return
+
+        self._context_alt = browser.new_context()
+        self._page_alt = self._context_alt.new_page()
+
+        try:
+            response_alt = self._page_alt.goto(url[0], timeout=Config.LOAD_TIMEOUT,
+                                               wait_until=Config.WAIT_LOAD_UNTIL)
+        except Error as error:
+            self._log.error(error.message)
+            sys.exit()
+
+        self._page_alt.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+
+        if Config.ACCEPT_COOKIES:
+            self._cookies.receive_response(browser, self._context_alt, self._page_alt,
+                                           [response_alt], context_database, url, page.url, [], [],
+                                           force=True)
 
         def handler(login: bool) -> Callable[[Response], None]:
             def helper(response: Response):
@@ -58,30 +77,16 @@ class CollectLoginHeaders(Login):
             return helper
 
         page.on('response', handler(True))
-        self._context_alt = browser.new_context()
-        self._page_alt = self._context_alt.new_page()
         self._page_alt.on('response', handler(False))
-
-        if Config.ACCEPT_COOKIES:
-            self._cookies_alt = AcceptCookies(self.job_id, self.crawler_id, self._database,
-                                              self._log)
-            self._cookies_alt.add_handlers(browser, context, self._page_alt, context_database,
-                                           url, [])
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module]) -> None:
-        response: Optional[Response] = None
         try:
-            response = self._page_alt.goto(url[0], timeout=Config.LOAD_TIMEOUT,
-                                           wait_until=Config.WAIT_LOAD_UNTIL)
+            self._page_alt.goto(url[0], timeout=Config.LOAD_TIMEOUT,
+                                wait_until=Config.WAIT_LOAD_UNTIL)
             page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error:
             # Ignored
             pass
-
-        if self._cookies_alt:
-            self._cookies_alt.receive_response(browser, self._context_alt, self._page_alt,
-                                               [response], context_database, url,
-                                               self._page_alt.url, [], [])

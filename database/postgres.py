@@ -106,8 +106,12 @@ class Postgres:
         self.connect()
         cur: psycopg2.cursor = self._conn.cursor()
 
-        cur.execute(transaction, values)
-        data: Optional[List[Tuple[Any, ...]]] = cur.fetchall() if fetch else []
+        data: Optional[List[Tuple[Any, ...]]]
+        try:
+            cur.execute(transaction, values)
+            data = cur.fetchall() if fetch else []
+        except Exception:
+            data = None
 
         self._conn.commit()
         cur.close()
