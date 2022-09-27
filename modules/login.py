@@ -30,6 +30,7 @@ class Login(Module):
         self._rank: int = 0
         self._account: List[Tuple[str, str, str, str, str]] = []
         self._cookies: Optional[AcceptCookies] = None
+        self._url_login: str = ''
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
@@ -37,7 +38,8 @@ class Login(Module):
             "CREATE TABLE IF NOT EXISTS LOGINS (rank INT NOT NULL, job INT NOT NULL, "
             "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, loginform TEXT, "
             "loginformfinal TEXT, success BOOLEAN NOT NULL, captcha BOOLEAN NOT NULL, "
-            "error BOOLEAN NOT NULL, verification BOOLEAN NOT NULL, falsepos BOOLEAN NOT NULL);",
+            "error BOOLEAN NOT NULL, verification BOOLEAN NOT NULL, falsepos BOOLEAN NOT NULL, "
+            "successfinal BOOLEAN NOT NULL);",
             None, False)
         log.info('Create LOGINS table IF NOT EXISTS')
 
@@ -47,6 +49,8 @@ class Login(Module):
         self._url = url[0]
         self._rank = url[2]
         self.success = False
+        self._cookies = None
+        self._url_login = ''
 
         if Config.ACCEPT_COOKIES:
             self._cookies = cast(AcceptCookies, modules.pop(0))
@@ -60,9 +64,9 @@ class Login(Module):
         if self._account is None or len(self._account) == 0:
             self._log.info(f"Found no credentials for {self._url}")
             self._database.invoke_transaction(
-                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s)", (
+                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                     self._rank, self.job_id, self.crawler_id, self._url, None, None, False, False,
-                    False, False, False), False)
+                    False, False, False, False), False)
             return
 
         # Get URLs with login forms for given site
@@ -73,9 +77,9 @@ class Login(Module):
         if url_forms is None or len(url_forms) == 0:
             self._log.info(f"Found no login URLs for {self._url}")
             self._database.invoke_transaction(
-                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s)", (
+                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                     self._rank, self.job_id, self.crawler_id, self._url, None, None, False, False,
-                    False, False, False), False)
+                    False, False, False, False), False)
             return
 
         # Iterate over login form URLs
@@ -93,9 +97,9 @@ class Login(Module):
             # Check if response status is valid
             if response is None or response.status >= 400:
                 self._database.invoke_transaction(
-                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s)", (
+                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                         self._rank, self.job_id, self.crawler_id, self._url, url_form[0],
-                        url_form[0], False, False, False, False, False), False)
+                        url_form[0], False, False, False, False, False, False), False)
                 continue
 
             url_form_final: str = get_url_full(get_tld_object(page.url)) or page.url
@@ -123,9 +127,9 @@ class Login(Module):
                         buttons) == 0 else buttons
                 except Error:
                     self._database.invoke_transaction(
-                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s)", (
-                            self._rank, self.job_id, self.crawler_id, self._url, url_form[0],
-                            page.url, False, False, False, False, False), False)
+                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)",
+                        (self._rank, self.job_id, self.crawler_id, self._url, url_form[0], page.url,
+                         False, False, False, False, False, False), False)
                     continue
 
                 # Iterate over buttons and click on correct login button
@@ -149,9 +153,9 @@ class Login(Module):
                     break
                 else:
                     self._database.invoke_transaction(
-                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s)", (
-                            self._rank, self.job_id, self.crawler_id, self._url, url_form[0],
-                            page.url, False, False, False, False, False), False)
+                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)",
+                        (self._rank, self.job_id, self.crawler_id, self._url, url_form[0], page.url,
+                         False, False, False, False, False, False), False)
                     continue
 
                 # Get login form again
@@ -159,9 +163,9 @@ class Login(Module):
                 # If no login form is found this time, continue to next login form URL
                 if form is None:
                     self._database.invoke_transaction(
-                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s)", (
-                            self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
-                            False, False, False, False, False), False)
+                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)",
+                        (self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
+                         False, False, False, False, False, False), False)
                     continue
 
             get_screenshot(page,
@@ -171,9 +175,9 @@ class Login(Module):
             # If filling of login form fails, continue to next login form URL
             if not self._fill_login_form(page, form):
                 self._database.invoke_transaction(
-                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s)", (
+                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                         self._rank, self.job_id, self.crawler_id, self._url, url_form[0], page.url,
-                        False, False, False, False, False), False)
+                        False, False, False, False, False, False), False)
                 continue
 
             get_screenshot(page,
@@ -186,9 +190,9 @@ class Login(Module):
                                Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}login3.png",
                                True)
                 self._database.invoke_transaction(
-                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s)", (
+                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                         self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
-                        False, False, False, False, False), False)
+                        False, False, False, False, False, False), False)
                 continue
 
             get_screenshot(page,
@@ -199,17 +203,26 @@ class Login(Module):
             if self._verify_login_after_post(browser, context, page, context_database, form,
                                              url_form[0], url_form_final, modules):
                 self.success = True
+                self._url_login = url_form
                 self._database.invoke_transaction(
-                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s)", (
+                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                         self._rank, self.job_id, self.crawler_id, self._url, url_form[0], page.url,
-                        True, False, False, False, False), False)
+                        True, False, False, False, False, False), False)
                 break
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module], repetition: int) -> None:
-        pass
+        if len(context_database) > 0 or repetition < Config.REPETITIONS:
+            return
+
+        page_alt: Page = context.new_page()
+        if self.verify_login(browser, context, page_alt, context_database, modules,
+                             self._url_login):
+            self._database.invoke_transaction(
+                "UPDATE LOGINS SET successfinal = %s WHERE job = %s AND crawler = %s AND url = %s "
+                "AND success", (True, self.job_id, self.crawler_id, self._url), False)
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         # TODO improve + german
@@ -413,23 +426,23 @@ class Login(Module):
 
         if captcha:
             self._database.invoke_transaction(
-                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s , %s, %s)", (
+                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s , %s, %s, %s)", (
                     self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
-                    False, True, False, False, False), False)
+                    False, True, False, False, False, False), False)
             return False
 
         if error_message:
             self._database.invoke_transaction(
-                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s)", (
+                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                     self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
-                    False, False, True, False, False), False)
+                    False, False, True, False, False, False), False)
             return False
 
         if verification:
             self._database.invoke_transaction(
-                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s)", (
+                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                     self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
-                    False, False, False, True, False), False)
+                    False, False, False, True, False, False), False)
             return False
 
         if self.verify_login(browser, context, page, context_database, modules, url):
@@ -438,9 +451,9 @@ class Login(Module):
 
             if self.verify_login(browser, context_alt, page_alt, context_database, modules, None):
                 self._database.invoke_transaction(
-                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s)", (
+                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                         self._rank, self.job_id, self.crawler_id, self._url, url, page.url, False,
-                        False, False, False, True), False)
+                        False, False, False, True, False), False)
                 page_alt.close()
                 return False
             else:
@@ -493,9 +506,9 @@ class Login(Module):
         form = FindLoginForms.find_login_form(page)
         if form is not None:
             self._database.invoke_transaction(
-                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s)", (
+                "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                     self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
-                    False, False, False, False, False), False)
+                    False, False, False, False, False, False), False)
             return False
         else:
             try:
@@ -533,9 +546,9 @@ class Login(Module):
             form = FindLoginForms.find_login_form(page)
             if form is not None:
                 self._database.invoke_transaction(
-                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s)", (
+                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                         self._rank, self.job_id, self.crawler_id, self._url, url, page.url,
-                        False, False, False, False, False), False)
+                        False, False, False, False, False, False), False)
                 return False
 
         return True

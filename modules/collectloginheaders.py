@@ -90,6 +90,10 @@ class CollectLoginHeaders(Login):
                          start: List[datetime], modules: List[Module], repetition: int) -> None:
         self._repetition = repetition
         self._page_alt = cast(Page, self._page_alt)
+
+        super().receive_response(browser, context, page, responses, context_database, url,
+                                 final_url, start, modules, repetition)
+
         try:
             self._page_alt.goto(url[0], timeout=Config.LOAD_TIMEOUT,
                                 wait_until=Config.WAIT_LOAD_UNTIL)
