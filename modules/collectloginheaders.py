@@ -45,6 +45,7 @@ class CollectLoginHeaders(Login):
 
         if not self.success:
             self._log.info('Login failed')
+            self._log.info('Close Browser')
             sys.exit()
 
         self._context_alt = browser.new_context()
