@@ -46,17 +46,21 @@ class CollectLoginHeaders(Login):
         if not self.success:
             self._log.info('Login failed')
             self._log.info('Close Browser')
+            page.close()
+            context.close()
+            browser.close()
             sys.exit()
 
         self._context_alt = browser.new_context()
         self._page_alt = self._context_alt.new_page()
 
+        response_alt: Optional[Response] = None
         try:
             response_alt = self._page_alt.goto(url[0], timeout=Config.LOAD_TIMEOUT,
                                                wait_until=Config.WAIT_LOAD_UNTIL)
         except Error as error:
             self._log.error(error.message)
-            sys.exit()
+            pass
 
         self._page_alt.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
@@ -88,7 +92,6 @@ class CollectLoginHeaders(Login):
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module], repetition: int) -> None:
-        self._repetition = repetition
         self._page_alt = cast(Page, self._page_alt)
 
         super().receive_response(browser, context, page, responses, context_database, url,
@@ -101,3 +104,8 @@ class CollectLoginHeaders(Login):
         except Error:
             # Ignored
             pass
+
+        if len(context_database) == 0 and repetition == Config.REPETITIONS:
+            self._page_alt.close()
+
+        self._repetition += 1

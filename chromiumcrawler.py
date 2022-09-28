@@ -62,7 +62,7 @@ class ChromiumCrawler:
             for repetition in range(1, Config.REPETITIONS + 1):
                 # Navigate to page
                 response: Optional[Response] = self._open_url(page, url)
-                self._log.info(f"Response status {response.status} repetition {repetition}")
+                self._log.info(f"Response status {response if response is None else response.status} repetition {repetition}")
 
                 # Wait after page is loaded
                 page.wait_for_timeout(Config.WAIT_AFTER_LOAD)

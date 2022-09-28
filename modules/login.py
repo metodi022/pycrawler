@@ -224,6 +224,12 @@ class Login(Module):
                 "UPDATE LOGINS SET successfinal = %s WHERE job = %s AND crawler = %s AND url = %s "
                 "AND success", (True, self.job_id, self.crawler_id, self._url), False)
 
+        get_screenshot(page_alt,
+                       Config.LOG / f"screenshots/job{self.job_id}rank{self._rank}login4.png",
+                       True)
+
+        page_alt.close()
+
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         # TODO improve + german
         def filt(url: tld.utils.Result) -> bool:
@@ -448,16 +454,18 @@ class Login(Module):
         if self.verify_login(browser, context, page, context_database, modules, url):
             context_alt: BrowserContext = browser.new_context()
             page_alt: Page = context_alt.new_page()
+            verify: bool = self.verify_login(browser, context_alt, page_alt, context_database,
+                                             modules, None)
 
-            if self.verify_login(browser, context_alt, page_alt, context_database, modules, None):
+            page_alt.close()
+
+            if verify:
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                         self._rank, self.job_id, self.crawler_id, self._url, url, page.url, False,
                         False, False, False, True, False), False)
-                page_alt.close()
                 return False
             else:
-                page_alt.close()
                 return True
 
         return False
