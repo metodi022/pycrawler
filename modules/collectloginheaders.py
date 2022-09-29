@@ -108,4 +108,4 @@ class CollectLoginHeaders(Login):
         if len(context_database) == 0 and repetition == Config.REPETITIONS:
             self._page_alt.close()
 
-        self._repetition += 1
+        self._repetition = (self._repetition % Config.REPETITIONS) + 1
