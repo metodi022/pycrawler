@@ -38,7 +38,7 @@ class CollectHeaders(Module):
         def handler(response: Response):
             headers: Optional[str]
             try:
-                headers = json.dumps(response.all_headers())
+                headers = json.dumps(response.headers_array())
             except ValueError:
                 headers = None
 

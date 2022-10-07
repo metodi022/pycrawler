@@ -74,7 +74,7 @@ class CollectLoginHeaders(Login):
             def helper(response: Response):
                 headers: Optional[str]
                 try:
-                    headers = json.dumps(response.all_headers())
+                    headers = json.dumps(response.headers_array())
                 except ValueError:
                     headers = None
 
