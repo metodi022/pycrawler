@@ -1,4 +1,3 @@
-import json
 import sys
 from datetime import datetime
 from logging import Logger
@@ -74,8 +73,8 @@ class CollectLoginHeaders(Login):
             def helper(response: Response):
                 headers: Optional[str]
                 try:
-                    headers = json.dumps(response.headers_array())
-                except ValueError:
+                    headers = str(response.headers_array())
+                except Exception:
                     headers = None
 
                 self._database.invoke_transaction(
