@@ -164,7 +164,7 @@ class Login(Module):
                 if form is None:
                     self._database.invoke_transaction(
                         "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)",
-                        (self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
+                        (self._rank, self.job_id, self.crawler_id, self._url, url_form[0], page.url,
                          False, False, False, False, False, False), False)
                     continue
 
@@ -191,7 +191,7 @@ class Login(Module):
                                True)
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
-                        self._rank, self.job_id, self.crawler_id, self._url, url_form, page.url,
+                        self._rank, self.job_id, self.crawler_id, self._url, url_form[0], page.url,
                         False, False, False, False, False, False), False)
                 continue
 
@@ -203,7 +203,7 @@ class Login(Module):
             if self._verify_login_after_post(browser, context, page, context_database, form,
                                              url_form[0], url_form_final, modules):
                 self.success = True
-                self._url_login = url_form
+                self._url_login = url_form[0]
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                         self._rank, self.job_id, self.crawler_id, self._url, url_form[0], page.url,
