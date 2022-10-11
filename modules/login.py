@@ -233,7 +233,7 @@ class Login(Module):
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         # TODO improve + german
         def filt(url: tld.utils.Result) -> bool:
-            return re.match(r'log.?out|sign.?out|log.?off|sign.?off|exit|quit|invalidate',
+            return re.search(r'log.?out|sign.?out|log.?off|sign.?off|exit|quit|invalidate',
                             get_url_full_with_query_fragment(url), flags=re.I) is not None
 
         filters.append(filt)
