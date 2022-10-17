@@ -40,8 +40,10 @@ class CollectLoginHeaders(Login):
         if Config.ACCEPT_COOKIES:
             self._cookies = cast(AcceptCookies, modules[0])
 
+        # Log in
         super().add_handlers(browser, context, page, context_database, url, modules)
 
+        # Check if login is successful
         if not self.success:
             self._log.info('Login failed')
             self._log.info('Close Browser')
@@ -50,6 +52,7 @@ class CollectLoginHeaders(Login):
             browser.close()
             sys.exit()
 
+        # Create a fresh context to emulate a not logged-in user
         self._context_alt = browser.new_context()
         self._page_alt = self._context_alt.new_page()
 
@@ -69,6 +72,7 @@ class CollectLoginHeaders(Login):
                                            [response_alt], context_database, url, page.url, [], [],
                                            1, force=True)
 
+        # Create response listener that saves all headers
         def handler(login: bool) -> Callable[[Response], None]:
             def helper(response: Response):
                 headers: Optional[str]
@@ -84,6 +88,7 @@ class CollectLoginHeaders(Login):
 
             return helper
 
+        # Register response listener
         page.on('response', handler(True))
         self._page_alt.on('response', handler(False))
 
@@ -96,6 +101,7 @@ class CollectLoginHeaders(Login):
         super().receive_response(browser, context, page, responses, context_database, url,
                                  final_url, start, modules, repetition)
 
+        # Navigate with the fresh context to the same page
         try:
             self._page_alt.goto(url[0], timeout=Config.LOAD_TIMEOUT,
                                 wait_until=Config.WAIT_LOAD_UNTIL)
@@ -104,6 +110,7 @@ class CollectLoginHeaders(Login):
             # Ignored
             pass
 
+        # Check if we are at the end of the crawl
         if len(context_database) == 0 and repetition == Config.REPETITIONS:
             self._page_alt.close()
 

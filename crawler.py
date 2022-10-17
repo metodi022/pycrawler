@@ -16,8 +16,7 @@ from modules.savestats import SaveStats
 from utils import get_screenshot
 
 
-class ChromiumCrawler:
-    # noinspection PyTypeChecker
+class Crawler:
     def __init__(self, job_id: int, crawler_id: int,
                  url: Tuple[str, int, int, List[Tuple[str, str]]], database: Postgres, log: Logger,
                  modules: List[Type[Module]]) -> None:
@@ -48,21 +47,29 @@ class ChromiumCrawler:
         if url is None:
             return
 
+        # Initiate playwright, browser, context, and page
         playwright: Playwright = sync_playwright().start()
-        browser: Browser = playwright.chromium.launch(headless=Config.HEADLESS)
+        browser: Browser = playwright.firefox.launch(
+            headless=Config.HEADLESS) if Config.BROWSER == 'firefox' else (playwright.webkit.launch(
+            headless=Config.HEADLESS) if Config.BROWSER == 'webkit' else playwright.chromium.launch(
+            headless=Config.HEADLESS))
         context: BrowserContext = browser.new_context()
         context_database: DequeDB = DequeDB()
         page: Page = context.new_page()
         self._log.info(f"Start Chromium {browser.version}")
         self._log.info('New context')
 
+        # Initiate modules
         self._invoke_page_handler(browser, context, page, url, context_database)
 
+        # Main loop
         while url is not None:
+            # Repetition loop
             for repetition in range(1, Config.REPETITIONS + 1):
                 # Navigate to page
                 response: Optional[Response] = self._open_url(page, url)
-                self._log.info(f"Response status {response if response is None else response.status} repetition {repetition}")
+                self._log.info(
+                    f"Response status {response if response is None else response.status} repetition {repetition}")
 
                 # Wait after page is loaded
                 page.wait_for_timeout(Config.WAIT_AFTER_LOAD)

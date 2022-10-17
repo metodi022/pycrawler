@@ -214,9 +214,11 @@ class Login(Module):
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module], repetition: int) -> None:
+        # Check if we are at the end of the crawl
         if len(context_database) > 0 or repetition < Config.REPETITIONS:
             return
 
+        # At the end of the crawl check if we are still logged-in
         page_alt: Page = context.new_page()
         if self.verify_login(browser, context, page_alt, context_database, modules,
                              self._url_login):
@@ -231,16 +233,18 @@ class Login(Module):
         page_alt.close()
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
-        # TODO improve + german
+        # TODO improve
+        # Ignore URLs which could lead to logout
         def filt(url: tld.utils.Result) -> bool:
             return re.search(r'log.?out|sign.?out|log.?off|sign.?off|exit|quit|invalidate',
-                            get_url_full_with_query_fragment(url), flags=re.I) is not None
+                             get_url_full_with_query_fragment(url), flags=re.I) is not None
 
         filters.append(filt)
 
     def _fill_login_form(self, page: Page, form: Locator) -> bool:
         self._log.info('Fill login form')
 
+        # Find relevant fields
         try:
             password_field: Locator = form.locator('input[type="password"]:visible')
             text_fields: Locator = form.locator(
@@ -248,15 +252,18 @@ class Login(Module):
         except Error:
             return False
 
+        # Iterate over all text fields and fill them
         for i in range(get_locator_count(text_fields)):
             text_field: Optional[Locator] = get_locator_nth(text_fields, i)
             text_type: Optional[str] = get_locator_attribute(text_field, 'type')
             label: Locator = get_label_for(form, get_locator_attribute(text_field, 'id') or '')
             placeholder: str = get_locator_attribute(text_field, 'placeholder') or ''
 
+            # If not visible, skip
             if text_field is None or not get_visible_extra(text_field):
                 continue
 
+            # Decide if it is email or username
             try:
                 if (text_type is not None and text_type == 'email') or \
                         re.search(r'e.?mail', get_outer_html(text_field) or '', flags=re.I):
@@ -276,6 +283,7 @@ class Login(Module):
                 # Ignored
                 pass
         else:
+            # If no text field was filled, fill all possible text fields with email
             for i in range(get_locator_count(text_fields)):
                 text_field: Optional[Locator] = get_locator_nth(text_fields, i)
                 if text_field is None or not get_visible_extra(text_field):
@@ -290,7 +298,10 @@ class Login(Module):
 
         page.wait_for_timeout(500)
 
+        # Check if password field is visible, if not try to click on a next/continue button
+        # This is helpful for two-step logins
         if get_locator_count(password_field) != 1 or not get_visible_extra(password_field):
+            # Get possible buttons similar to continue/next
             try:
                 check2_str: str = r'/log.?in|sign.?in|continue|next|weiter|melde|logge|e.?mail|' \
                                   r'user.?name|nutzer.?name|fortfahren|anmeldung|einmeldung|submit/i'
@@ -302,9 +313,11 @@ class Login(Module):
             except Error:
                 return False
 
+            # Iterate over buttons and try to click them
             for i in range(get_locator_count(buttons)):
                 button: Optional[Locator] = get_locator_nth(buttons, i)
 
+                # Ignore certain buttons (SSO, help links, registration links)
                 if button is None:
                     continue
                 elif re.search(SSO, get_outer_html(button) or '', flags=re.I) is not None:
@@ -313,6 +326,7 @@ class Login(Module):
                                flags=re.I) is not None:
                     continue
 
+                # Click on a button
                 try:
                     invoke_click(page, button, 5000)
                     page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
@@ -327,14 +341,17 @@ class Login(Module):
             else:
                 return False
 
+            # Try to get password field again
             try:
                 password_field: Locator = form.locator('input[type="password"]:visible')
             except Error:
                 return False
 
+            # If password field does not show again, return
             if get_locator_count(password_field) == 0 or not get_visible_extra(password_field):
                 return False
 
+        # Type password
         try:
             password_field.type(self._account[0][2], delay=100)
         except Error:
@@ -347,6 +364,7 @@ class Login(Module):
     def _post_login_form(self, page: Page, form: Locator) -> bool:
         self._log.info('Post login form')
 
+        # Locate login button
         try:
             check_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|fortfahren|' \
                              r'anmeldung|einmeldung|submit)/i'
@@ -359,12 +377,15 @@ class Login(Module):
         except Error:
             return False
 
+        # If no login button detected, return
         if get_locator_count(buttons) == 0:
             return False
 
+        # Iterate over login buttons and find the correct one to click
         for i in range(get_locator_count(buttons)):
             button = get_locator_nth(buttons, i)
 
+            # Ignore certain buttons for SSO, registration or help/trouble
             if button is None:
                 continue
             elif re.search(SSO, get_outer_html(button) or '', flags=re.I) is not None:
@@ -373,6 +394,7 @@ class Login(Module):
                            flags=re.I) is not None:
                 continue
 
+            # Click on button
             try:
                 invoke_click(page, button, 5000)
                 page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
@@ -394,16 +416,17 @@ class Login(Module):
                                  final_url: str, modules: List[Module]) -> bool:
         self._log.info('Verify login form')
 
-        # Check if page is redirected or there are username/email indicators
+        # Check if page is redirected
         redirected: bool = get_url_full(get_tld_object(page.url)) != final_url
 
-        # Check if there are error messages, captcha or verifications
+        # Initialize variables
         error_message: bool = False
         captcha: bool = False
         verification: bool = False
 
-        # Check for verification
+        # Check for verification message
         inputs: Locator = page.locator('input:visible')
+        # Iterate over inputs and detect if they are verification inputs
         for i in range(get_locator_count(inputs)):
             input_: Optional[Locator] = get_locator_nth(inputs, i)
             input_label: Locator = get_label_for(page, get_locator_attribute(input_, 'id') or '')
@@ -421,7 +444,7 @@ class Login(Module):
                 verification = True
                 break
 
-        # Confirm redirection
+        # Confirm redirection and search for captcha and error messages
         if not redirected:
             try:
                 error_message = re.search(Login.ERROR_MESSAGE, form.inner_html(timeout=5000),
@@ -451,14 +474,18 @@ class Login(Module):
                     False, False, False, True, False, False), False)
             return False
 
+        # If no error messages, captcha or verification exist, verify login successful
         if self.verify_login(browser, context, page, context_database, modules, url):
+            # Create a fresh context
             context_alt: BrowserContext = browser.new_context()
             page_alt: Page = context_alt.new_page()
+
+            # Check if verification is false positive for fresh context
             verify: bool = self.verify_login(browser, context_alt, page_alt, context_database,
                                              modules, None)
-
             page_alt.close()
 
+            # Handle false positives
             if verify:
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
@@ -474,6 +501,7 @@ class Login(Module):
                      context_database: DequeDB, modules: List[Module], url: Optional[str]):
         response: Optional[Response] = None
 
+        # Navigate to landing page
         try:
             responses: List[Optional[Response]] = [page.goto(self._url, timeout=Config.LOAD_TIMEOUT,
                                                              wait_until=Config.WAIT_LOAD_UNTIL)]
@@ -485,6 +513,7 @@ class Login(Module):
                                                (page.url, 0, self._rank, []), page.url, [], modules,
                                                1, force=True)
 
+            # Search for account indicators
             if responses[-1] is not None and 400 > responses[-1].status >= 200:
                 if re.search(
                         f"(^|\\W)({self._account[0][0]}|{self._account[0][1]}|"
@@ -498,7 +527,7 @@ class Login(Module):
         if url is None or not url:
             return False
 
-        # Check if page is still accessible
+        # Check if login page is still accessible
         try:
             response = page.goto(url, timeout=Config.LOAD_TIMEOUT,
                                  wait_until=Config.WAIT_LOAD_UNTIL)
@@ -550,7 +579,7 @@ class Login(Module):
             else:
                 return True
 
-            # Get all forms again
+            # Get all login forms again
             form = FindLoginForms.find_login_form(page)
             if form is not None:
                 self._database.invoke_transaction(

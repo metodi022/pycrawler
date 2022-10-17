@@ -188,27 +188,34 @@ class FindLoginForms(Module):
     @staticmethod
     def find_login_form(page: Page) -> Optional[Locator]:
         forms: Optional[Locator] = None
+
+        # Find all forms on a page
         try:
             forms = page.locator('form:visible,fieldset:visible', has=page.locator('input:visible'))
         except Error:
             # Ignored
             pass
 
+        # Check if each form is a login form
         for i in range(get_locator_count(forms)):
             form: Optional[Locator] = get_locator_nth(forms, i)
             if form is None or not FindLoginForms.get_login_form(form):
                 continue
             return form
 
+        # If we did not find login forms, try to find password field
         try:
             form = page.locator('input[type="password"]:visible').locator('..')
         except Error:
             return None
 
+        # Go up the node tree of the password field and search for login forms (w/o form tags)
         for _ in range(100):
+            # Stop if we reached top of element node tree
             if get_locator_count(form) != 1:
                 break
 
+            # Get relevant fields
             passwords: int = get_locator_count(form.locator('input[type="password"]:visible'))
             text_fields: int = get_locator_count(
                 form.locator('input[type="email"]:visible')) + get_locator_count(
@@ -216,12 +223,15 @@ class FindLoginForms(Module):
                 form.locator('input[type="tel"]:visible')) + get_locator_count(
                 form.locator('input:not([type]):visible'))
 
+            # Stop earlier if it cannot be a login form
             if passwords != 1 or text_fields > 2:
                 return None
 
+            # Check if element tree is a login form
             if FindLoginForms.get_login_form(form):
                 return form
 
+            # Go up the node tree
             try:
                 form = form.locator('..')
             except Error:

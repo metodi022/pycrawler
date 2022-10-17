@@ -13,7 +13,7 @@ class Config:
     LOG: pathlib.Path = pathlib.Path('./.logs/')  # path for saving logs
     LOG_LEVEL = INFO  # DEBUG|INFO|WARNING|ERROR
 
-    BROWSER: Literal['chromium', 'firefox', 'webkit'] = 'chromium'  # TODO which browser to use
+    BROWSER: Literal['chromium', 'firefox', 'webkit'] = 'chromium'
     HEADLESS: bool = True  # Headless browser
 
     RECURSIVE: bool = True  # Discover additional URLs while crawling

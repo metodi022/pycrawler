@@ -10,7 +10,7 @@ from logging import Logger, FileHandler, Formatter
 from multiprocessing import Process
 from typing import List, Type, Tuple, Optional, cast
 
-from chromiumcrawler import ChromiumCrawler
+from crawler import Crawler
 from config import Config
 from database.postgres import Postgres
 from loader.csvloader import CSVLoader
@@ -96,9 +96,11 @@ def main() -> int:
         crawler.start()
         log.info(f"Start crawler {i + 1} with PID {crawler.pid}")
 
+    # Wait for crawlers to finish
     for crawler in crawlers:
         crawler.join()
 
+    # Exit code
     return 0
 
 
@@ -157,7 +159,7 @@ def _start_crawler2(job_id: int, crawler_id: int, url: Tuple[str, int, int, List
                                   Config.PORT)
 
     log.info('Start crawler')
-    ChromiumCrawler(job_id, crawler_id, url, database, log, modules).start_crawl()
+    Crawler(job_id, crawler_id, url, database, log, modules).start_crawl()
     log.info('Stop crawler')
 
 
