@@ -11,7 +11,7 @@ from database.postgres import Postgres
 from modules.module import Module
 from utils import get_tld_object, get_url_from_href, get_url_origin, get_url_full, \
     get_locator_count, get_locator_nth, get_locator_attribute, get_url_full_with_query_fragment, \
-    get_url_entity
+    get_url_entity, get_url_full_with_query
 
 
 class CollectUrls(Module):
@@ -97,7 +97,7 @@ class CollectUrls(Module):
                 continue
 
             # Check seen
-            parsed_link_full: str = get_url_full(parsed_link)
+            parsed_link_full: str = get_url_full_with_query(parsed_link) if Config.QUERY else get_url_full(parsed_link)
             if context_database.get_seen(parsed_link_full):
                 continue
             context_database.add_seen(parsed_link_full)

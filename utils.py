@@ -64,12 +64,18 @@ def get_url_full(url: Optional[tld.utils.Result]) -> str:
     return url.parsed_url.scheme + '://' + url.parsed_url.netloc + url.parsed_url.path
 
 
+def get_url_full_with_query(url: Optional[tld.utils.Result]) -> str:
+    if url is None:
+        return ''
+
+    return get_url_full(url) + ('?' if url.parsed_url.query else '') + url.parsed_url.query
+
+
 def get_url_full_with_query_fragment(url: Optional[tld.utils.Result]) -> str:
     if url is None:
         return ''
 
-    return get_url_full(url) + ('?' if url.parsed_url.query else '') + url.parsed_url.query + (
-        '#' if url.parsed_url.fragment else '') + url.parsed_url.fragment
+    return get_url_full_with_query(url) + ('#' if url.parsed_url.fragment else '') + url.parsed_url.fragment
 
 
 def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils.Result]:
