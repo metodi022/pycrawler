@@ -10,8 +10,8 @@ from logging import Logger, FileHandler, Formatter
 from multiprocessing import Process
 from typing import List, Type, Tuple, Optional, cast
 
-from crawler import Crawler
 from config import Config
+from crawler import Crawler
 from database.postgres import Postgres
 from loader.csvloader import CSVLoader
 from loader.loader import Loader
@@ -125,7 +125,6 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
                                    args=(job_id, crawler_id, url, log_path, modules))
         crawler.start()
 
-        stale: bool = False
         while crawler.is_alive():
             crawler.join(timeout=Config.RESTART_TIMEOUT)
 
@@ -137,17 +136,18 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
                 continue
 
             log.error('Close stale crawler')
-            stale = True
-            break
 
-        crawler.terminate()
-        crawler.join(timeout=30)
-        crawler.kill()
-        time.sleep(1)
+            crawler.terminate()
+            crawler.join(timeout=30)
 
-        if stale:
+            if crawler.is_alive():
+                crawler.kill()
+                time.sleep(5)
+
             database.update_url(job_id, crawler_id, url[0], Config.ERROR_CODES['browser_error'],
                                 None)
+
+            break
 
         url = database.get_url(job_id, crawler_id)
 
