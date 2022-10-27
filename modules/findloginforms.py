@@ -82,11 +82,7 @@ class FindLoginForms(Module):
         try:
             check1_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|next|' \
                               r'continue|proceed|fortfahren/i'
-            check1: Locator = page.locator(f"text={check1_str}")
-            buttons = page.locator(CLICKABLES, has=check1)
-            buttons = page.locator(
-                f"{CLICKABLES} >> text={check1_str}") if get_locator_count(
-                buttons) == 0 else buttons
+            buttons = page.locator(f"{CLICKABLES} >> text={check1_str} >> visible=true")
         except Error:
             return
 
@@ -172,12 +168,7 @@ class FindLoginForms(Module):
         try:
             check1_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|proceed|' \
                               r'fortfahren|anmeldung|einmeldung|submit)/i'
-            check1: Locator = form.locator(f"text={check1_str}")
-            button: Locator = form.locator(CLICKABLES, has=check1)
-            button = form.locator(
-                f"{CLICKABLES} >> text={check1_str}") if get_locator_count(button) == 0 else button
-            button = form.locator(f'input[type="submit"]:visible') if get_locator_count(
-                button) == 0 else button
+            button: Locator = form.locator(f"{CLICKABLES} >> text={check1_str} >> visible=true")
         except Error:
             return False
 
@@ -192,7 +183,7 @@ class FindLoginForms(Module):
 
         # Find all forms on a page
         try:
-            forms = page.locator('form:visible,fieldset:visible', has=page.locator('input:visible'))
+            forms = page.locator('form:visible,fieldset:visible')
         except Error:
             # Ignored
             pass

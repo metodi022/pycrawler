@@ -120,11 +120,7 @@ class Login(Module):
                 try:
                     check_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|' \
                                      r'next|continue|fortfahren|anmeldung|einmeldung/i'
-                    check: Locator = page.locator(f"text={check_str}")
-                    buttons = page.locator(CLICKABLES, has=check)
-                    buttons = page.locator(
-                        f"{CLICKABLES} >> text={check_str}") if get_locator_count(
-                        buttons) == 0 else buttons
+                    buttons = page.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
                 except Error:
                     self._database.invoke_transaction(
                         "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)",
@@ -307,11 +303,7 @@ class Login(Module):
             try:
                 check2_str: str = r'/log.?in|sign.?in|continue|next|weiter|melde|logge|e.?mail|' \
                                   r'user.?name|nutzer.?name|fortfahren|anmeldung|einmeldung|submit/i'
-                check2: Locator = form.locator(f"text={check2_str}")
-                buttons = form.locator(CLICKABLES, has=check2)
-                buttons = form.locator(
-                    f"{CLICKABLES} >> text={check2_str}") if get_locator_count(
-                    buttons) == 0 else buttons
+                buttons = form.locator(f"{CLICKABLES} >> text={check2_str} >> visible=true")
             except Error:
                 return False
 
@@ -370,12 +362,7 @@ class Login(Module):
         try:
             check_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|fortfahren|' \
                              r'anmeldung|einmeldung|submit)/i'
-            check: Locator = form.locator(f"text={check_str}")
-            buttons = form.locator(CLICKABLES, has=check)
-            buttons = form.locator(f"{CLICKABLES} >> text={check_str}") if get_locator_count(
-                buttons) == 0 else buttons
-            buttons = form.locator(f'input[type="submit"]:visible') if get_locator_count(
-                buttons) == 0 else buttons
+            buttons = form.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
         except Error:
             return False
 
@@ -553,11 +540,7 @@ class Login(Module):
             try:
                 check_str: str = r'/log.?in|sign.?in|[^sb]melde|[^sb]logge|user.?name|e.?mail|' \
                                  r'nutzer|next|continue|fortfahren|anmeldung|einmeldung/i'
-                check: Locator = page.locator(f"text={check_str}")
-                buttons = page.locator(CLICKABLES, has=check)
-                buttons = page.locator(
-                    f"{CLICKABLES} >> text={check_str}") if get_locator_count(
-                    buttons) == 0 else buttons
+                buttons = page.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
             except Error:
                 return True
 

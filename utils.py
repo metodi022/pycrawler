@@ -8,8 +8,8 @@ from playwright.sync_api import Page, Locator, Error, Frame
 from sklearn.cluster import dbscan
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
-CLICKABLES: str = r'button:visible,*[role="button"]:visible,*[onclick]:visible,' \
-                  r'input[type="button"]:visible,input[type="submit"]:visible,a[href="#"]'
+CLICKABLES: str = r'button,*[role="button"],*[onclick],input[type="button"],input[type="submit"],' \
+                  r'a[href="#"]'
 
 SSO: str = r'Facebook|Twitter|Google|Yahoo|Windows.?Live|Linked.?In|Git.?Hub|Pay.?Pal|Amazon|' \
            r'v.?Kontakte|Yandex|37.?signals|Salesforce|Fitbit|Baidu|Ren.?Ren|Weibo|AOL|Shopify|' \
@@ -75,7 +75,8 @@ def get_url_full_with_query_fragment(url: Optional[tld.utils.Result]) -> str:
     if url is None:
         return ''
 
-    return get_url_full_with_query(url) + ('#' if url.parsed_url.fragment else '') + url.parsed_url.fragment
+    return get_url_full_with_query(url) + (
+        '#' if url.parsed_url.fragment else '') + url.parsed_url.fragment
 
 
 def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils.Result]:

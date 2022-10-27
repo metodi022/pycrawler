@@ -73,23 +73,15 @@ class AcceptCookies(Module):
         locator_count: int = 0
         try:
             # First check for english keywords
-            check: Locator = page.locator(f"text={AcceptCookies.CHECK_ENG}")
-            buttons: Locator = page.locator(CLICKABLES, has=check)
+            buttons: Locator = page.locator(f"{CLICKABLES} >> text={AcceptCookies.CHECK_ENG} >> "
+                                            f"visible=true")
             locator_count = get_locator_count(buttons, page)
-
-            if locator_count == 0:
-                buttons = page.locator(f"{CLICKABLES} >> text={AcceptCookies.CHECK_ENG}")
-                locator_count = get_locator_count(buttons, page)
 
             # Then check for german keywords
             if locator_count == 0:
-                check = page.locator(f"text={AcceptCookies.CHECK_GER}")
-                buttons = page.locator(CLICKABLES, has=check)
+                buttons = page.locator(f"{CLICKABLES} >> text={AcceptCookies.CHECK_ENG} >> "
+                                       f"visible=true")
                 locator_count = get_locator_count(buttons, page)
-
-                if locator_count == 0:
-                    buttons = page.locator(f"{CLICKABLES} >> text={AcceptCookies.CHECK_ENG}")
-                    locator_count = get_locator_count(buttons, page)
         except Error:
             return
 
