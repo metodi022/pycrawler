@@ -149,8 +149,6 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
             database.update_url(job_id, crawler_id, url[0], Config.ERROR_CODES['browser_error'],
                                 None)
 
-            break
-
         url = database.get_url(job_id, crawler_id)
 
 
