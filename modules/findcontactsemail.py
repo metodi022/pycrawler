@@ -74,10 +74,8 @@ class FindContactsEmail(Module):
                 # Ignored
                 pass
 
-            self._seen.add(email)
             self._database.invoke_transaction(
                 'INSERT INTO CONTACTSEMAIL VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
                 (self._rank, self.job_id, self.crawler_id, self._url, url[0], final_url, url[1],
-                 email, nostril.nonsense(email.split('@')[0]) == 'real',
-                 url[3][-1][0] if len(url[3]) > 0 else None,
+                 email, nonsense, url[3][-1][0] if len(url[3]) > 0 else None,
                  url[3][-1][1] if len(url[3]) > 0 else None), False)
