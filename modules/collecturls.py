@@ -97,7 +97,8 @@ class CollectUrls(Module):
                 continue
 
             # Check seen
-            parsed_link_full: str = get_url_full_with_query(parsed_link) if Config.QUERY else get_url_full(parsed_link)
+            parsed_link_full: str = get_url_full_with_query(
+                parsed_link) if Config.QUERY else get_url_full(parsed_link)
             if context_database.get_seen(parsed_link_full):
                 continue
             context_database.add_seen(parsed_link_full)
@@ -113,6 +114,8 @@ class CollectUrls(Module):
 
             # Add link
             urls.append(parsed_link)
+
+        self._log.info(f"Collected {min(len(urls), self._max_urls)} URLs at depth {url[1]}")
 
         # Shuffle the URLs, so that we prioritize visiting the URLs that appear in the beginning and
         # in the end of the page
