@@ -65,6 +65,14 @@ class FindContactsEmail(Module):
         for email in re.findall(FindContactsEmail.EMAILSRE, html):
             if email in self._seen:
                 continue
+            self._seen.add(email)
+
+            nonsense: bool = False
+            try:
+                nonsense = nostril.nonsense(email)
+            except Exception:
+                # Ignored
+                pass
 
             self._seen.add(email)
             self._database.invoke_transaction(

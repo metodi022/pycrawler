@@ -182,6 +182,7 @@ class FindLoginForms(Module):
             return False
 
         # Return true if there is at least one login button in the form
+        # TODO fix to ignore false positives
         return get_locator_count(button) > 0 and re.search(r'search|news.?letter|subscribe',
                                                            get_outer_html(form), flags=re.I) is None
 

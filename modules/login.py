@@ -236,8 +236,10 @@ class Login(Module):
         # TODO improve
         # Ignore URLs which could lead to logout
         def filt(url: tld.utils.Result) -> bool:
-            return re.search(r'log.?out|sign.?out|log.?off|sign.?off|exit|quit|invalidate',
-                             get_url_full_with_query_fragment(url), flags=re.I) is not None
+            return re.search(
+                r'log.?out|sign.?out|log.?off|sign.?off|exit|quit|invalidate|ab.?melden|'
+                r'aus.?loggen|ab.?meldung|verlassen|aus.?treten|annullieren',
+                get_url_full_with_query_fragment(url), flags=re.I) is not None
 
         filters.append(filt)
 

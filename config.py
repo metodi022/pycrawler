@@ -14,7 +14,7 @@ class Config:
     LOG_LEVEL = INFO  # DEBUG|INFO|WARNING|ERROR
 
     BROWSER: Literal['chromium', 'firefox', 'webkit'] = 'chromium'
-    HEADLESS: bool = True  # Headless browser
+    HEADLESS: bool = False  # Headless browser
 
     RECURSIVE: bool = True  # Discover additional URLs while crawling
     SAME_ORIGIN: bool = False  # URL discovery for same-origin only
