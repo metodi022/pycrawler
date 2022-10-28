@@ -3,6 +3,7 @@ import importlib
 import os
 import pathlib
 import re
+import signal
 import sys
 import time
 from datetime import datetime
@@ -112,8 +113,15 @@ def _get_modules(module_names: List[str]) -> List[Type[Module]]:
     return result
 
 
+def _handler(signum, frame):
+    print(f"SIGNUM {signum} FRAME {frame}")
+
+
 def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
                     modules: List[Type[Module]]) -> None:
+    signal.signal(signal.SIGINT, _handler)
+    signal.signal(signal.SIGTERM, _handler)
+
     log = _get_logger(job_id, crawler_id, log_path)
     database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
                                   Config.PORT)
@@ -129,11 +137,13 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
             crawler.join(timeout=Config.RESTART_TIMEOUT)
 
             line = _get_line_last(log_path / f"job{job_id}crawler{crawler_id}.log").split()
-            date1: datetime = datetime.today()
-            date2: datetime = datetime.strptime(line[0] + ' ' + line[1], '%Y-%m-%d %H:%M:%S,%f')
 
-            if (date1 - date2).seconds < Config.RESTART_TIMEOUT:
-                continue
+            if len(line) > 1:
+                date1: datetime = datetime.today()
+                date2: datetime = datetime.strptime(line[0] + ' ' + line[1], '%Y-%m-%d %H:%M:%S,%f')
+
+                if (date1 - date2).seconds < Config.RESTART_TIMEOUT:
+                    continue
 
             log.error('Close stale crawler')
 
@@ -148,6 +158,8 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
 
             database.update_url(job_id, crawler_id, url[0], Config.ERROR_CODES['browser_error'],
                                 None)
+
+            break
 
         url = database.get_url(job_id, crawler_id)
 
@@ -175,11 +187,28 @@ def _get_logger(job_id: int, crawler_id: int, log_path: pathlib.Path) -> Logger:
 def _get_line_last(path: str | pathlib.Path) -> str:
     with open(path, mode='rb') as file:
         line: bytes = b''
-        file.seek(-2, 2)
+
+        try:
+            file.seek(-2, 2)
+        except OSError:
+            return ''
+
         while re.match('\\d{4}-\\d{2}-\\d{2}', line.decode("utf-8", errors="ignore")) is None:
-            file.seek(-(len(line) + 2) if len(line) > 0 else 0, 1)
+            try:
+                file.seek(-(len(line) + 2) if len(line) > 0 else 0, 1)
+            except OSError:
+                return ''
+
             while file.read(1) != b'\n':
-                file.seek(-2, 1)
+                try:
+                    file.seek(-2, 1)
+                except OSError:
+                    try:
+                        file.seek(-1, 1)
+                    except OSError:
+                        return ''
+                    break
+
             line = file.readline()
     return line.decode("utf-8", errors="ignore")
 
