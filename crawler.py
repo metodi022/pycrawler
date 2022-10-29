@@ -56,7 +56,7 @@ class Crawler:
         context: BrowserContext = browser.new_context()
         context_database: DequeDB = DequeDB()
         page: Page = context.new_page()
-        self._log.info(f"Start Chromium {browser.version}")
+        self._log.info(f"Start {Config.BROWSER.capitalize()} {browser.version}")
         self._log.info('New context')
 
         # Initiate modules

@@ -29,7 +29,7 @@ class FindContactsEmail(Module):
             "CREATE TABLE IF NOT EXISTS CONTACTSEMAIL (rank INT NOT NULL, job INT NOT NULL,"
             "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, emailurl TEXT NOT NULL, "
             "emailurlfinal TEXT NOT NULL, depth INT NOT NULL, email TEXT NOT NULL, "
-            "gibberish BOOLEAN NOT NULL, fromurl TEXT, fromurlfinal TEXT)", None, False)
+            "nonsense BOOLEAN NOT NULL, fromurl TEXT, fromurlfinal TEXT)", None, False)
         log.info('Create CONTACTSEMAIL table IF NOT EXISTS')
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
@@ -67,6 +67,12 @@ class FindContactsEmail(Module):
                 continue
             self._seen.add(email)
 
+            # Check for valid TLD
+            if get_tld_object("https://" + email.split('@')[1]) is None:
+                continue
+
+            # Check if email makes sense (some emails are actually API endpoints)
+            # If email is random -> mark it as nonsense
             nonsense: bool = False
             try:
                 nonsense = nostril.nonsense(email)
