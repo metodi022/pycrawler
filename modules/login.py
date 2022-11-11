@@ -35,6 +35,8 @@ class Login(Module):
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
+        FindLoginForms.register_job(database, log)
+
         database.invoke_transaction(
             "CREATE TABLE IF NOT EXISTS LOGINS (rank INT NOT NULL, job INT NOT NULL, "
             "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, loginform TEXT, "
@@ -71,7 +73,7 @@ class Login(Module):
                     False, False, False, False), False)
             return
 
-        if self._state['Login']:
+        if self._state.get('Login', None):
             self.success = True
             self._url_login = self._state['Login']
             return

@@ -82,11 +82,11 @@ class Crawler:
         url = context_database.get_url()
         self._log.info(f"Get URL {url[0] if url is not None else url}")
 
-        # Initiate modules
-        self._invoke_page_handler(browser, context, page, url, context_database)
-
         # Main loop
         while url is not None:
+            # Initiate modules
+            self._invoke_page_handler(browser, context, page, url, context_database)
+
             # Repetition loop
             for repetition in range(1, Config.REPETITIONS + 1):
                 # Navigate to page
@@ -119,9 +119,6 @@ class Crawler:
             context.close()
             context = browser.new_context(storage_state=self._state['Crawler'])
             page = context.new_page()
-
-            # Reload modules
-            self._invoke_page_handler(browser, context, page, url, context_database)
 
         # Close everything
         page.close()
