@@ -45,6 +45,7 @@ class FindLogout(Login):
 
         # Restore old state
         self._logout = self._state['FindLogout'] if 'FindLogout' in self._state else self._logout
+        self._state['FindLogout'] = self._logout
 
         # Check if login is successful
         if not self.success or self._logout:
@@ -151,3 +152,4 @@ class FindLogout(Login):
                         0, None), False)
 
         page_alt.close()
+        self._state['FindLogout'] = self._logout
