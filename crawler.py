@@ -55,8 +55,8 @@ class Crawler:
 
     def start_crawl(self):
         url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = self._url
-        self._log.info(f"Get URL {url[0] if url is not None else url}")
         if url is None:
+            self._log.info(f"Get URL {url[0] if url is not None else url}")
             return
 
         # Initiate playwright, browser, context, and page
@@ -77,6 +77,10 @@ class Crawler:
             self._state['DequeDB'] = []
             self._state['DequeDB'].append(context_database._data)
             self._state['DequeDB'].append(context_database._seen)
+
+        context_database.add_url(url)
+        url = context_database.get_url()
+        self._log.info(f"Get URL {url[0] if url is not None else url}")
 
         # Initiate modules
         self._invoke_page_handler(browser, context, page, url, context_database)

@@ -1,3 +1,4 @@
+import os
 import sys
 from datetime import datetime
 from logging import Logger
@@ -51,11 +52,17 @@ class CollectLoginHeaders(Login):
                 page.close()
                 context.close()
                 browser.close()
+
+                if Config.RESTART and (
+                        Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
+                    os.remove(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
+
                 sys.exit()
 
             # Create a fresh context to emulate a not logged-in user
             self._context_alt = browser.new_context(storage_state=(
-                self._state['CollectLoginHeaders'] if 'CollectLoginHeaders' in self._state else None))
+                self._state[
+                    'CollectLoginHeaders'] if 'CollectLoginHeaders' in self._state else None))
             self._page_alt = self._context_alt.new_page()
 
             response_alt: Optional[Response] = None
@@ -71,7 +78,8 @@ class CollectLoginHeaders(Login):
             if Config.ACCEPT_COOKIES:
                 self._cookies = cast(AcceptCookies, self._cookies)
                 self._cookies.receive_response(browser, self._context_alt, self._page_alt,
-                                               [response_alt], context_database, url, page.url, [], [],
+                                               [response_alt], context_database, url, page.url, [],
+                                               [],
                                                1, force=True)
 
             self._state['CollectLoginHeaders'] = self._context_alt.storage_state()
