@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from logging import Logger
-from typing import List, Tuple, MutableSet, Optional
+from typing import List, Tuple, MutableSet, Optional, Dict, Any
 
 import nostril  # https://github.com/casics/nostril
 import tld.utils
@@ -17,8 +17,9 @@ from utils import get_tld_object, get_url_origin
 class FindContactsEmail(Module):
     EMAILSRE: str = r'[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+'
 
-    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
-        super().__init__(job_id, crawler_id, database, log)
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
+                 state: Dict[str, Any]) -> None:
+        super().__init__(job_id, crawler_id, database, log, state)
         self._url: str = ''
         self._rank: int = 0
         self._seen: MutableSet[str] = set()
@@ -35,9 +36,14 @@ class FindContactsEmail(Module):
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
                      modules: List[Module]) -> None:
+        if self.setup:
+            return
+
+        super().add_handlers(browser, context, page, context_database, url, modules)
         self._url = url[0]
         self._rank = url[2]
-        self._seen.clear()
+        self._seen = self._state['FindContactsEmail'] if 'FindContactsEmail' in self._state else self._seen
+        self._state['FindContactsEmail'] = self._seen
 
         temp: Optional[tld.utils.Result] = get_tld_object(url[0])
         if temp is None:

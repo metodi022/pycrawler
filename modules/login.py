@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from logging import Logger
-from typing import List, Tuple, Callable, Optional, cast
+from typing import List, Tuple, Callable, Optional, cast, Dict, Any
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Error, Locator
@@ -23,8 +23,9 @@ class Login(Module):
                          r"not exist|isn't right|not right|nicht richtig|fail|fehlgeschlagen|" \
                          r"wasn't right|not right)(\W|$)"
 
-    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
-        super().__init__(job_id, crawler_id, database, log)
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
+                 state: Dict[str, Any]) -> None:
+        super().__init__(job_id, crawler_id, database, log, state)
         self.success = False
         self._url: str = ''
         self._rank: int = 0
@@ -46,14 +47,15 @@ class Login(Module):
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
                      modules: List[Module]) -> None:
+        if self.setup:
+            return
+
+        super().add_handlers(browser, context, page, context_database, url, modules)
         self._url = url[0]
         self._rank = url[2]
-        self.success = False
-        self._cookies = None
-        self._url_login = ''
 
         if Config.ACCEPT_COOKIES:
-            self._cookies = cast(AcceptCookies, modules.pop(0))
+            self._cookies = cast(AcceptCookies, modules[0])
 
         # Get account details from database
         self._account = self._database.invoke_transaction(
@@ -67,6 +69,11 @@ class Login(Module):
                 "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                     self._rank, self.job_id, self.crawler_id, self._url, None, None, False, False,
                     False, False, False, False), False)
+            return
+
+        if self._state['Login']:
+            self.success = True
+            self._url_login = self._state['Login']
             return
 
         # Get URLs with login forms for given site
@@ -204,6 +211,7 @@ class Login(Module):
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
                         self._rank, self.job_id, self.crawler_id, self._url, url_form[0], page.url,
                         True, False, False, False, False, False), False)
+                self._state['Login'] = self._url_login
                 break
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,

@@ -1,6 +1,8 @@
+import os
+import pickle
 from datetime import datetime
 from logging import Logger
-from typing import Optional, Tuple, List, Type, Callable
+from typing import Optional, Tuple, List, Type, Callable, Dict, Any
 
 import tld
 from playwright.sync_api import sync_playwright, Playwright, Browser, BrowserContext, Page, \
@@ -26,15 +28,25 @@ class Crawler:
         self._url: Tuple[str, int, int, List[Tuple[str, str]]] = url
         self._database: Postgres = database
         self._log: Logger = log
+        self._state: Dict[str, Any] = dict()
+
+        # Load previous state
+        if Config.RESTART and (
+                Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
+            with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache",
+                      mode="rb") as file:
+                self._state = pickle.load(file)
 
         # Prepare modules
         self._modules: List[Module] = []
         self._modules += [
-            AcceptCookies(job_id, crawler_id, database, log)] if Config.ACCEPT_COOKIES else []
+            AcceptCookies(job_id, crawler_id, database, log,
+                          self._state)] if Config.ACCEPT_COOKIES else []
         self._modules += [
-            CollectUrls(job_id, crawler_id, database, log, )] if Config.RECURSIVE else []
-        self._modules += self._initialize_modules(modules, job_id, crawler_id, database, log)
-        self._modules += [SaveStats(job_id, crawler_id, database, log)]
+            CollectUrls(job_id, crawler_id, database, log, self._state)] if Config.RECURSIVE else []
+        self._modules += self._initialize_modules(modules, job_id, crawler_id, database, log,
+                                                  self._state)
+        self._modules += [SaveStats(job_id, crawler_id, database, log, self._state)]
 
         # Prepare filters
         url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
@@ -53,11 +65,18 @@ class Crawler:
             headless=Config.HEADLESS) if Config.BROWSER == 'firefox' else (playwright.webkit.launch(
             headless=Config.HEADLESS) if Config.BROWSER == 'webkit' else playwright.chromium.launch(
             headless=Config.HEADLESS))
-        context: BrowserContext = browser.new_context()
+        context: BrowserContext = browser.new_context(storage_state=self._state.get('Crawler', None))
         context_database: DequeDB = DequeDB()
         page: Page = context.new_page()
         self._log.info(f"Start {Config.BROWSER.capitalize()} {browser.version}")
-        self._log.info('New context')
+
+        if 'DequeDB' in self._state:
+            context_database._data = self._state['DequeDB'][0]
+            context_database._seen = self._state['DequeDB'][1]
+        else:
+            self._state['DequeDB'] = []
+            self._state['DequeDB'].append(context_database._data)
+            self._state['DequeDB'].append(context_database._seen)
 
         # Initiate modules
         self._invoke_page_handler(browser, context, page, url, context_database)
@@ -84,19 +103,21 @@ class Crawler:
             url = context_database.get_url()
             self._log.info(f"Get URL {url[0] if url is not None else url}")
 
-            # Reload context if need be
-            if not Config.SAME_CONTEXT and url:
-                # Open a new page
-                page.close()
-                context.close()
-                browser.close()
-                browser = playwright.chromium.launch(headless=Config.HEADLESS)
-                context = browser.new_context()
-                page = context.new_page()
-                self._log.info('New context')
+            # Save state
+            self._state['Crawler'] = context.storage_state()
+            if Config.RESTART:
+                with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache",
+                          mode='wb') as file:
+                    pickle.dump(self._state, file)
 
-                # Run module
-                self._invoke_page_handler(browser, context, page, url, context_database)
+            # Close and open the context again (to avoid memory issues)
+            page.close()
+            context.close()
+            context = browser.new_context(storage_state=self._state['Crawler'])
+            page = context.new_page()
+
+            # Reload modules
+            self._invoke_page_handler(browser, context, page, url, context_database)
 
         # Close everything
         page.close()
@@ -104,6 +125,10 @@ class Crawler:
         browser.close()
         playwright.stop()
         self._log.info(f"Close Chromium")
+
+        # Delete old cache
+        if Config.RESTART and (Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
+            os.remove(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
 
     def _open_url(self, page: Page, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> \
             Optional[Response]:
@@ -145,8 +170,8 @@ class Crawler:
                                     page.url, start, self._modules, repetition)
 
     def _initialize_modules(self, modules: List[Type[Module]], job_id: int, crawler_id: int,
-                            database: Postgres, log: Logger) -> List[Module]:
+                            database: Postgres, log: Logger, state: Dict[str, Any]) -> List[Module]:
         result: List[Module] = []
         for module in modules:
-            result.append(module(job_id, crawler_id, database, log))
+            result.append(module(job_id, crawler_id, database, log, state))
         return result

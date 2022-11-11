@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from logging import Logger
-from typing import List, MutableSet, Optional, Tuple, cast
+from typing import List, MutableSet, Optional, Tuple, cast, Dict, Any
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error, Frame
@@ -25,8 +25,9 @@ class AcceptCookies(Module):
     CHECK_GER: str = '/(\\W|^)(stimm|verstanden|versteh|akzeptier|ja(\\W|$)|weiter(\\W|$)|' \
                      'annehm|bestätig|willig|zulassen(\\W|$)|lasse)/i'
 
-    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
-        super().__init__(job_id, crawler_id, database, log)
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
+                 state: Dict[str, Any]) -> None:
+        super().__init__(job_id, crawler_id, database, log, state)
         self._url: str = ''
         self._urls: MutableSet[str] = set()
         self._rank: int = 0
@@ -38,9 +39,14 @@ class AcceptCookies(Module):
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
                      modules: List[Module]) -> None:
+        if self.setup:
+            return
+
+        super().add_handlers(browser, context, page, context_database, url, modules)
         self._url = url[0]
         self._rank = url[2]
-        self._urls.clear()
+        self._urls = self._state['AcceptCookies'] if 'AcceptCookies' in self._state else self._urls
+        self._state['AcceptCookies'] = self._urls
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page | Frame,
                          responses: List[Optional[Response]], context_database: DequeDB,

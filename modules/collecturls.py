@@ -1,6 +1,6 @@
 from datetime import datetime
 from logging import Logger
-from typing import Optional, List, Tuple, Callable
+from typing import Optional, List, Tuple, Callable, Dict, Any
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
@@ -19,8 +19,9 @@ class CollectUrls(Module):
     Module to automatically collect links to crawl further.
     """
 
-    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
-        super().__init__(job_id, crawler_id, database, log)
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
+                 state: Dict[str, Any]) -> None:
+        super().__init__(job_id, crawler_id, database, log, state)
         self._url: str = ''
         self._rank: int = 0
         self._max_urls: int = 0
@@ -34,11 +35,14 @@ class CollectUrls(Module):
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
                      modules: List[Module]) -> None:
-        context_database.clear_urls()
-        context_database.add_seen(url[0])
+        if self.setup:
+            return
+
+        super().add_handlers(browser, context, page, context_database, url, modules)
         self._url = url[0]
         self._rank = url[2]
-        self._max_urls = Config.MAX_URLS
+        self._max_urls = self._state['CollectUrls'] if 'CollectUrls' in self._state else Config.MAX_URLS
+        self._state['CollectUrls'] = self._max_urls
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
@@ -131,6 +135,8 @@ class CollectUrls(Module):
             self._max_urls -= 1
             if self._max_urls < 1:
                 break
+
+        self._state['CollectUrls'] = self._max_urls
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         self._url_filter_out = filters

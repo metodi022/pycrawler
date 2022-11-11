@@ -1,6 +1,6 @@
 from datetime import datetime
 from logging import Logger
-from typing import List, Tuple, Callable, Optional
+from typing import List, Tuple, Callable, Optional, Dict, Any
 
 import tld.utils
 from playwright.sync_api import Browser, BrowserContext, Page, Response
@@ -14,7 +14,8 @@ class Module:
     A baseclass from which all modules inherit.
     """
 
-    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger) -> None:
+    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
+                 state: Dict[str, Any]) -> None:
         """
         Initializes module instance.
 
@@ -23,11 +24,14 @@ class Module:
             crawler_id (int): crawler id
             database (Postgres): database
             log (Logger): log
+            state (Dict[str, Any]): state
         """
         self.job_id: int = job_id
         self.crawler_id: int = crawler_id
+        self.setup: bool = False
         self._database: Postgres = database
         self._log: Logger = log
+        self._state: Dict[str, Any] = state
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
@@ -54,7 +58,7 @@ class Module:
             url (Tuple[str, int, int, List[Tuple[str, str]]]): URL, depth, rank, previous URL
             modules (List[Module]): list of modules currently active modules
         """
-        raise NotImplementedError
+        self.setup = True
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
@@ -75,7 +79,7 @@ class Module:
             modules (List[Module]): list of modules currently active modules
             repetition (int): current URL visited repetition
         """
-        raise NotImplementedError
+        pass
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         """
