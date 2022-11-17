@@ -20,8 +20,6 @@ class FindContactsEmail(Module):
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
                  state: Dict[str, Any]) -> None:
         super().__init__(job_id, crawler_id, database, log, state)
-        self._url: str = ''
-        self._rank: int = 0
         self._seen: MutableSet[str] = set()
 
     @staticmethod
@@ -36,27 +34,29 @@ class FindContactsEmail(Module):
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
                      modules: List[Module]) -> None:
-        if self.setup:
+        super().add_handlers(browser, context, page, context_database, url, modules)
+
+        if self.ready:
             return
 
-        super().add_handlers(browser, context, page, context_database, url, modules)
-        self._url = url[0]
-        self._rank = url[2]
-        self._seen = self._state['FindContactsEmail'] if 'FindContactsEmail' in self._state else self._seen
+        self._seen = self._state.get('FindContactsEmail', self._seen)
         self._state['FindContactsEmail'] = self._seen
 
-        temp: Optional[tld.utils.Result] = get_tld_object(url[0])
+        temp: Optional[tld.utils.Result] = get_tld_object(self.domainurl)
         if temp is None:
             return
 
         url_origin: str = get_url_origin(temp)
         context_database.add_url(
-            (url_origin + '/.well-known/security.txt', Config.DEPTH, self._rank, []))
+            (url_origin + '/.well-known/security.txt', Config.DEPTH, self.rank, []))
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module], repetition: int) -> None:
+        super().receive_response(browser, context, page, responses, context_database, url,
+                                 final_url, start, modules, repetition)
+
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
@@ -88,6 +88,6 @@ class FindContactsEmail(Module):
 
             self._database.invoke_transaction(
                 'INSERT INTO CONTACTSEMAIL VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
-                (self._rank, self.job_id, self.crawler_id, self._url, url[0], final_url, url[1],
-                 email, nonsense, url[3][-1][0] if len(url[3]) > 0 else None,
+                (self.rank, self.job_id, self.crawler_id, self.domainurl, furl, page.url,
+                 self.depth, email, nonsense, url[3][-1][0] if len(url[3]) > 0 else None,
                  url[3][-1][1] if len(url[3]) > 0 else None), False)

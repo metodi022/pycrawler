@@ -22,8 +22,6 @@ class FindLoginForms(Module):
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
                  state: Dict[str, Any]) -> None:
         super().__init__(job_id, crawler_id, database, log, state)
-        self._url: str = ''
-        self._rank: int = 0
         self._found: int = 0
 
     @staticmethod
@@ -38,30 +36,32 @@ class FindLoginForms(Module):
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
                      modules: List[Module]) -> None:
-        if self.setup:
+        super().add_handlers(browser, context, page, context_database, url, modules)
+
+        if self.ready:
             return
 
-        super().add_handlers(browser, context, page, context_database, url, modules)
-        self._url = url[0]
-        self._rank = url[2]
-        self._found = self._state['FindLoginForms'] if 'FindLoginForms' in self._state else self._found
+        self._found = self._state.get('FindLoginForms', self._found)
         self._state['FindLoginForms'] = self._found
 
-        temp: Optional[tld.utils.Result] = get_tld_object(self._url)
+        temp: Optional[tld.utils.Result] = get_tld_object(self.domainurl)
         if temp is None:
             return
 
         # Add common URLs with logins
         url_origin: str = get_url_origin(temp)
-        context_database.add_url((url_origin + '/login/', Config.DEPTH, self._rank, []))
-        context_database.add_url((url_origin + '/signin/', Config.DEPTH, self._rank, []))
-        context_database.add_url((url_origin + '/account/', Config.DEPTH, self._rank, []))
-        context_database.add_url((url_origin + '/profile/', Config.DEPTH, self._rank, []))
+        context_database.add_url((url_origin + '/login/', Config.DEPTH, self.rank, []))
+        context_database.add_url((url_origin + '/signin/', Config.DEPTH, self.rank, []))
+        context_database.add_url((url_origin + '/account/', Config.DEPTH, self.rank, []))
+        context_database.add_url((url_origin + '/profile/', Config.DEPTH, self.rank, []))
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module], repetition: int) -> None:
+        super().receive_response(browser, context, page, responses, context_database, url,
+                                 final_url, start, modules, repetition)
+
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
@@ -72,8 +72,8 @@ class FindLoginForms(Module):
         if form is not None:
             self._database.invoke_transaction(
                 "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (
-                    self._rank, self.job_id, self.crawler_id, self._url, url[0], final_url, url[1],
-                    url[3][-1][0] if len(url[3]) > 0 else None,
+                    self.rank, self.job_id, self.crawler_id, self.domainurl, self.currenturl,
+                    page.url, self.depth, url[3][-1][0] if len(url[3]) > 0 else None,
                     url[3][-1][1] if len(url[3]) > 0 else None), False)
 
             self._found += 1
@@ -127,14 +127,14 @@ class FindLoginForms(Module):
             if page.url == final_url:
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (self._rank, self.job_id, self.crawler_id, self._url, url[0], final_url, url[1],
-                     url[3][-1][0] if len(url[3]) > 0 else None,
+                    (self.rank, self.job_id, self.crawler_id, self.domainurl, self.currenturl,
+                     final_url, self.depth, url[3][-1][0] if len(url[3]) > 0 else None,
                      url[3][-1][1] if len(url[3]) > 0 else None), False)
             else:
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (self._rank, self.job_id, self.crawler_id, self._url, page.url,
-                     page.url, url[1] + 1, url[0], final_url), False)
+                    (self.rank, self.job_id, self.crawler_id, self.domainurl, page.url,
+                     page.url, self.depth + 1, self.currenturl, final_url), False)
 
             return
 

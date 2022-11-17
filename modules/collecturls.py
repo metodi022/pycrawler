@@ -22,32 +22,27 @@ class CollectUrls(Module):
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
                  state: Dict[str, Any]) -> None:
         super().__init__(job_id, crawler_id, database, log, state)
-        self._url: str = ''
-        self._rank: int = 0
         self._max_urls: int = 0
         self._url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
-
-    @staticmethod
-    def register_job(database: Postgres, log: Logger) -> None:
-        # Empty
-        pass
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
                      modules: List[Module]) -> None:
-        if self.setup:
+        super().add_handlers(browser, context, page, context_database, url, modules)
+
+        if self.ready:
             return
 
-        super().add_handlers(browser, context, page, context_database, url, modules)
-        self._url = url[0]
-        self._rank = url[2]
-        self._max_urls = self._state['CollectUrls'] if 'CollectUrls' in self._state else Config.MAX_URLS
+        self._max_urls = self._state.get('CollectUrls', Config.MAX_URLS)
         self._state['CollectUrls'] = self._max_urls
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module], repetition: int) -> None:
+        super().receive_response(browser, context, page, responses, context_database, url,
+                                 final_url, start, modules, repetition)
+
         # Make sure to add page as seen
         parsed_url_final: Optional[tld.utils.Result] = get_tld_object(final_url)
         context_database.add_seen(
@@ -59,10 +54,10 @@ class CollectUrls(Module):
             return
 
         # Check if depth or max URLs exceeded
-        if url[1] >= Config.DEPTH or self._max_urls < 1:
+        if self.depth >= Config.DEPTH or self._max_urls < 1:
             return
 
-        parsed_url: Optional[tld.utils.Result] = get_tld_object(self._url)
+        parsed_url: Optional[tld.utils.Result] = get_tld_object(self.currenturl)
         if parsed_url is None or parsed_url_final is None:
             return
 
@@ -119,7 +114,7 @@ class CollectUrls(Module):
             # Add link
             urls.append(parsed_link)
 
-        self._log.info(f"Collected {min(len(urls), self._max_urls)} URLs at depth {url[1]}")
+        self._log.info(f"Collected {min(len(urls), self._max_urls)} URLs at depth {self.depth}")
 
         # Shuffle the URLs, so that we prioritize visiting the URLs that appear in the beginning and
         # in the end of the page
@@ -130,7 +125,8 @@ class CollectUrls(Module):
         # limit
         for parsed_link in urls:
             context_database.add_url_force((get_url_full_with_query_fragment(parsed_link),
-                                            url[1] + 1, url[2], url[3] + [(url[0], final_url)]))
+                                            self.depth + 1, self.rank,
+                                            url[3] + [(self.currenturl, final_url)]))
 
             self._max_urls -= 1
             if self._max_urls < 1:

@@ -28,7 +28,11 @@ class Module:
         """
         self.job_id: int = job_id
         self.crawler_id: int = crawler_id
-        self.setup: bool = False
+        self.domainurl: str = ''
+        self.currenturl: str = ''
+        self.depth: int = 0
+        self.rank: int = 0
+        self.ready: bool = False
         self._database: Postgres = database
         self._log: Logger = log
         self._state: Dict[str, Any] = state
@@ -42,7 +46,7 @@ class Module:
             database (Postgres): database
             log (Logger): log
         """
-        raise NotImplementedError
+        pass
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
@@ -58,7 +62,13 @@ class Module:
             url (Tuple[str, int, int, List[Tuple[str, str]]]): URL, depth, rank, previous URL
             modules (List[Module]): list of modules currently active modules
         """
-        self.setup = True
+        if not self.ready:
+            self.domainurl = self._state.get('Module', url[0])
+            self.rank = url[2]
+            self._state['Module'] = url[0]
+
+        self.currenturl = url[0]
+        self.depth = url[1]
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
@@ -79,7 +89,7 @@ class Module:
             modules (List[Module]): list of modules currently active modules
             repetition (int): current URL visited repetition
         """
-        pass
+        self.ready = True
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         """

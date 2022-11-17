@@ -46,7 +46,7 @@ class Crawler:
             CollectUrls(job_id, crawler_id, database, log, self._state)] if Config.RECURSIVE else []
         self._modules += self._initialize_modules(modules, job_id, crawler_id, database, log,
                                                   self._state)
-        self._modules += [SaveStats(job_id, crawler_id, database, log, self._state)]
+        # self._modules += [SaveStats(job_id, crawler_id, database, log, self._state)]  # TODO improve
 
         # Prepare filters
         url_filter_out: List[Callable[[tld.utils.Result], bool]] = []

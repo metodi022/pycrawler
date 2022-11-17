@@ -1,4 +1,3 @@
-import os
 import sys
 from datetime import datetime
 from logging import Logger
@@ -12,6 +11,7 @@ from database.postgres import Postgres
 from modules.acceptcookies import AcceptCookies
 from modules.login import Login
 from modules.module import Module
+from utils import clear_cache
 
 
 class CollectLoginHeaders(Login):
@@ -52,11 +52,8 @@ class CollectLoginHeaders(Login):
                 page.close()
                 context.close()
                 browser.close()
-
-                if Config.RESTART and (
-                        Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
-                    os.remove(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
-
+                clear_cache(Config.RESTART,
+                            Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
                 sys.exit()
 
             # Create a fresh context to emulate a not logged-in user

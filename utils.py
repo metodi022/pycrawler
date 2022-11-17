@@ -1,3 +1,4 @@
+import os
 import pathlib
 import re
 from typing import Optional
@@ -239,3 +240,8 @@ def get_visible_extra(locator: Optional[Locator]) -> bool:
                                     """)
 
     return locator.is_visible() and float(opacity) > 0.0
+
+
+def clear_cache(restart: bool, path: pathlib.Path):
+    if restart and path.exists():
+        os.remove(path)

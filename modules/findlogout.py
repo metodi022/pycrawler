@@ -1,5 +1,4 @@
 import json
-import os
 import sys
 from datetime import datetime
 from logging import Logger
@@ -14,7 +13,7 @@ from database.postgres import Postgres
 from modules.login import Login
 from modules.module import Module
 from utils import get_locator_count, get_locator_nth, get_locator_attribute, CLICKABLES, \
-    get_url_from_href, get_tld_object, get_url_full_with_query, invoke_click
+    get_url_from_href, get_tld_object, get_url_full_with_query, invoke_click, clear_cache
 
 
 class FindLogout(Login):
@@ -44,22 +43,8 @@ class FindLogout(Login):
         super().add_handlers(browser, context, page, context_database, url, modules)
 
         # Restore old state
-        self._logout = self._state['FindLogout'] if 'FindLogout' in self._state else self._logout
+        self._logout = self._state.get('FindLogout', self._logout)
         self._state['FindLogout'] = self._logout
-
-        # Check if login is successful
-        if not self.login:
-            self._log.info('Login failed')
-            self._log.info('Close Browser')
-            page.close()
-            context.close()
-            browser.close()
-
-            if Config.RESTART and (
-                    Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
-                os.remove(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
-
-            sys.exit()
 
         # Check if logout is successful
         if self._logout:
@@ -68,6 +53,22 @@ class FindLogout(Login):
             page.close()
             context.close()
             browser.close()
+            clear_cache(Config.RESTART,
+                        Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
+            sys.exit()
+
+        if self.ready:
+            return
+
+        # Check if login is successful
+        if not self.login:
+            self._log.info('Login failed')
+            self._log.info('Close Browser')
+            page.close()
+            context.close()
+            browser.close()
+            clear_cache(Config.RESTART,
+                        Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
             sys.exit()
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
@@ -116,7 +117,7 @@ class FindLogout(Login):
             page_alt.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
             if self.verify_login(browser, context, page_alt, context_database, modules,
-                                 self._url_login):
+                                 self.loginurl):
                 continue
 
             self._logout = True
@@ -129,7 +130,7 @@ class FindLogout(Login):
 
             self._database.invoke_transaction(
                 'INSERT INTO LOGOUTS VALUES (%s, %s, %s, %s, %s, %s, %s, %s)', (
-                    self._rank, self.job_id, self.crawler_id, self._url, parsed_link_full,
+                    self.rank, self.job_id, self.crawler_id, self.domainurl, parsed_link_full,
                     page_alt.url, response.status, headers), False)
 
             break
@@ -156,12 +157,12 @@ class FindLogout(Login):
                     continue
 
             if not self.verify_login(browser, context, page, context_database, modules,
-                                     self._url_login):
+                                     self.loginurl):
                 self._logout = True
 
                 self._database.invoke_transaction(
                     'INSERT INTO LOGOUTS VALUES (%s, %s, %s, %s, %s, %s, %s, %s)', (
-                        self._rank, self.job_id, self.crawler_id, self._url, page.url, page.url,
+                        self.rank, self.job_id, self.crawler_id, self.domainurl, page.url, page.url,
                         0, None), False)
 
         page_alt.close()

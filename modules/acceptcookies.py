@@ -28,24 +28,17 @@ class AcceptCookies(Module):
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
                  state: Dict[str, Any]) -> None:
         super().__init__(job_id, crawler_id, database, log, state)
-        self._url: str = ''
         self._urls: MutableSet[str] = set()
-        self._rank: int = 0
-
-    @staticmethod
-    def register_job(database: Postgres, log: Logger) -> None:
-        pass
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
                      modules: List[Module]) -> None:
-        if self.setup:
+        super().add_handlers(browser, context, page, context_database, url, modules)
+
+        if self.ready:
             return
 
-        super().add_handlers(browser, context, page, context_database, url, modules)
-        self._url = url[0]
-        self._rank = url[2]
-        self._urls = self._state['AcceptCookies'] if 'AcceptCookies' in self._state else self._urls
+        self._urls = self._state.get('AcceptCookies', self._urls)
         self._state['AcceptCookies'] = self._urls
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page | Frame,
@@ -53,6 +46,9 @@ class AcceptCookies(Module):
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module], repetition: int, frames=True,
                          force=False) -> None | bool:
+        super().receive_response(browser, context, page, responses, context_database, url,
+                                 final_url, start, modules, repetition)
+
         # Verify that response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
@@ -121,7 +117,7 @@ class AcceptCookies(Module):
         # Refresh the page
         temp: datetime = datetime.now()
         try:
-            response = page.goto(url[0], timeout=Config.LOAD_TIMEOUT,
+            response = page.goto(self.currenturl, timeout=Config.LOAD_TIMEOUT,
                                  wait_until=Config.WAIT_LOAD_UNTIL)
         except Error:
             start.append(temp)
