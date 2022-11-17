@@ -48,7 +48,7 @@ class FindLogout(Login):
         self._state['FindLogout'] = self._logout
 
         # Check if login is successful
-        if not self.success or self._logout:
+        if not self.success:
             self._log.info('Login failed')
             self._log.info('Close Browser')
             page.close()
@@ -59,6 +59,15 @@ class FindLogout(Login):
                     Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
                 os.remove(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
 
+            sys.exit()
+
+        # Check if logout is successful
+        if self._logout:
+            self._log.info('Logout found')
+            self._log.info('Close Browser')
+            page.close()
+            context.close()
+            browser.close()
             sys.exit()
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
@@ -77,6 +86,8 @@ class FindLogout(Login):
             links: Locator = page.locator(f"a[href] >> text=/{FindLogout.LOGOUTKEYWORDS}/i")
         except Error:
             return
+
+        self._log.info(f"Found {get_locator_count(links)} logout links")
 
         # Prepare an alt page
         page_alt: Page = context.new_page()
@@ -130,6 +141,8 @@ class FindLogout(Login):
             except Error:
                 page_alt.close()
                 return
+
+            self._log.info(f"Found {get_locator_count(buttons)} logout links")
 
             for i in range(get_locator_count(buttons)):
                 button: Optional[Locator] = get_locator_nth(buttons, i)
