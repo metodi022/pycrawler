@@ -48,7 +48,7 @@ class FindLogout(Login):
         self._state['FindLogout'] = self._logout
 
         # Check if login is successful
-        if not self.success:
+        if not self.login:
             self._log.info('Login failed')
             self._log.info('Close Browser')
             page.close()

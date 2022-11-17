@@ -26,7 +26,7 @@ class Login(Module):
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
                  state: Dict[str, Any]) -> None:
         super().__init__(job_id, crawler_id, database, log, state)
-        self.success = False
+        self.login = False
         self._url: str = ''
         self._rank: int = 0
         self._account: List[Tuple[str, str, str, str, str]] = []
@@ -74,7 +74,7 @@ class Login(Module):
             return
 
         if self._state.get('Login', None):
-            self.success = True
+            self.login = True
             self._url_login = self._state['Login']
             return
 
@@ -207,7 +207,7 @@ class Login(Module):
             # If login is successful, end
             if self._verify_login_after_post(browser, context, page, context_database, form,
                                              url_form[0], url_form_final, modules):
-                self.success = True
+                self.login = True
                 self._url_login = url_form[0]
                 self._database.invoke_transaction(
                     "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (

@@ -46,7 +46,7 @@ class CollectLoginHeaders(Login):
             super().add_handlers(browser, context, page, context_database, url, modules)
 
             # Check if login is successful
-            if not self.success:
+            if not self.login:
                 self._log.info('Login failed')
                 self._log.info('Close Browser')
                 page.close()
