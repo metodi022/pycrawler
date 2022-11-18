@@ -11,6 +11,7 @@ from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.acceptcookies import AcceptCookies
 from modules.findloginforms import FindLoginForms
+from modules.findlogout import FindLogout
 from modules.module import Module
 from utils import get_locator_count, get_locator_nth, CLICKABLES, \
     get_locator_attribute, get_outer_html, invoke_click, SSO, get_label_for, get_screenshot, \
@@ -246,13 +247,10 @@ class Login(Module):
         page_alt.close()
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
-        # TODO improve
         # Ignore URLs which could lead to logout
         def filt(url: tld.utils.Result) -> bool:
-            return re.search(
-                r'log.?out|sign.?out|log.?off|sign.?off|exit|quit|invalidate|ab.?melden|'
-                r'aus.?loggen|ab.?meldung|verlassen|aus.?treten|annullieren',
-                get_url_full_with_query_fragment(url), flags=re.I) is not None
+            return re.search(FindLogout.LOGOUTKEYWORDS, get_url_full_with_query_fragment(url),
+                             flags=re.I) is not None
 
         filters.append(filt)
 

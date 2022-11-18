@@ -122,16 +122,18 @@ class FindLogout(Login):
 
             self._logout = True
 
-            headers: Optional[str]
+            headers: Optional[str] = None
             try:
-                headers = json.dumps(response.headers_array())
+                headers = json.dumps(response.headers_array()) if response is not None else None
             except ValueError:
-                headers = None
+                # Ignored
+                pass
 
             self._database.invoke_transaction(
                 'INSERT INTO LOGOUTS VALUES (%s, %s, %s, %s, %s, %s, %s, %s)', (
                     self.rank, self.job_id, self.crawler_id, self.domainurl, parsed_link_full,
-                    page_alt.url, response.status, headers), False)
+                    page_alt.url, response.status if response is not None else Config.ERROR_CODES[
+                        'response_error'], headers), False)
 
             break
         # Find logout clickable elements, click each, and verify logout
