@@ -29,6 +29,8 @@ class FindLogout(Login):
     def register_job(database: Postgres, log: Logger) -> None:
         Login.register_job(database, log)
 
+        # TODO fix rename + in other modules
+
         database.invoke_transaction(
             'CREATE TABLE IF NOT EXISTS LOGOUTS (rank INT NOT NULL, job INT NOT NULL,'
             'crawler INT NOT NULL, url VARCHAR(255) NOT NULL, fromurl TEXT, fromurlfinal TEXT,'
@@ -164,8 +166,8 @@ class FindLogout(Login):
 
                 self._database.invoke_transaction(
                     'INSERT INTO LOGOUTS VALUES (%s, %s, %s, %s, %s, %s, %s, %s)', (
-                        self.rank, self.job_id, self.crawler_id, self.domainurl, page.url, page.url,
-                        0, None), False)
+                        self.rank, self.job_id, self.crawler_id, self.domainurl, self.currenturl,
+                        page.url, 0, None), False)
 
         page_alt.close()
         self._state['FindLogout'] = self._logout

@@ -88,6 +88,6 @@ class FindContactsEmail(Module):
 
             self._database.invoke_transaction(
                 'INSERT INTO CONTACTSEMAIL VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
-                (self.rank, self.job_id, self.crawler_id, self.domainurl, furl, page.url,
+                (self.rank, self.job_id, self.crawler_id, self.domainurl, self.currenturl, page.url,
                  self.depth, email, nonsense, url[3][-1][0] if len(url[3]) > 0 else None,
                  url[3][-1][1] if len(url[3]) > 0 else None), False)
