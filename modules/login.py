@@ -507,6 +507,7 @@ class Login(Module):
             verify: bool = self.verify_login(browser, context_alt, page_alt, context_database,
                                              modules, None)
             page_alt.close()
+            context_alt.close()
 
             # Handle false positives
             if verify:

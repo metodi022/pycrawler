@@ -171,3 +171,6 @@ class FindLogout(Login):
 
         page_alt.close()
         self._state['FindLogout'] = self._logout
+
+        if self._logout:
+            context_database.clear_urls()
