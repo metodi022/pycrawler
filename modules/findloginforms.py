@@ -1,4 +1,5 @@
 import re
+import urllib.parse
 from datetime import datetime
 from logging import Logger
 from typing import List, Optional, Tuple, Callable, Dict, Any
@@ -85,11 +86,10 @@ class FindLoginForms(Module):
             return
 
         # Get all buttons with login keywords
-        buttons: Optional[Locator]
         try:
-            check1_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|next|' \
+            check_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|next|' \
                               r'continue|proceed|fortfahren/i'
-            buttons = page.locator(f"{CLICKABLES} >> text={check1_str} >> visible=true")
+            buttons: Locator = page.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
         except Error:
             return
 
@@ -136,13 +136,15 @@ class FindLoginForms(Module):
                     (self.rank, self.job_id, self.crawler_id, self.domainurl, page.url,
                      page.url, self.depth + 1, self.currenturl, final_url), False)
 
-            return
+            break
 
-        # If we already found entries -> finish
+        # If we already found entries or there are still URLs left -> stop here
         if self._found > 0 or len(context_database) > 0:
             return
 
-        # TODO no entries for login for Web site -> use search engine with login keywords
+        # Finally, use search engine with login keyword
+        if Config.DEPTH > 0:
+            context_database.add_url((urllib.parse.quote(f"https://www.google.com/search?q=\"login\" site:{self.domainurl}"), Config.DEPTH - 1, self.rank, []))
 
     @staticmethod
     def get_login_form(form: Locator) -> bool:
@@ -162,7 +164,6 @@ class FindLoginForms(Module):
             text_fields: int = get_locator_count(
                 form.locator('input[type="email"]:visible')) + get_locator_count(
                 form.locator('input[type="text"]:visible')) + get_locator_count(
-                form.locator('input[type="tel"]:visible')) + get_locator_count(
                 form.locator('input:not([type]):visible'))
         except Error:
             return False
@@ -174,27 +175,24 @@ class FindLoginForms(Module):
 
         # Find if there are login buttons
         try:
-            check1_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|proceed|' \
+            check_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|proceed|' \
                               r'fortfahren|anmeldung|einmeldung|submit)/i'
-            button: Locator = form.locator(f"{CLICKABLES} >> text={check1_str} >> visible=true")
+            button: Locator = form.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
         except Error:
             return False
 
         # Return true if there is at least one login button in the form
-        # TODO fix to ignore false positives
-        return get_locator_count(button) > 0 and re.search(r'search|news.?letter|subscribe',
-                                                           get_outer_html(form), flags=re.I) is None
+        # TODO improve to ignore false positives
+        return get_locator_count(button) > 0 and re.search(r'search|news.?letter|subscribe', get_outer_html(form) or '', flags=re.I) is None
 
     @staticmethod
     def find_login_form(page: Page) -> Optional[Locator]:
-        forms: Optional[Locator] = None
-
         # Find all forms on a page
         try:
-            forms = page.locator('form:visible,fieldset:visible')
+            forms: Locator = page.locator('form:visible,fieldset:visible')
         except Error:
             # Ignored
-            pass
+            return None
 
         # Check if each form is a login form
         for i in range(get_locator_count(forms)):
@@ -210,17 +208,12 @@ class FindLoginForms(Module):
             return None
 
         # Go up the node tree of the password field and search for login forms (w/o form tags)
-        for _ in range(100):
-            # Stop if we reached top of element node tree
-            if get_locator_count(form) != 1:
-                break
-
+        while form.count() == 1:
             # Get relevant fields
             passwords: int = get_locator_count(form.locator('input[type="password"]:visible'))
             text_fields: int = get_locator_count(
                 form.locator('input[type="email"]:visible')) + get_locator_count(
                 form.locator('input[type="text"]:visible')) + get_locator_count(
-                form.locator('input[type="tel"]:visible')) + get_locator_count(
                 form.locator('input:not([type]):visible'))
 
             # Stop earlier if it cannot be a login form
