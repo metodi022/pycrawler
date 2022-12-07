@@ -68,91 +68,32 @@ class FindLoginForms(Module):
         if response is None or response.status >= 400:
             return
 
-        # Try to find a login form
-        form: Optional[Locator] = FindLoginForms.find_login_form(page)
+        # Find login forms
+        form: Optional[Locator] = FindLoginForms.find_login_form(page, interact=(self._found >= 3))
         if form is not None:
+            self._found += 1
+            self._state['FindLoginForms'] = self._found
+
             self._database.invoke_transaction(
                 "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (
                     self.rank, self.job_id, self.crawler_id, self.domainurl, self.currenturl,
                     page.url, self.depth, url[3][-1][0] if len(url[3]) > 0 else None,
                     url[3][-1][1] if len(url[3]) > 0 else None), False)
 
-            self._found += 1
-            self._state['FindLoginForms'] = self._found
-            return
-
-        # Next step searches for login buttons, but only do it if we haven't seen a login form
-        if self._found > 3:
-            return
-
-        # Get all buttons with login keywords
-        try:
-            check_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|next|' \
-                              r'continue|proceed|fortfahren/i'
-            buttons: Locator = page.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
-        except Error:
-            return
-
-        # Iterate over each button
-        for i in range(get_locator_count(buttons)):
-            # Get button and validate
-            button: Optional[Locator] = get_locator_nth(buttons, i)
-            if button is None:
-                continue
-
-            # If button is an SSO login -> ignore
-            if re.search(SSO, get_outer_html(button), flags=re.I) is not None:
-                continue
-
-            # Click button and wait for some time
-            try:
-                invoke_click(page, get_locator_nth(buttons, i), 5000)
-                page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                page.wait_for_load_state(timeout=Config.LOAD_TIMEOUT,
-                                         state=Config.WAIT_LOAD_UNTIL)
-                page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-            except Error:
-                # Ignored
-                pass
-
-            form = FindLoginForms.find_login_form(page)
-            if form is None:
-                continue
-
-            self._found += 1
-            self._state['FindLoginForms'] = self._found
-            self._log.info(f"Found a possible login button")
-
-            # Add url to database
-            if page.url == final_url:
-                self._database.invoke_transaction(
-                    "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (self.rank, self.job_id, self.crawler_id, self.domainurl, self.currenturl,
-                     final_url, self.depth, url[3][-1][0] if len(url[3]) > 0 else None,
-                     url[3][-1][1] if len(url[3]) > 0 else None), False)
-            else:
-                self._database.invoke_transaction(
-                    "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (self.rank, self.job_id, self.crawler_id, self.domainurl, page.url,
-                     page.url, self.depth + 1, self.currenturl, final_url), False)
-
-            break
-
         # If we already found entries or there are still URLs left -> stop here
         if self._found > 0 or len(context_database) > 0:
             return
 
         # Finally, use search engine with login keyword
-        if Config.DEPTH > 0:
-            context_database.add_url((urllib.parse.quote(f"https://www.google.com/search?q=\"login\" site:{self.domainurl}"), Config.DEPTH - 1, self.rank, []))
+        context_database.add_url((urllib.parse.quote(f"https://www.google.com/search?q=\"login\" site:{self.domainurl}"), Config.DEPTH - 1, self.rank, []))
 
     @staticmethod
-    def get_login_form(form: Locator) -> bool:
+    def verify_login_form(form: Locator) -> bool:
         """
-        Check if given form is a login form.
+        Check if given locator is a login form.
 
         Args:
-            form (Locator): form
+            form (Locator): locator
 
         Returns:
             true if the form is a login form, otherwise false
@@ -181,12 +122,11 @@ class FindLoginForms(Module):
         except Error:
             return False
 
-        # Return true if there is at least one login button in the form
-        # TODO improve to ignore false positives
+        # Return true if there is at least one login button in the form and avoid false positives
         return get_locator_count(button) > 0 and re.search(r'search|news.?letter|subscribe', get_outer_html(form) or '', flags=re.I) is None
 
     @staticmethod
-    def find_login_form(page: Page) -> Optional[Locator]:
+    def _find_login_form(page: Page) -> Optional[Locator]:
         # Find all forms on a page
         try:
             forms: Locator = page.locator('form:visible,fieldset:visible')
@@ -197,7 +137,7 @@ class FindLoginForms(Module):
         # Check if each form is a login form
         for i in range(get_locator_count(forms)):
             form: Optional[Locator] = get_locator_nth(forms, i)
-            if form is None or not FindLoginForms.get_login_form(form):
+            if form is None or not FindLoginForms.verify_login_form(form):
                 continue
             return form
 
@@ -221,7 +161,7 @@ class FindLoginForms(Module):
                 return None
 
             # Check if element tree is a login form
-            if FindLoginForms.get_login_form(form):
+            if FindLoginForms.verify_login_form(form):
                 return form
 
             # Go up the node tree
@@ -231,6 +171,44 @@ class FindLoginForms(Module):
                 return None
 
         return None
+
+    @staticmethod
+    def find_login_form(page: Page, interact: bool = True) -> Optional[Locator]:
+        # Get login form from page
+        form: Optional[Locator] = FindLoginForms._find_login_form(page)
+        if form is not None:
+            return form
+
+        # If you don't want to interact with the page
+        # and click on potential login buttons, stop here
+        if not interact:
+            return None
+
+        # Get all buttons with login keywords
+        try:
+            check_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|next|' \
+                             r'continue|proceed|fortfahren|weiter|anmeldung|einmeldung/i'
+            buttons: Locator = page.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
+        except Error:
+            return None
+
+        # Click each button with login keyword
+        for i in range(get_locator_count(buttons, page)):
+            button: Optional[Locator] = get_locator_nth(buttons, i)
+            if button is None:
+                continue
+
+            # Avoid clicking SSO login buttons
+            if re.search(SSO, get_outer_html(button) or '', flags=re.I) is not None:
+                continue
+
+            invoke_click(page, button, 2000)
+
+            form = FindLoginForms._find_login_form(page)
+            if form is not None:
+                break
+
+        return form
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         def filt(url: tld.utils.Result) -> bool:

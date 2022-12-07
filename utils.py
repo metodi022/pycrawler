@@ -209,9 +209,13 @@ def invoke_click(page: Page | Frame, clickable: Optional[Locator], timeout=30000
     if clickable is None or get_locator_count(clickable) > 1:
         return
 
-    clickable.hover(timeout=timeout)
-    page.wait_for_timeout(500)
-    clickable.click(delay=500, timeout=timeout)
+    try:
+        clickable.hover(timeout=timeout)
+        page.wait_for_timeout(500)
+        clickable.click(delay=500, timeout=timeout)
+    except Error:
+        # Ignored
+        pass
 
 
 def get_visible_extra(locator: Optional[Locator]) -> bool:
