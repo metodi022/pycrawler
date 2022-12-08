@@ -28,6 +28,8 @@ class CollectHeaders(Module):
                      modules: List['Module']) -> None:
         super().add_handlers(browser, context, page, context_database, url, modules)
 
+        # TODO improve with response information as well
+
         def handler(response: Response):
             headers: Optional[str]
             try:

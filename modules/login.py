@@ -85,12 +85,15 @@ class Login(Module):
         # Iterate over login form URLs
         for url_form in url_forms:
             self._log.info(f"Get login URL {url_form[0]}")
-            if Login.login(browser, context, self.domainurl, url_form[0], self._cookies, self._account[0]):
-                self._log.info(f"Log in successful for {url_form[0]}")
-                self.login = True
-                self.loginurl = url_form[0]
-                self._state['Login'] = self.loginurl
-                return
+
+            if not Login.login(browser, context, self.domainurl, url_form[0], self._cookies, self._account[0]):
+                continue
+
+            self._log.info(f"Log in successful for {url_form[0]}")
+            self.login = True
+            self.loginurl = url_form[0]
+            self._state['Login'] = self.loginurl
+            return
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
