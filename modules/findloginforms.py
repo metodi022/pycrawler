@@ -60,8 +60,7 @@ class FindLoginForms(Module):
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module], repetition: int) -> None:
-        super().receive_response(browser, context, page, responses, context_database, url,
-                                 final_url, start, modules, repetition)
+        super().receive_response(browser, context, page, responses, context_database, url, final_url, start, modules, repetition)
 
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
@@ -86,6 +85,19 @@ class FindLoginForms(Module):
 
         # Finally, use search engine with login keyword
         context_database.add_url((urllib.parse.quote(f"https://www.google.com/search?q=\"login\" site:{self.domainurl}"), Config.DEPTH - 1, self.rank, []))
+
+    def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
+        def filt(url: tld.utils.Result) -> bool:
+            url_full: str = get_url_full(url)
+
+            # Ignore URLs which possibly do not lead to HTML pages, because login forms should only be found on HTML pages
+            return re.search(
+                r'(\.js|\.mp3|\.wav|\.aif|\.aiff|\.wma|\.csv|\.pdf|\.jpg|\.png|\.gif|\.tif|\.svg'
+                r'|\.bmp|\.psd|\.tiff|\.ai|\.lsm|\.3gp|\.avi|\.flv|\.gvi|\.m2v|\.m4v|\.mkv|\.mov'
+                r'|\.mp4|\.mpg|\.ogv|\.wmv|\.xml|\.otf|\.ttf|\.css|\.rss|\.ico|\.cfg|\.ogg|\.mpa'
+                r'|\.jpeg|\.webm|\.mpeg|\.webp)$', url_full, flags=re.I) is not None
+
+        filters.append(filt)
 
     @staticmethod
     def verify_login_form(form: Locator) -> bool:
@@ -209,17 +221,3 @@ class FindLoginForms(Module):
                 break
 
         return form
-
-    def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
-        def filt(url: tld.utils.Result) -> bool:
-            url_full: str = get_url_full(url)
-
-            # Ignore URLs which possibly do not lead to HTML pages, because login forms should only
-            # be found on HTML pages
-            return re.search(
-                r'(\.js|\.mp3|\.wav|\.aif|\.aiff|\.wma|\.csv|\.pdf|\.jpg|\.png|\.gif|\.tif|\.svg'
-                r'|\.bmp|\.psd|\.tiff|\.ai|\.lsm|\.3gp|\.avi|\.flv|\.gvi|\.m2v|\.m4v|\.mkv|\.mov'
-                r'|\.mp4|\.mpg|\.ogv|\.wmv|\.xml|\.otf|\.ttf|\.css|\.rss|\.ico|\.cfg|\.ogg|\.mpa'
-                r'|\.jpeg|\.webm|\.mpeg|\.webp)$', url_full, flags=re.I) is not None
-
-        filters.append(filt)

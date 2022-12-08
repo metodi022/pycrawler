@@ -14,8 +14,8 @@ from modules.findloginforms import FindLoginForms
 from modules.findlogout import FindLogout
 from modules.module import Module
 from utils import get_locator_count, get_locator_nth, CLICKABLES, \
-    get_locator_attribute, get_outer_html, invoke_click, SSO, get_label_for, get_screenshot, \
-    get_url_full_with_query_fragment, get_tld_object, get_url_full, get_visible_extra
+    get_locator_attribute, get_outer_html, invoke_click, SSO, get_label_for, \
+    get_url_full_with_query_fragment, get_visible_extra
 
 
 class Login(Module):
@@ -25,13 +25,12 @@ class Login(Module):
                          r"wasn't right|not right)(\W|$)"
 
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
-                 state: Dict[str, Any], output: bool = True) -> None:
+                 state: Dict[str, Any]) -> None:
         super().__init__(job_id, crawler_id, database, log, state)
         self.login = False
         self.loginurl: Optional[str] = None
-        self._account: List[Tuple[str, str, str, str, str]] = []
+        self._account: Optional[List[Tuple[str, str, str, str, str]]] = None
         self._cookies: Optional[AcceptCookies] = None
-        self._output: bool = output
 
     @staticmethod
     def register_job(database: Postgres, log: Logger) -> None:
@@ -60,20 +59,16 @@ class Login(Module):
         # Get account details from database
         self._account = self._database.invoke_transaction(
             "SELECT email, username, password, first_name, last_name FROM accounts WHERE %s LIKE "
-            "CONCAT(%s, site, %s)", (self.domainurl, '%', '%'), True) or []
+            "CONCAT(%s, site, %s)", (self.domainurl, '%', '%'), True)
 
         # Check if we got credentials for the given site
         if self._account is None or len(self._account) == 0:
             self._log.info(f"Found no credentials for {self.domainurl}")
-
-            if self._output:
-                self._database.invoke_transaction(
-                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
-                        self.rank, self.job_id, self.crawler_id, self.domainurl, None, None, False,
-                        False, False, False, False, False), False)
             return
 
-        if self._state.get('Login', None):
+        self._account = cast(List[Tuple[str, str, str, str, str]], self._account)
+
+        if self._state.get('Login', None) is not None:
             self.login = True
             self.loginurl = self._state['Login']
             return
@@ -85,154 +80,17 @@ class Login(Module):
         # Check if we got URLs with login forms
         if url_forms is None or len(url_forms) == 0:
             self._log.info(f"Found no login URLs for {self.domainurl}")
-
-            if self._output:
-                self._database.invoke_transaction(
-                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
-                        self.rank, self.job_id, self.crawler_id, self.domainurl, None, None, False,
-                        False, False, False, False, False), False)
             return
 
         # Iterate over login form URLs
         for url_form in url_forms:
             self._log.info(f"Get login URL {url_form[0]}")
-
-            # Navigate to log in form URL
-            response: Optional[Response] = None
-            try:
-                response = page.goto(url_form[0], timeout=Config.LOAD_TIMEOUT,
-                                     wait_until=Config.WAIT_LOAD_UNTIL)
-            except Error as error:
-                self._log.warning(error.message)
-
-            # Check if response status is valid
-            if response is None or response.status >= 400:
-                if self._output:
-                    self._database.invoke_transaction(
-                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)",
-                        (self.rank, self.job_id, self.crawler_id, self.domainurl, url_form[0],
-                         url_form[0], False, False, False, False, False, False), False)
-
-                continue
-
-            url_form_final: str = get_url_full(get_tld_object(page.url)) or page.url
-            page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-
-            # Accept cookie banners, sometimes they block login forms
-            if Config.ACCEPT_COOKIES:
-                self._cookies = cast(AcceptCookies, self._cookies)
-                self._cookies.receive_response(browser, context, page, [response], context_database,
-                                               (url_form[0], 0, self.rank, []), page.url, [],
-                                               modules, 1, force=True)
-
-            # Find login form
-            form: Optional[Locator] = FindLoginForms.find_login_form(page)
-            # If no login form is found, try clicking on a login button
-            if form is None:
-                # Find login buttons
-                try:
-                    check_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|' \
-                                     r'next|continue|fortfahren|anmeldung|einmeldung/i'
-                    buttons = page.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
-                except Error:
-                    if self._output:
-                        self._database.invoke_transaction(
-                            "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)",
-                            (self.rank, self.job_id, self.crawler_id, self.domainurl, url_form[0],
-                             page.url, False, False, False, False, False, False), False)
-
-                    continue
-
-                # Iterate over buttons and click on correct login button
-                for i in range(get_locator_count(buttons)):
-                    button: Optional[Locator] = get_locator_nth(buttons, i)
-                    if button is None or re.search(SSO, button.text_content(),
-                                                   flags=re.I) is not None:
-                        continue
-
-                    # Click button and wait if redirect
-                    try:
-                        invoke_click(page, get_locator_nth(buttons, i), 5000)
-                        page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                        page.wait_for_load_state(timeout=Config.LOAD_TIMEOUT,
-                                                 state=Config.WAIT_LOAD_UNTIL)
-                        page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                    except Error:
-                        # Ignored
-                        pass
-
-                    break
-                else:
-                    if self._output:
-                        self._database.invoke_transaction(
-                            "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)",
-                            (self.rank, self.job_id, self.crawler_id, self.domainurl, url_form[0],
-                             page.url, False, False, False, False, False, False), False)
-
-                    continue
-
-                # Get login form again
-                form = FindLoginForms.find_login_form(page)
-                # If no login form is found this time, continue to next login form URL
-                if form is None:
-                    if self._output:
-                        self._database.invoke_transaction(
-                            "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)",
-                            (self.rank, self.job_id, self.crawler_id, self.domainurl, url_form[0],
-                             page.url, False, False, False, False, False, False), False)
-
-                    continue
-
-            get_screenshot(page,
-                           Config.LOG / f"screenshots/job{self.job_id}rank{self.rank}login1.png",
-                           True)
-
-            # If filling of login form fails, continue to next login form URL
-            if not self._fill_login_form(page, form):
-                if self._output:
-                    self._database.invoke_transaction(
-                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)",
-                        (self.rank, self.job_id, self.crawler_id, self.domainurl, url_form[0],
-                         page.url, False, False, False, False, False, False), False)
-
-                continue
-
-            get_screenshot(page,
-                           Config.LOG / f"screenshots/job{self.job_id}rank{self.rank}login2.png",
-                           True)
-
-            # If posting login form fails, continue to next login form URL
-            if not self._post_login_form(page, form):
-                get_screenshot(page,
-                               Config.LOG / f"screenshots/job{self.job_id}rank{self.rank}login3.png",
-                               True)
-
-                if self._output:
-                    self._database.invoke_transaction(
-                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)",
-                        (self.rank, self.job_id, self.crawler_id, self.domainurl, url_form[0],
-                         page.url, False, False, False, False, False, False), False)
-
-                continue
-
-            get_screenshot(page,
-                           Config.LOG / f"screenshots/job{self.job_id}rank{self.rank}login3.png",
-                           True)
-
-            # If login is successful, end
-            if self._verify_login_after_post(browser, context, page, context_database, form,
-                                             url_form[0], url_form_final, modules):
+            if Login.login(browser, context, self.domainurl, url_form[0], self._cookies, self._account[0]):
+                self._log.info(f"Log in successful for {url_form[0]}")
                 self.login = True
                 self.loginurl = url_form[0]
                 self._state['Login'] = self.loginurl
-
-                if self._output:
-                    self._database.invoke_transaction(
-                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)",
-                        (self.rank, self.job_id, self.crawler_id, self.domainurl, url_form[0],
-                         page.url, True, False, False, False, False, False), False)
-
-                break
+                return
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
@@ -245,19 +103,8 @@ class Login(Module):
         if len(context_database) > 0 or repetition < Config.REPETITIONS:
             return
 
-        # At the end of the crawl check if we are still logged-in
-        page_alt: Page = context.new_page()
-        if self._output and self.verify_login(browser, context, page_alt, context_database, modules,
-                                              self.loginurl):
-            self._database.invoke_transaction(
-                "UPDATE LOGINS SET successfinal = %s WHERE job = %s AND crawler = %s AND url = %s "
-                "AND success", (True, self.job_id, self.crawler_id, self.domainurl), False)
-
-        get_screenshot(page_alt,
-                       Config.LOG / f"screenshots/job{self.job_id}rank{self.rank}login4.png",
-                       True)
-
-        page_alt.close()
+        # TODO At the end of the crawl check if we are still logged-in
+        # TODO screenshots + better feedback
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         # Ignore URLs which could lead to logout
@@ -267,9 +114,54 @@ class Login(Module):
 
         filters.append(filt)
 
-    def _fill_login_form(self, page: Page, form: Locator) -> bool:
-        self._log.info('Fill login form')
+    @staticmethod
+    def login(browser: Browser, context: BrowserContext, domainurl: str, loginurl: str,
+              cookies: Optional[AcceptCookies], account: Tuple[str, str, str, str, str]) -> bool:
+        # Navigate to login form URL
+        page: Page = context.new_page()
+        try:
+            response: Optional[Response] = page.goto(loginurl, timeout=Config.LOAD_TIMEOUT,
+                                                     wait_until=Config.WAIT_LOAD_UNTIL)
+        except Error:
+            page.close()
+            return False
 
+        # Check if response status is valid
+        if response is None or response.status >= 400:
+            page.close()
+            return False
+
+        page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+
+        # Accept cookie banners, sometimes they block login forms
+        if Config.ACCEPT_COOKIES and cookies is not None:
+            cookies = cast(AcceptCookies, cookies)
+            cookies.receive_response(browser, context, page, [response], DequeDB(),
+                                     (loginurl, 0, 0, []), page.url, [], [], 1, force=True)
+
+        # Find login form
+        form: Optional[Locator] = FindLoginForms.find_login_form(page)
+        if form is None:
+            page.close()
+            return False
+
+        # If filling of login form fails, continue to next login form URL
+        if not Login._fill_login_form(page, form, account):
+            page.close()
+            return False
+
+        # If posting login form fails, continue to next login form URL
+        if not Login._post_login_form(page, form):
+            page.close()
+            return False
+
+        # Verify that login is successful
+        result: bool = Login.verify_login_after_post(browser, context, page, form, domainurl, loginurl, cookies, account)
+        page.close()
+        return result
+
+    @staticmethod
+    def _fill_login_form(page: Page, form: Locator, account: Tuple[str, str, str, str, str]) -> bool:
         # Find relevant fields
         try:
             password_field: Locator = form.locator('input[type="password"]:visible')
@@ -293,17 +185,17 @@ class Login(Module):
             try:
                 if (text_type is not None and text_type == 'email') or \
                         re.search(r'e.?mail', get_outer_html(text_field) or '', flags=re.I):
-                    text_field.type(self._account[0][0], delay=100)
+                    text_field.type(account[0], delay=100)
                     break
                 elif label.count() == 1 and re.search(r'e.?mail', get_outer_html(label) or '',
                                                       flags=re.I):
-                    text_field.type(self._account[0][0], delay=100)
+                    text_field.type(account[0], delay=100)
                     break
                 elif re.search(r'e.?mail', placeholder, flags=re.I):
-                    text_field.type(self._account[0][0], delay=100)
+                    text_field.type(account[0], delay=100)
                     break
                 else:
-                    text_field.type(self._account[0][1], delay=100)
+                    text_field.type(account[1], delay=100)
                     break
             except Error:
                 # Ignored
@@ -316,9 +208,11 @@ class Login(Module):
                     continue
 
                 try:
-                    text_field.type(self._account[0][0], delay=100)
+                    text_field.type(account[0], delay=100)
                 except Error:
-                    return False
+                    continue
+
+                break
             else:
                 return False
 
@@ -329,9 +223,9 @@ class Login(Module):
         if get_locator_count(password_field) != 1 or not get_visible_extra(password_field):
             # Get possible buttons similar to continue/next
             try:
-                check2_str: str = r'/log.?in|sign.?in|continue|next|weiter|melde|logge|e.?mail|' \
+                check_str: str = r'/log.?in|sign.?in|continue|next|weiter|melde|logge|e.?mail|' \
                                   r'user.?name|nutzer.?name|fortfahren|anmeldung|einmeldung|submit/i'
-                buttons = form.locator(f"{CLICKABLES} >> text={check2_str} >> visible=true")
+                buttons = form.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
             except Error:
                 return False
 
@@ -375,17 +269,15 @@ class Login(Module):
 
         # Type password
         try:
-            password_field.type(self._account[0][2], delay=100)
+            password_field.type(account[2], delay=100)
         except Error:
             return False
 
         page.wait_for_timeout(500)
-
         return True
 
-    def _post_login_form(self, page: Page, form: Locator) -> bool:
-        self._log.info('Post login form')
-
+    @staticmethod
+    def _post_login_form(page: Page, form: Locator) -> bool:
         # Locate login button
         try:
             check_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|fortfahren|' \
@@ -415,8 +307,7 @@ class Login(Module):
             try:
                 invoke_click(page, button, 5000)
                 page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                page.wait_for_load_state(timeout=Config.LOAD_TIMEOUT,
-                                         state=Config.WAIT_LOAD_UNTIL)
+                page.wait_for_load_state(timeout=Config.LOAD_TIMEOUT, state=Config.WAIT_LOAD_UNTIL)
                 page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
             except Error:
                 # Ignored
@@ -428,14 +319,11 @@ class Login(Module):
 
         return True
 
-    def _verify_login_after_post(self, browser: Browser, context: BrowserContext, page: Page,
-                                 context_database: DequeDB, form: Locator, url: str,
-                                 final_url: str, modules: List[Module]) -> bool:
-        self._log.info('Verify login form')
-
-        # Check if page is redirected
-        redirected: bool = get_url_full(get_tld_object(page.url)) != final_url
-
+    @staticmethod
+    def verify_login_after_post(browser: Browser, context: BrowserContext, page: Page,
+                                form: Locator, domainurl: str, loginurl: Optional[str],
+                                cookies: Optional[AcceptCookies],
+                                account: Tuple[str, str, str, str, str]) -> bool:
         # Initialize variables
         error_message: bool = False
         captcha: bool = False
@@ -461,158 +349,138 @@ class Login(Module):
                 verification = True
                 break
 
-        # Confirm redirection and search for captcha and error messages
-        if not redirected:
-            try:
-                error_message = re.search(Login.ERROR_MESSAGE, form.inner_html(timeout=5000),
-                                          flags=re.I) is not None
-                captcha = re.search(r'captcha', form.inner_html(), flags=re.I) is not None
-            except Error:
-                redirected = True
+        # Search for captcha and error messages
+        try:
+            error_message = re.search(Login.ERROR_MESSAGE, form.inner_html(timeout=5000),
+                                      flags=re.I) is not None
+            captcha = re.search(r'captcha', form.inner_html(), flags=re.I) is not None
+        except Error:
+            redirected = True
 
-        if captcha:
-            if self._output:
-                self._database.invoke_transaction(
-                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s , %s, %s, %s)", (
-                        self.rank, self.job_id, self.crawler_id, self.domainurl, url, page.url,
-                        False, True, False, False, False, False), False)
-
-            return False
-
-        if error_message:
-            if self._output:
-                self._database.invoke_transaction(
-                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
-                        self.rank, self.job_id, self.crawler_id, self.domainurl, url, page.url,
-                        False, False, True, False, False, False), False)
-
-            return False
-
-        if verification:
-            if self._output:
-                self._database.invoke_transaction(
-                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
-                        self.rank, self.job_id, self.crawler_id, self.domainurl, url, page.url,
-                        False, False, False, True, False, False), False)
-
+        if captcha or error_message or verification:
             return False
 
         # If no error messages, captcha or verification exist, verify login successful
-        if self.verify_login(browser, context, page, context_database, modules, url):
-            # Create a fresh context
-            context_alt: BrowserContext = browser.new_context()
-            page_alt: Page = context_alt.new_page()
+        return Login.verify_login(browser, context, domainurl, loginurl, cookies, account)
 
-            # Check if verification is false positive for fresh context
-            verify: bool = self.verify_login(browser, context_alt, page_alt, context_database,
-                                             modules, None)
-            page_alt.close()
-            context_alt.close()
-
-            # Handle false positives
-            if verify:
-                if self._output:
-                    self._database.invoke_transaction(
-                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)",
-                        (self.rank, self.job_id, self.crawler_id, self.domainurl, url, page.url,
-                         False, False, False, False, True, False), False)
-
-                return False
-            else:
-                return True
-
-        return False
-
-    def verify_login(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB, modules: List[Module], url: Optional[str]):
-        response: Optional[Response] = None
+    @staticmethod
+    def verify_login(browser: Browser, context: BrowserContext, domainurl: str,
+                     loginurl: Optional[str], cookies: Optional[AcceptCookies],
+                     account: Tuple[str, str, str, str, str]):
+        # Create a fresh context
+        context_alt: BrowserContext = browser.new_context()
+        page_alt: Page = context_alt.new_page()
+        page: Page = context.new_page()
 
         # Navigate to landing page
         try:
-            responses: List[Optional[Response]] = [
-                page.goto(self.domainurl, timeout=Config.LOAD_TIMEOUT,
-                          wait_until=Config.WAIT_LOAD_UNTIL)]
+            response: Optional[Response] = page.goto(domainurl, timeout=Config.LOAD_TIMEOUT,
+                                                     wait_until=Config.WAIT_LOAD_UNTIL)
             page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
-            if Config.ACCEPT_COOKIES:
-                self._cookies = cast(AcceptCookies, self._cookies)
-                self._cookies.receive_response(browser, context, page, responses, context_database,
-                                               (page.url, 0, self.rank, []), page.url, [], modules,
-                                               1, force=True)
-
-            # Search for account indicators
-            if responses[-1] is not None and 400 > responses[-1].status >= 200:
-                if re.search(
-                        f"(^|\\W)({self._account[0][0]}|{self._account[0][1]}|"
-                        f"{self._account[0][3]}|{self._account[0][4]})($|\\W)",
-                        page.content()) is not None:
-                    return True
+            response_alt: Optional[Response] = page_alt.goto(domainurl, timeout=Config.LOAD_TIMEOUT,
+                                                             wait_until=Config.WAIT_LOAD_UNTIL)
+            page_alt.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error:
-            # Ignored
-            pass
+            page.close()
+            page_alt.close()
+            context_alt.close()
+            return False
 
-        if url is None or not url:
+        # Verify response
+        if response is None or response.status >= 400:
+            page.close()
+            page_alt.close()
+            context_alt.close()
+            return False
+
+        # Verify response
+        if response_alt is None or response_alt.status >= 400:
+            page.close()
+            page_alt.close()
+            context_alt.close()
+            return False
+
+        # Accept cookies if needed
+        if Config.ACCEPT_COOKIES and cookies is not None:
+            cookies = cast(AcceptCookies, cookies)
+            cookies.receive_response(browser, context, page, [response], DequeDB(), (page.url, 0, 0, []),
+                                     page.url, [], [], 1, force=True)
+            cookies.receive_response(browser, context_alt, page_alt, [response_alt], DequeDB(),
+                                     (page_alt.url, 0, 0, []), page_alt.url, [], [], 1, force=True)
+
+        # Search page HTML for account indicators (name, username, email)
+        if Login._verify_account_indicator(page, account[0], account[1], account[3], account[4]) and not Login._verify_account_indicator(page_alt, account[0], account[1], account[3], account[4]):
+            page.close()
+            page_alt.close()
+            context_alt.close()
+            return True
+
+        # Search page HTML for logout element
+        if Login._verify_logout_element(page) and not Login._verify_logout_element(page_alt):
+            page.close()
+            page_alt.close()
+            context_alt.close()
+            return True
+
+        if loginurl is None:
+            page.close()
+            page_alt.close()
+            context_alt.close()
             return False
 
         # Check if login page is still accessible
         try:
-            response = page.goto(url, timeout=Config.LOAD_TIMEOUT,
+            response = page.goto(loginurl, timeout=Config.LOAD_TIMEOUT,
                                  wait_until=Config.WAIT_LOAD_UNTIL)
+            page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error:
             return True
+
+        try:
+            response_alt = page_alt.goto(loginurl, timeout=Config.LOAD_TIMEOUT,
+                                         wait_until=Config.WAIT_LOAD_UNTIL)
+            page_alt.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+        except Error:
+            return False
+
+        if response_alt is None or response_alt.status >= 400:
+            return False
 
         if response is None or response.status >= 400:
             return True
 
-        page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-
-        # Try to find login forms again
+        # Try to find login forms
         form = FindLoginForms.find_login_form(page)
-        if form is not None:
-            if self._output:
-                self._database.invoke_transaction(
-                    "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)", (
-                        self.rank, self.job_id, self.crawler_id, self.domainurl, url, page.url,
-                        False, False, False, False, False, False), False)
+        return form is None
 
+    @staticmethod
+    def _verify_account_indicator(page: Page, email: str, username: str, first: str, last: str) -> bool:
+        # Get page HTML
+        try:
+            html: str = page.content()
+        except Error:
             return False
-        else:
-            try:
-                check_str: str = r'/log.?in|sign.?in|[^sb]melde|[^sb]logge|user.?name|e.?mail|' \
-                                 r'nutzer|next|continue|fortfahren|anmeldung|einmeldung/i'
-                buttons = page.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
-            except Error:
+
+        # Search page HTML for account indicators
+        return re.search(f"(^|\\W)({email}|{username}|{first}|{last})($|\\W)", html,
+                         flags=re.I) is not None
+
+    @staticmethod
+    def _verify_logout_element(page: Page) -> bool:
+        # Get clickable elements with logout keyword
+        try:
+            buttons: Locator = page.locator(
+                f"{CLICKABLES} >> text=/{FindLogout.LOGOUTKEYWORDS}/i >> visible=true")
+            if get_locator_count(buttons, page) > 0:
                 return True
+        except Error:
+            pass
 
-            for i in range(get_locator_count(buttons)):
-                button: Optional[Locator] = get_locator_nth(buttons, i)
-                if button is None or re.search(SSO, button.text_content(),
-                                               flags=re.I) is not None:
-                    continue
+        # Get URLs with logout keyword
+        try:
+            urls: Locator = page.locator(f"a[href] >> text=/{FindLogout.LOGOUTKEYWORDS}/i >> visible=true")
+        except Error:
+            return False
 
-                try:
-                    invoke_click(page, get_locator_nth(buttons, i), 5000)
-                    page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                    page.wait_for_load_state(timeout=Config.LOAD_TIMEOUT,
-                                             state=Config.WAIT_LOAD_UNTIL)
-                    page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                except Error:
-                    # Ignored
-                    pass
-
-                break
-            else:
-                return True
-
-            # Get all login forms again
-            form = FindLoginForms.find_login_form(page)
-            if form is not None:
-                if self._output:
-                    self._database.invoke_transaction(
-                        "INSERT INTO LOGINS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s ,%s, %s, %s)",
-                        (self.rank, self.job_id, self.crawler_id, self.domainurl, url, page.url,
-                         False, False, False, False, False, False), False)
-
-                return False
-
-        return True
+        return urls.count() > 0
