@@ -11,7 +11,6 @@ from database.dequedb import DequeDB
 from database.postgres import Postgres
 from modules.acceptcookies import AcceptCookies
 from modules.findloginforms import FindLoginForms
-from modules.findlogout import FindLogout
 from modules.module import Module
 from utils import get_locator_count, get_locator_nth, CLICKABLES, \
     get_locator_attribute, get_outer_html, invoke_click, SSO, get_label_for, \
@@ -23,6 +22,9 @@ class Login(Module):
                          r"not match|stimmt nicht|existiert nicht|doesn't match|doesn't exist|" \
                          r"not exist|isn't right|not right|nicht richtig|fail|fehlgeschlagen|" \
                          r"wasn't right|not right)(\W|$)"
+
+    LOGOUTKEYWORDS = r'log.?out|sign.?out|log.?off|sign.?off|exit|quit|invalidate|ab.?melden|' \
+                     r'aus.?loggen|ab.?meldung|verlassen|aus.?treten|annullieren'
 
     def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
                  state: Dict[str, Any]) -> None:
@@ -112,7 +114,7 @@ class Login(Module):
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         # Ignore URLs which could lead to logout
         def filt(url: tld.utils.Result) -> bool:
-            return re.search(FindLogout.LOGOUTKEYWORDS, get_url_full_with_query_fragment(url),
+            return re.search(Login.LOGOUTKEYWORDS, get_url_full_with_query_fragment(url),
                              flags=re.I) is not None
 
         filters.append(filt)
@@ -466,15 +468,14 @@ class Login(Module):
             return False
 
         # Search page HTML for account indicators
-        return re.search(f"(^|\\W)({email}|{username}|{first}|{last})($|\\W)", html,
-                         flags=re.I) is not None
+        return re.search(f"(^|\\W)({email}|{username or email}|{first or email}|{last or email})($|\\W)", html, flags=re.I) is not None
 
     @staticmethod
     def _verify_logout_element(page: Page) -> bool:
         # Get clickable elements with logout keyword
         try:
             buttons: Locator = page.locator(
-                f"{CLICKABLES} >> text=/{FindLogout.LOGOUTKEYWORDS}/i >> visible=true")
+                f"{CLICKABLES} >> text=/{Login.LOGOUTKEYWORDS}/i >> visible=true")
             if get_locator_count(buttons, page) > 0:
                 return True
         except Error:
@@ -482,7 +483,7 @@ class Login(Module):
 
         # Get URLs with logout keyword
         try:
-            urls: Locator = page.locator(f"a[href] >> text=/{FindLogout.LOGOUTKEYWORDS}/i >> visible=true")
+            urls: Locator = page.locator(f"a[href] >> text=/{Login.LOGOUTKEYWORDS}/i >> visible=true")
         except Error:
             return False
 
