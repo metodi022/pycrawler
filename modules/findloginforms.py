@@ -5,7 +5,7 @@ from logging import Logger
 from typing import List, Optional, Tuple, Callable, Dict, Any
 
 import tld.utils
-from peewee import IntegerField, CharField
+from peewee import IntegerField, CharField, BooleanField
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
 
 from config import Config
@@ -23,6 +23,7 @@ class LoginForm(BaseModel):
     depth = IntegerField()
     formurl = CharField()
     formurlfinal = CharField()
+    success = BooleanField(null=True)
 
 
 class FindLoginForms(Module):

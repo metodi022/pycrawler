@@ -4,17 +4,28 @@ from logging import Logger
 from typing import List, Tuple, Callable, Optional, cast, Dict, Any
 
 import tld
+from peewee import CharField, DateField, DoesNotExist
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Error, Locator
 
 from config import Config
-from database.dequedb import DequeDB
-from database.postgres import Postgres
+from database import DequeDB, BaseModel, database
 from modules.acceptcookies import AcceptCookies
-from modules.findloginforms import FindLoginForms
+from modules.findloginforms import FindLoginForms, LoginForm
 from modules.module import Module
 from utils import get_locator_count, get_locator_nth, CLICKABLES, \
     get_locator_attribute, get_outer_html, invoke_click, SSO, get_label_for, \
     get_url_full_with_query_fragment, get_visible_extra
+
+
+class Account(BaseModel):
+    site = CharField()
+    email = CharField()
+    username = CharField()
+    password = CharField()
+    firstname = CharField()
+    lastname = CharField()
+    birthday = DateField()
+    gender = CharField()
 
 
 class Login(Module):
@@ -26,26 +37,19 @@ class Login(Module):
     LOGOUTKEYWORDS = r'log.?out|sign.?out|log.?off|sign.?off|exit|quit|invalidate|ab.?melden|' \
                      r'aus.?loggen|ab.?meldung|verlassen|aus.?treten|annullieren'
 
-    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
-                 state: Dict[str, Any]) -> None:
-        super().__init__(job_id, crawler_id, database, log, state)
+    def __init__(self, job_id: int, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
+        super().__init__(job_id, crawler_id, log, state)
         self.login = False
         self.loginurl: Optional[str] = None
-        self._account: Optional[List[Tuple[str, str, str, str, str]]] = None
+        self._account: Optional[Account] = None
         self._cookies: Optional[AcceptCookies] = None
 
     @staticmethod
-    def register_job(database: Postgres, log: Logger) -> None:
-        FindLoginForms.register_job(database, log)
-
-        database.invoke_transaction(
-            "CREATE TABLE IF NOT EXISTS LOGINS (rank INT NOT NULL, job INT NOT NULL, "
-            "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, loginform TEXT, "
-            "loginformfinal TEXT, success BOOLEAN NOT NULL, captcha BOOLEAN NOT NULL, "
-            "error BOOLEAN NOT NULL, verification BOOLEAN NOT NULL, falsepos BOOLEAN NOT NULL, "
-            "successfinal BOOLEAN NOT NULL);",
-            None, False)
-        log.info('Create LOGINS table IF NOT EXISTS')
+    def register_job(log: Logger) -> None:
+        FindLoginForms.register_job(log)
+        log.info('Create accounts table')
+        with database:
+            database.create_tables([Account])
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
@@ -58,17 +62,14 @@ class Login(Module):
         if Config.ACCEPT_COOKIES:
             self._cookies = cast(AcceptCookies, modules[0])
 
-        # Get account details from database
-        self._account = self._database.invoke_transaction(
-            "SELECT email, username, password, first_name, last_name FROM accounts WHERE %s LIKE "
-            "CONCAT(%s, site, %s)", (self.domainurl, '%', '%'), True)
-
-        # Check if we got credentials for the given site
-        if self._account is None or len(self._account) == 0:
-            self._log.info(f"Found no credentials for {self.domainurl}")
+        # Get account from database
+        try:
+            self._account = Account.get(site=self.site)
+        except DoesNotExist:
+            self._log.info(f"Found no credentials for {self.site}")
             return
 
-        self._account = cast(List[Tuple[str, str, str, str, str]], self._account)
+        self._account = cast(Account, self._account)
 
         if self._state.get('Login', None) is not None:
             self.login = True
@@ -76,24 +77,29 @@ class Login(Module):
             return
 
         # Get URLs with login forms for given site
-        url_forms: Optional[List[Tuple[str]]] = self._database.invoke_transaction(
-            "SELECT loginform FROM LOGINFORMS WHERE url=%s", (self.domainurl,), True)
-
-        # Check if we got URLs with login forms
-        if url_forms is None or len(url_forms) == 0:
-            self._log.info(f"Found no login URLs for {self.domainurl}")
+        url_forms = LoginForm.select(LoginForm.formurl).where(LoginForm.site == self.site).execute()
+        if url_forms.count == 0:
+            self._log.info(f"Found no login URLs for {self.site}")
             return
 
-        # Iterate over login form URLs
-        for url_form in url_forms:
-            self._log.info(f"Get login URL {url_form[0]}")
+        account: Tuple[str, str, str, str, str] = cast(Tuple[str, str, str, str, str],
+                                                       (self._account.email,
+                                                        self._account.username,
+                                                        self._account.password,
+                                                        self._account.firstname,
+                                                        self._account.lastname))
 
-            if not Login.login(browser, context, self.domainurl, url_form[0], self._cookies, self._account[0]):
+        # Iterate over login form URLs
+        url_form: str
+        for url_form in url_forms:
+            self._log.info(f"Get login URL {url_form}")
+
+            if not Login.login(browser, context, self.site, url_form, self._cookies, account):
                 continue
 
-            self._log.info(f"Log in successful for {url_form[0]}")
+            self._log.info(f"Log in successful for {url_form}")
             self.login = True
-            self.loginurl = url_form[0]
+            self.loginurl = url_form
             self._state['Login'] = self.loginurl
             return
 
