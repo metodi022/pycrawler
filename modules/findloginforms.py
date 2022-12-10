@@ -5,14 +5,24 @@ from logging import Logger
 from typing import List, Optional, Tuple, Callable, Dict, Any
 
 import tld.utils
+from peewee import IntegerField, CharField
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
 
 from config import Config
-from database.dequedb import DequeDB
-from database.postgres import Postgres
+from database import DequeDB, database, BaseModel
 from modules.module import Module
 from utils import get_tld_object, get_url_origin, get_locator_count, get_locator_nth, \
     invoke_click, CLICKABLES, get_url_full, SSO, get_outer_html
+
+
+class LoginForm(BaseModel):
+    rank = IntegerField()
+    job = IntegerField()
+    crawler = IntegerField()
+    site = CharField()
+    depth = IntegerField()
+    formurl = CharField()
+    formurlfinal = CharField()
 
 
 class FindLoginForms(Module):
@@ -20,19 +30,15 @@ class FindLoginForms(Module):
         Module to automatically find login forms.
     """
 
-    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
-                 state: Dict[str, Any]) -> None:
-        super().__init__(job_id, crawler_id, database, log, state)
+    def __init__(self, job_id: int, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
+        super().__init__(job_id, crawler_id, log, state)
         self._found: int = 0
 
     @staticmethod
-    def register_job(database: Postgres, log: Logger) -> None:
-        database.invoke_transaction(
-            "CREATE TABLE IF NOT EXISTS LOGINFORMS (rank INT NOT NULL, job INT NOT NULL, "
-            "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, loginform TEXT NOT NULL, "
-            "loginformfinal TEXT NOT NULL, depth INT NOT NULL, fromurl TEXT, fromurlfinal TEXT);",
-            None, False)
-        log.info('Create LOGINFORMS table IF NOT EXISTS')
+    def register_job(log: Logger) -> None:
+        log.info('Create login form table')
+        with database:
+            database.create_tables([LoginForm])
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
@@ -45,7 +51,7 @@ class FindLoginForms(Module):
         self._found = self._state.get('FindLoginForms', self._found)
         self._state['FindLoginForms'] = self._found
 
-        temp: Optional[tld.utils.Result] = get_tld_object(self.domainurl)
+        temp: Optional[tld.utils.Result] = get_tld_object(self.site)
         if temp is None:
             return
 
@@ -72,19 +78,20 @@ class FindLoginForms(Module):
         if form is not None:
             self._found += 1
             self._state['FindLoginForms'] = self._found
-
-            self._database.invoke_transaction(
-                "INSERT INTO LOGINFORMS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (
-                    self.rank, self.job_id, self.crawler_id, self.domainurl, self.currenturl,
-                    page.url, self.depth, url[3][-1][0] if len(url[3]) > 0 else None,
-                    url[3][-1][1] if len(url[3]) > 0 else None), False)
+            LoginForm.create(rank=self.rank, job=self.job_id, crawler=self.crawler_id,
+                             site=self.site, depth=self.depth, formurl=self.currenturl,
+                             formurlfinal=page.url)
 
         # If we already found entries or there are still URLs left -> stop here
         if self._found > 0 or len(context_database) > 0:
             return
 
+        # Do not use search engine without recursive option
+        if not Config.RECURSIVE or Config.DEPTH <= 0:
+            return
+
         # Finally, use search engine with login keyword
-        context_database.add_url((urllib.parse.quote(f"https://www.google.com/search?q=\"login\" site:{self.domainurl}"), Config.DEPTH - 1, self.rank, []))
+        context_database.add_url((urllib.parse.quote(f"https://www.google.com/search?q=\"login\" site:{self.site}"), Config.DEPTH - 1, self.rank, []))
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         def filt(url: tld.utils.Result) -> bool:
@@ -130,12 +137,24 @@ class FindLoginForms(Module):
         try:
             check_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|proceed|' \
                               r'fortfahren|anmeldung|einmeldung|submit)/i'
-            button: Locator = form.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
+            button1: Locator = form.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
         except Error:
             return False
 
+        # Find if there is registration link
+        button2: Optional[Locator] = None
+        try:
+            check_str = r'/log.?in|sing.?in|logge/i'
+            button2 = form.locator(f"a[href] >> text={check_str} >> visible=true")
+        except Error:
+            # Ignored
+            pass
+
+        # Forms that are not registration or login forms
+        misc_form: bool = re.search(r'search|news.?letter|subscribe', get_outer_html(form) or '', flags=re.I) is not None
+
         # Return true if there is at least one login button in the form and avoid false positives
-        return get_locator_count(button) > 0 and re.search(r'search|news.?letter|subscribe', get_outer_html(form) or '', flags=re.I) is None
+        return get_locator_count(button1) > 0 and get_locator_count(button2) == 0 and not misc_form
 
     @staticmethod
     def _find_login_form(page: Page) -> Optional[Locator]:
