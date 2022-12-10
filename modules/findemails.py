@@ -5,31 +5,39 @@ from typing import List, Tuple, MutableSet, Optional, Dict, Any
 
 import nostril  # https://github.com/casics/nostril
 import tld.utils
+from peewee import IntegerField, CharField, BooleanField
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Error
 
 from config import Config
-from database.dequedb import DequeDB
-from database.postgres import Postgres
+from database import DequeDB, BaseModel, database
 from modules.module import Module
 from utils import get_tld_object, get_url_origin
 
 
-class FindContactsEmail(Module):
+class Email(BaseModel):
+    rank = IntegerField()
+    job = IntegerField()
+    crawler = IntegerField()
+    site = CharField()
+    depth = IntegerField()
+    email = CharField()
+    nonsense = BooleanField()
+    fromurl = CharField()
+    fromurlfinal = CharField()
+
+
+class FindEmails(Module):
     EMAILSRE: str = r'[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+'
 
-    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
-                 state: Dict[str, Any]) -> None:
-        super().__init__(job_id, crawler_id, database, log, state)
+    def __init__(self, job_id: int, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
+        super().__init__(job_id, crawler_id, log, state)
         self._seen: MutableSet[str] = set()
 
     @staticmethod
-    def register_job(database: Postgres, log: Logger) -> None:
-        database.invoke_transaction(
-            "CREATE TABLE IF NOT EXISTS CONTACTSEMAIL (rank INT NOT NULL, job INT NOT NULL,"
-            "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, emailurl TEXT NOT NULL, "
-            "emailurlfinal TEXT NOT NULL, depth INT NOT NULL, email TEXT NOT NULL, "
-            "nonsense BOOLEAN NOT NULL, fromurl TEXT, fromurlfinal TEXT)", None, False)
-        log.info('Create CONTACTSEMAIL table IF NOT EXISTS')
+    def register_job(log: Logger) -> None:
+        log.info('Create email table')
+        with database:
+            database.create_tables([Email])
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
@@ -42,7 +50,7 @@ class FindContactsEmail(Module):
         self._seen = self._state.get('FindContactsEmail', self._seen)
         self._state['FindContactsEmail'] = self._seen
 
-        temp: Optional[tld.utils.Result] = get_tld_object(self.domainurl)
+        temp: Optional[tld.utils.Result] = get_tld_object(self.site)
         if temp is None:
             return
 
@@ -54,8 +62,7 @@ class FindContactsEmail(Module):
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module], repetition: int) -> None:
-        super().receive_response(browser, context, page, responses, context_database, url,
-                                 final_url, start, modules, repetition)
+        super().receive_response(browser, context, page, responses, context_database, url, final_url, start, modules, repetition)
 
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
@@ -68,7 +75,7 @@ class FindContactsEmail(Module):
             return
 
         email: str
-        for email in re.findall(FindContactsEmail.EMAILSRE, html):
+        for email in re.findall(FindEmails.EMAILSRE, html):
             if email in self._seen:
                 continue
             self._seen.add(email)
@@ -86,8 +93,6 @@ class FindContactsEmail(Module):
                 # Ignored
                 pass
 
-            self._database.invoke_transaction(
-                'INSERT INTO CONTACTSEMAIL VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
-                (self.rank, self.job_id, self.crawler_id, self.domainurl, self.currenturl, page.url,
-                 self.depth, email, nonsense, url[3][-1][0] if len(url[3]) > 0 else None,
-                 url[3][-1][1] if len(url[3]) > 0 else None), False)
+            Email.create(rank=self.rank, job=self.job_id, crawler=self.crawler_id, site=self.site,
+                         depth=self.depth, email=email, nonsense=nonsense, fromurl=self.currenturl,
+                         finalurl=page.url)

@@ -40,7 +40,6 @@ class Crawler:
         self._modules += [AcceptCookies(job_id, crawler_id, log, self._state)] if Config.ACCEPT_COOKIES else []
         self._modules += [CollectURLs(job_id, crawler_id, log, self._state)] if Config.RECURSIVE else []
         self._modules += self._initialize_modules(modules, job_id, crawler_id, log, self._state)
-        self._modules += [SaveStats(job_id, crawler_id, log, self._state)]
 
         # Prepare filters
         url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
