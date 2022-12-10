@@ -6,12 +6,13 @@ from typing import Dict, Any, Tuple, List, Callable, Optional
 
 import tld
 from peewee import IntegerField, CharField
-from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator
+from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
 
 from config import Config
 from database import DequeDB, BaseModel, database
 from modules.module import Module
-from utils import get_url_full
+from utils import get_url_full, get_locator_count, get_tld_object, get_url_origin, CLICKABLES, \
+    get_outer_html, get_locator_nth, SSO, invoke_click
 
 
 class RegistrationForm(BaseModel):
@@ -35,7 +36,7 @@ class FindRegistrationForms(Module):
 
     @staticmethod
     def register_job(log: Logger) -> None:
-        log.info('Create registration form database')
+        log.info('Create registration form table')
         with database:
             database.create_tables([RegistrationForm])
 
@@ -49,6 +50,18 @@ class FindRegistrationForms(Module):
 
         self._found = self._state.get('FindRegistrationForms', self._found)
         self._state['FindRegistrationForms'] = self._found
+
+        temp: Optional[tld.utils.Result] = get_tld_object(self.site)
+        if temp is None:
+            return
+
+        # Add common URLs for registration
+        url_origin: str = get_url_origin(temp)
+        context_database.add_url((url_origin + '/register/', Config.DEPTH, self.rank, []))
+        context_database.add_url((url_origin + '/registration/', Config.DEPTH, self.rank, []))
+        context_database.add_url((url_origin + '/signup/', Config.DEPTH, self.rank, []))
+        context_database.add_url((url_origin + '/account/', Config.DEPTH, self.rank, []))
+        context_database.add_url((url_origin + '/profile/', Config.DEPTH, self.rank, []))
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
@@ -67,9 +80,9 @@ class FindRegistrationForms(Module):
         if form is not None:
             self._found += 1
             self._state['FindRegistrationForms'] = self._found
-            RegistrationForm(rank=self.rank, job=self.job_id, crawler=self.crawler_id,
-                             site=self.site, depth=self.depth, formurl=self.currenturl,
-                             formurlfinal=page.url)
+            RegistrationForm.create(rank=self.rank, job=self.job_id, crawler=self.crawler_id,
+                                    site=self.site, depth=self.depth, formurl=self.currenturl,
+                                    formurlfinal=page.url)
 
         # If we already found entries or there are still URLs left -> stop here
         if self._found > 0 or len(context_database) > 0:
@@ -96,6 +109,143 @@ class FindRegistrationForms(Module):
         filters.append(filt)
 
     @staticmethod
-    def find_registration_form(page: Page, interact: bool = True) -> Optional[Locator]:
-        # TODO
+    def verify_registration_form(form: Locator) -> bool:
+        """
+        Check if given locator is a registration form.
+
+        Args:
+            form (Locator): locator
+
+        Returns:
+            true if the form is a registration form, otherwise false
+        """
+
+        # Get all relevant fields
+        try:
+            password_fields: int = get_locator_count(form.locator('input[type="password"]:visible'))
+            text_fields: int = get_locator_count(
+                form.locator('input[type="email"]:visible')) + get_locator_count(
+                form.locator('input[type="text"]:visible')) + get_locator_count(
+                form.locator('input:not([type]):visible'))
+        except Error:
+            return False
+
+        # If there are two password fields -> it's a registration form
+        if password_fields >= 2:
+            return True
+
+        # Find if there are registration buttons
+        try:
+            check_str: str = r'/(regist|sign.?up|continue|next|weiter|melde|proceed|submit' \
+                             r'fortfahren|anmeldung)/i'
+            button1: Locator = form.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
+        except Error:
+            return False
+
+        # If there is less than one text field -> it's not a registration form
+        if text_fields < 1:
+            return False
+
+        # Forms that are not registration or login forms
+        misc_form: bool = re.search(r'search|news.?letter|subscribe', get_outer_html(form) or '', flags=re.I) is not None
+
+        # It's not a login form, so return safely
+        if text_fields > 2:
+            return get_locator_count(button1) > 0 and not misc_form
+
+        # Find if there is login link
+        button2: Optional[Locator] = None
+        try:
+            check_str = r'/regist|sing.?up/i'
+            button2 = form.locator(f"a[href] >> text={check_str} >> visible=true")
+        except Error:
+            # Ignored
+            pass
+
+        # Return true if there is at least one registration button in the form and avoid false positives
+        return get_locator_count(button1) > 0 and get_locator_count(button2) == 0 and not misc_form
+
+    @staticmethod
+    def _find_registration_form(page: Page) -> Optional[Locator]:
+        # Find all forms on a page
+        try:
+            forms: Locator = page.locator('form:visible,fieldset:visible')
+        except Error:
+            # Ignored
+            return None
+
+        # Check if each form is a registration form
+        for i in range(get_locator_count(forms)):
+            form: Optional[Locator] = get_locator_nth(forms, i)
+            if form is None or not FindRegistrationForms.verify_registration_form(form):
+                continue
+            return form
+
+        # If we did not find registration forms, try to find password field
+        try:
+            form = page.locator('input[type="password"]:visible').locator('..')
+        except Error:
+            return None
+
+        # Go up the node tree of the password field and search for registration forms (w/o form tags)
+        while form.count() == 1:
+            # Get relevant fields
+            passwords: int = get_locator_count(form.locator('input[type="password"]:visible'))
+            text_fields: int = get_locator_count(
+                form.locator('input[type="email"]:visible')) + get_locator_count(
+                form.locator('input[type="text"]:visible')) + get_locator_count(
+                form.locator('input:not([type]):visible'))
+
+            # Stop earlier if it cannot be a registration form
+            if passwords > 2 or text_fields > 15:
+                return None
+
+            # Check if element tree is a registration form
+            if FindRegistrationForms.verify_registration_form(form):
+                return form
+
+            # Go up the node tree
+            try:
+                form = form.locator('..')
+            except Error:
+                return None
+
         return None
+
+    @staticmethod
+    def find_registration_form(page: Page, interact: bool = True) -> Optional[Locator]:
+        # Get registration form from page
+        form: Optional[Locator] = FindRegistrationForms._find_registration_form(page)
+        if form is not None:
+            return form
+
+        # If you don't want to interact with the page
+        # and click on potential login buttons, stop here
+        if not interact:
+            return None
+
+        # Get all buttons with registration keywords
+        try:
+            check_str: str = r'/regist|sign.?up|melde|user.?name|e.?mail|nutzer|next|' \
+                             r'continue|proceed|fortfahren|weiter|anmeldung/i'
+            buttons: Locator = page.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
+        except Error:
+            return None
+
+        # Click each button with login keyword
+        for i in range(get_locator_count(buttons, page)):
+            button: Optional[Locator] = get_locator_nth(buttons, i)
+            if button is None:
+                continue
+
+            # Avoid clicking SSO login buttons
+            if re.search(SSO, get_outer_html(button) or '', flags=re.I) is not None:
+                continue
+
+            invoke_click(page, button, 2000)
+
+            form = FindRegistrationForms._find_registration_form(page)
+            if form is not None:
+                break
+
+        return form
