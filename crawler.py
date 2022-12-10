@@ -13,6 +13,7 @@ from database import DequeDB, URL
 from modules.acceptcookies import AcceptCookies
 from modules.collecturls import CollectURLs
 from modules.module import Module
+from modules.savestats import SaveStats
 from utils import get_screenshot
 
 
@@ -39,6 +40,7 @@ class Crawler:
         self._modules += [AcceptCookies(job_id, crawler_id, log, self._state)] if Config.ACCEPT_COOKIES else []
         self._modules += [CollectURLs(job_id, crawler_id, log, self._state)] if Config.RECURSIVE else []
         self._modules += self._initialize_modules(modules, job_id, crawler_id, log, self._state)
+        self._modules += [SaveStats(job_id, crawler_id, log, self._state)]
 
         # Prepare filters
         url_filter_out: List[Callable[[tld.utils.Result], bool]] = []

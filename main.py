@@ -18,6 +18,7 @@ from crawler import Crawler
 from database import database, URL
 from loader.csvloader import CSVLoader
 from modules.module import Module
+from modules.savestats import SaveStats
 
 
 def main() -> int:
@@ -87,7 +88,7 @@ def main() -> int:
         for module in modules:
             module.register_job(log)
 
-        # SaveStats.register_job(log)  # TODO improve
+        SaveStats.register_job(log)
 
     # Prepare crawlers
     crawlers: List[Process] = []

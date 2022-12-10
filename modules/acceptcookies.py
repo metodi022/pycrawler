@@ -122,13 +122,6 @@ class AcceptCookies(Module):
             responses.append(None)
             return
 
-        # Verify that response is valid
-        if response is None or response.status >= 400:
-            # Make sure to add the new response for the following models
-            start.append(temp)
-            responses.append(None)
-            return
-
         page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
         # Make sure to add the new response for the following models
