@@ -1,25 +1,23 @@
 import argparse
+import ast
 import importlib
 import os
 import pathlib
 import re
-import signal
 import sys
 import time
 from datetime import datetime
 from logging import Logger, FileHandler, Formatter
 from multiprocessing import Process
-from typing import List, Type, Tuple, Optional, cast
+from typing import List, Type, Tuple, Optional
+
+from peewee import DoesNotExist
 
 from config import Config
 from crawler import Crawler
-from database.postgres import Postgres
+from database import database, URL
 from loader.csvloader import CSVLoader
-from loader.loader import Loader
-from modules.acceptcookies import AcceptCookies
-from modules.collecturls import CollectUrls
 from modules.module import Module
-from modules.savestats import SaveStats
 
 
 def main() -> int:
@@ -27,36 +25,32 @@ def main() -> int:
     args_parser = argparse.ArgumentParser()
     args_parser.add_argument("-o", "--log", help="path to directory where output log will be saved",
                              type=pathlib.Path)
-    args_parser.add_argument("-f", "--urls", help="path to file with urls", type=pathlib.Path)
+    args_parser.add_argument("-f", "--urlspath", help="path to file with urls", type=pathlib.Path)
+    args_parser.add_argument("-u", "--urls", help="urls to crawl", nargs='+', type=ast.literal_eval)
     args_parser.add_argument("-m", "--modules", help="which modules the crawler will run",
-                             type=str, required=True, nargs='*')
+                             type=str, required=True, nargs='+')
     args_parser.add_argument("-j", "--job", help="unique job id for crawl", type=int, required=True)
     args_parser.add_argument("-c", "--crawlers", help="how many crawlers will run concurrently",
                              type=int, required=True)
-    args_parser.add_argument("-s", "--setup", help="run setup for DB and modules",
-                             action='store_true')
+    args_parser.add_argument("-i", "--crawlerid", default=1, type=int,
+                             help="starting crawler id (default 1); must be > 0")
 
     # Parse command line arguments
     args = vars(args_parser.parse_args())
     job_id: int = args.get('job') or 0
     log_path: pathlib.Path = args.get('log') or Config.LOG
-    urls_path: Optional[pathlib.Path] = args.get('urls')
-    setup: bool = args.get('setup') or False
+    urls_path: Optional[pathlib.Path] = args.get('urlspath')
+    urls: Optional[List[Tuple[int, str]]] = args.get('urls')
 
     # Verify arguments
-    if not log_path.exists() and log_path.is_dir():
+    if not (log_path.exists() and log_path.is_dir()):
         raise RuntimeError('Path to directory for log output is incorrect')
 
-    if setup and not urls_path:
-        raise RuntimeError('Setup without path to urls file')
-
-    urls_path = cast(pathlib.Path, urls_path)
-
-    if setup and not urls_path.exists() and not urls_path.is_dir():
+    if urls_path is not None and not (urls_path.exists() or urls_path.is_dir()):
         raise RuntimeError('Path to file with urls is incorrect')
 
-    if (args.get('crawlers') or 0) <= 0:
-        raise RuntimeError('Invalid number of crawlers')
+    if args.get('crawlers') <= 0 or args.get('crawlerid') <= 0:
+        raise RuntimeError('Invalid number of crawlers or starting crawler id.')
 
     # Main log
     if not (log_path / 'screenshots').exists():
@@ -75,27 +69,35 @@ def main() -> int:
     modules: List[Type[Module]] = _get_modules((args.get('modules') or []))
 
     # Run setup if needed
-    if setup and urls_path:
-        loader: Loader = CSVLoader(urls_path)
-        database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
-                                      Config.PORT)
-        database.register_job(job_id, (args.get('crawlers') or 0), loader)
-        CollectUrls.register_job(database, log)
-        AcceptCookies.register_job(database, log)
+    if (urls_path or urls) is not None:
+        with database:
+            database.create_tables([URL])
+
+        # Speedup by using atomic transaction
+        with database.atomic():
+            # Iterate over URLs and add them to database
+            entry: Tuple[int, str]
+            for entry in (CSVLoader(urls_path) if urls_path is not None else urls):
+                if entry[0] <= 0:
+                    raise RuntimeError('Invalid site rank.')
+                crawler_id: int = ((entry[0] - 1) % args.get('crawlers')) + args.get('crawlerid')
+                url: str = ('https://' if 'http' not in entry[1] else '') + entry[1]
+                URL.create(job=job_id, crawler=crawler_id, url=url, rank=entry[0])
+
         for module in modules:
-            module.register_job(database, log)
-        SaveStats.register_job(database, log)
-        database.disconnect()
+            module.register_job(log)
+
+        # SaveStats.register_job(log)  # TODO improve
 
     # Prepare crawlers
     crawlers: List[Process] = []
-    for i in range(1, (args.get('crawlers') or 0) + 1):
-        process = Process(target=_start_crawler1, args=(job_id, i, log_path, modules))
+    for i in range(0, args.get('crawlers')):
+        process = Process(target=_start_crawler1, args=(job_id, i + args.get('crawlerid'), log_path, modules))
         crawlers.append(process)
 
     for i, crawler in enumerate(crawlers):
         crawler.start()
-        log.info(f"Start crawler {i + 1} with PID {crawler.pid}")
+        log.info(f"Start crawler {i + args.get('crawlerid')} with PID {crawler.pid}")
 
     # Wait for crawlers to finish
     for crawler in crawlers:
@@ -113,24 +115,20 @@ def _get_modules(module_names: List[str]) -> List[Type[Module]]:
     return result
 
 
-def _handler(signum, frame):
-    print(f"SIGNUM {signum} FRAME {frame}")
-
-
 def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
                     modules: List[Type[Module]]) -> None:
-    signal.signal(signal.SIGINT, _handler)
-    signal.signal(signal.SIGTERM, _handler)
 
     log = _get_logger(job_id, crawler_id, log_path)
-    database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
-                                  Config.PORT)
+    url: Optional[URL] = None
+    try:
+        url = URL.get(job=job_id, crawler=crawler_id, code=None)
+    except DoesNotExist:
+        # Ignored
+        pass
 
-    url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = database.get_url(job_id,
-                                                                                  crawler_id)
     while url:
         crawler: Process = Process(target=_start_crawler2,
-                                   args=(job_id, crawler_id, url, log_path, modules))
+                                   args=(job_id, crawler_id, (url.url, 0, url.rank, []), log_path, modules))
         crawler.start()
 
         while crawler.is_alive():
@@ -160,17 +158,17 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
                                        args=(job_id, crawler_id, url, log_path, modules))
             crawler.start()
 
-        url = database.get_url(job_id, crawler_id)
+        try:
+            url = URL.get(job=job_id, crawler=crawler_id, code=None)
+        except DoesNotExist:
+            url = None
 
 
 def _start_crawler2(job_id: int, crawler_id: int, url: Tuple[str, int, int, List[Tuple[str, str]]],
                     log_path: pathlib.Path, modules: List[Type[Module]]) -> None:
     log = _get_logger(job_id, crawler_id, log_path)
-    database: Postgres = Postgres(Config.DATABASE, Config.USER, Config.PASSWORD, Config.HOST,
-                                  Config.PORT)
-
     log.info('Start crawler')
-    Crawler(job_id, crawler_id, url, database, log, modules).start_crawl()
+    Crawler(job_id, crawler_id, url, log, modules).start_crawl()
     log.info('Stop crawler')
 
 

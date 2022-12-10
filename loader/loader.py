@@ -16,3 +16,6 @@ class Loader:
 
     def __next__(self) -> Tuple[int, str]:
         raise NotImplementedError
+
+    def __len__(self) -> int:
+        raise NotImplementedError

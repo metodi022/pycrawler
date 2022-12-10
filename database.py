@@ -1,6 +1,28 @@
 from collections import deque
 from typing import Optional, Tuple, Deque, MutableSet, List
 
+from peewee import Model, CharField, IntegerField, TextField, PostgresqlDatabase
+
+from config import Config
+
+# Change the database to whatever you want
+database = PostgresqlDatabase(Config.DATABASE, user=Config.USER, password=Config.PASSWORD,
+                              host=Config.HOST, port=Config.PORT)
+
+
+class BaseModel(Model):
+    class Meta:
+        database = database
+
+
+class URL(BaseModel):
+    job = IntegerField()
+    crawler = IntegerField()
+    url = CharField()
+    rank = IntegerField()
+    code = IntegerField(null=True)
+    error = TextField(null=True)
+
 
 class DequeDB:
     def __init__(self) -> None:

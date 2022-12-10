@@ -7,8 +7,7 @@ import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error, Frame
 
 from config import Config
-from database.dequedb import DequeDB
-from database.postgres import Postgres
+from database import DequeDB
 from modules.module import Module
 from utils import get_url_origin, get_tld_object, get_locator_nth, invoke_click, CLICKABLES, \
     get_outer_html, SSO, get_locator_count
@@ -25,9 +24,8 @@ class AcceptCookies(Module):
     CHECK_GER: str = '/(\\W|^)(stimm|verstanden|versteh|akzeptier|ja(\\W|$)|weiter(\\W|$)|' \
                      'annehm|bestätig|willig|zulassen(\\W|$)|lasse)/i'
 
-    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
-                 state: Dict[str, Any]) -> None:
-        super().__init__(job_id, crawler_id, database, log, state)
+    def __init__(self, job_id: int, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
+        super().__init__(job_id, crawler_id, log, state)
         self._urls: MutableSet[str] = set()
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,

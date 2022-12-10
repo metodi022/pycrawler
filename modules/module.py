@@ -5,8 +5,7 @@ from typing import List, Tuple, Callable, Optional, Dict, Any
 import tld.utils
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
-from database.dequedb import DequeDB
-from database.postgres import Postgres
+from database import DequeDB
 
 
 class Module:
@@ -14,36 +13,32 @@ class Module:
     A baseclass from which all modules inherit.
     """
 
-    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
-                 state: Dict[str, Any]) -> None:
+    def __init__(self, job_id: int, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
         """
         Initializes module instance.
 
         Args:
             job_id (int): job id
             crawler_id (int): crawler id
-            database (Postgres): database
             log (Logger): log
             state (Dict[str, Any]): state
         """
         self.job_id: int = job_id
         self.crawler_id: int = crawler_id
-        self.domainurl: str = ''
+        self.site: str = ''
         self.currenturl: str = ''
         self.depth: int = 0
         self.rank: int = 0
         self.ready: bool = False
-        self._database: Postgres = database
         self._log: Logger = log
         self._state: Dict[str, Any] = state
 
     @staticmethod
-    def register_job(database: Postgres, log: Logger) -> None:
+    def register_job(log: Logger) -> None:
         """
         Initialize job preparations, for example creation of database.
 
         Args:
-            database (Postgres): database
             log (Logger): log
         """
         pass
@@ -63,7 +58,7 @@ class Module:
             modules (List[Module]): list of modules currently active modules
         """
         if not self.ready:
-            self.domainurl = self._state.get('Module', url[0])
+            self.site = self._state.get('Module', url[0])
             self.rank = url[2]
             self._state['Module'] = url[0]
 
