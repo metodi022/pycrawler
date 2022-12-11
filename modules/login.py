@@ -77,8 +77,8 @@ class Login(Module):
             return
 
         # Get URLs with login forms for given site
-        url_forms = LoginForm.select(LoginForm.formurl).where(LoginForm.site == self.site).execute()
-        if url_forms.count == 0:
+        formsurls = LoginForm.select().where(LoginForm.site == self.site).execute()
+        if formsurls.count == 0:
             self._log.info(f"Found no login URLs for {self.site}")
             return
 
@@ -90,17 +90,22 @@ class Login(Module):
                                                         self._account.lastname))
 
         # Iterate over login form URLs
-        url_form: str
-        for url_form in url_forms:
-            self._log.info(f"Get login URL {url_form}")
+        formurl: LoginForm
+        for formurl in formsurls:
+            self._log.info(f"Get login URL {formurl.formurl}")
 
-            if not Login.login(browser, context, self.site, url_form, self._cookies, account):
+            if not Login.login(browser, context, self.site, formurl.formurl, self._cookies, account):
+                if formurl.success is None:
+                    formurl.success = False
+                    formurl.save()
                 continue
 
-            self._log.info(f"Log in successful for {url_form}")
+            self._log.info(f"Login success {formurl.formurl}")
             self.login = True
-            self.loginurl = url_form
+            self.loginurl = formurl
             self._state['Login'] = self.loginurl
+            formurl.success = True
+            formurl.save()
             return
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,

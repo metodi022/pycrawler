@@ -112,15 +112,13 @@ class CollectURLs(Module):
             # Add link
             urls.append(parsed_link)
 
-        self._log.info(f"Collected {min(len(urls), self._max_urls)} URLs at depth {self.depth}")
+        self._log.info(f"Find {min(len(urls), self._max_urls)} URLs at depth {self.depth}")
 
-        # Shuffle the URLs, so that we prioritize visiting the URLs that appear in the beginning and
-        # in the end of the page
+        # Shuffle the URLs, so that we prioritize visiting the URLs that appear in the beginning and in the end of the page
         urls = urls[:int(len(urls) * 0.15)] + urls[int(len(urls) * 0.85):] + urls[int(len(
             urls) * 0.15):int(len(urls) * 0.85)]
 
-        # For each found URL, add it to the database, while making sure not to exceed the max URL
-        # limit
+        # For each found URL, add it to the database, while making sure not to exceed the max URL limit
         for parsed_link in urls:
             context_database.add_url_force((get_url_full_with_query_fragment(parsed_link),
                                             self.depth + 1, self.rank,

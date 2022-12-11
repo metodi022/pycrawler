@@ -61,15 +61,13 @@ def main() -> int:
     log.setLevel(Config.LOG_LEVEL)
     log.addHandler(handler)
 
-    # Prepare database
-    log.info('Load database with URLs')
-
     # Prepare modules
-    log.info('Load modules with URLs')
     modules: List[Type[Module]] = _get_modules((args.get('modules') or []))
 
     # Run setup if needed
     if (urls_path or urls) is not None:
+        log.info('Load database with URLs')
+
         with database:
             database.create_tables([URL])
 
@@ -94,8 +92,8 @@ def main() -> int:
         crawlers.append(process)
 
     for i, crawler in enumerate(crawlers):
-        crawler.start()
         log.info(f"Start crawler {i + args.get('crawlerid')} with PID {crawler.pid}")
+        crawler.start()
 
     # Wait for crawlers to finish
     for crawler in crawlers:
