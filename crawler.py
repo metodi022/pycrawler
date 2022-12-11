@@ -13,7 +13,6 @@ from database import DequeDB, URL
 from modules.acceptcookies import AcceptCookies
 from modules.collecturls import CollectURLs
 from modules.module import Module
-from modules.savestats import SaveStats
 from utils import get_screenshot
 
 

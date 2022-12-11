@@ -2,11 +2,26 @@ import json
 from logging import Logger
 from typing import List, Optional, Tuple
 
+from peewee import CharField, IntegerField, TextField
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
-from database.dequedb import DequeDB
-from database.postgres import Postgres
+from database import DequeDB, BaseModel, database
 from modules.module import Module
+
+
+class Header(BaseModel):
+    rank = IntegerField()
+    job = IntegerField()
+    crawler = IntegerField()
+    site = CharField()
+    depth = IntegerField()
+    code = IntegerField()
+    method = CharField()
+    type = CharField()
+    fromurl = CharField()
+    fromurlfinal = CharField()
+    tourl = CharField()
+    headers = TextField()
 
 
 class CollectHeaders(Module):
@@ -15,20 +30,15 @@ class CollectHeaders(Module):
     """
 
     @staticmethod
-    def register_job(database: Postgres, log: Logger) -> None:
-        database.invoke_transaction(
-            "CREATE TABLE IF NOT EXISTS HEADERS (rank INT NOT NULL, job INT NOT NULL,"
-            "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, fromurl TEXT NOT NULL, "
-            "fromurlfinal TEXT NOT NULL, tourl TEXT NOT NULL, code INT NOT NULL, headers TEXT)",
-            None, False)
-        log.info('Create HEADERS table IF NOT EXISTS')
+    def register_job(log: Logger) -> None:
+        log.info('Create header table')
+        with database:
+            database.create_tables([Header])
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
                      modules: List['Module']) -> None:
         super().add_handlers(browser, context, page, context_database, url, modules)
-
-        # TODO improve with response information as well
 
         def handler(response: Response):
             headers: Optional[str]
@@ -37,9 +47,10 @@ class CollectHeaders(Module):
             except ValueError:
                 headers = None
 
-            self._database.invoke_transaction(
-                "INSERT INTO HEADERS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (
-                    self.rank, self.job_id, self.crawler_id, self.domainurl, self.currenturl,
-                    page.url, response.url, response.status, headers), False)
+            Header.create(rank=self.rank, job=self.job_id, crawler=self.crawler_id, site=self.site,
+                          depth=self.depth, code=response.status, method=response.request.method,
+                          type=response.headers.get('content-type', response.request.resource_type),
+                          fromurl=self.currenturl, fromurlfinal=response.frame.url,
+                          tourl=response.url, headers=headers)
 
         page.on('response', handler)
