@@ -10,7 +10,7 @@ from config import Config
 from database import DequeDB
 from modules.module import Module
 from utils import get_url_origin, get_tld_object, get_locator_nth, invoke_click, CLICKABLES, \
-    get_outer_html, SSO, get_locator_count
+    get_outer_html, SSO, get_locator_count, refresh_page
 
 
 class AcceptCookies(Module):
@@ -113,17 +113,4 @@ class AcceptCookies(Module):
             return True
 
         # Refresh the page
-        temp: datetime = datetime.now()
-        try:
-            response = page.goto(self.currenturl, timeout=Config.LOAD_TIMEOUT,
-                                 wait_until=Config.WAIT_LOAD_UNTIL)
-        except Error:
-            start.append(temp)
-            responses.append(None)
-            return
-
-        page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-
-        # Make sure to add the new response for the following models
-        start.append(temp)
-        responses.append(response)
+        refresh_page(page, self.currenturl, responses, start)

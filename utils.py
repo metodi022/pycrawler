@@ -1,13 +1,16 @@
 import os
 import pathlib
 import re
-from typing import Optional
+from datetime import datetime
+from typing import Optional, List
 
 import numpy
 import tld
-from playwright.sync_api import Page, Locator, Error, Frame
+from playwright.sync_api import Page, Locator, Error, Frame, Response
 from sklearn.cluster import dbscan
 from tld.exceptions import TldBadUrl, TldDomainNotFound
+
+from config import Config
 
 CLICKABLES: str = r'button,*[role="button"],*[onclick],input[type="button"],input[type="submit"],' \
                   r'a[href="#"]'
@@ -249,3 +252,19 @@ def get_visible_extra(locator: Optional[Locator]) -> bool:
 def clear_cache(restart: bool, path: pathlib.Path):
     if restart and path.exists():
         os.remove(path)
+
+
+def refresh_page(page: Page, url: str, responses: List[Optional[Response]], start: List[datetime]):
+    temp: datetime = datetime.now()
+    try:
+        response = page.goto(url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+    except Error:
+        start.append(temp)
+        responses.append(None)
+        return
+
+    page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+
+    # Make sure to add the new response for the following models
+    start.append(temp)
+    responses.append(response)
