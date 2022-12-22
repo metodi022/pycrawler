@@ -1,3 +1,4 @@
+import os
 from collections import deque
 from typing import Optional, Tuple, Deque, MutableSet, List
 
@@ -6,8 +7,11 @@ from peewee import Model, CharField, IntegerField, TextField, PostgresqlDatabase
 from config import Config
 
 # Change the database to whatever you want
-database = PostgresqlDatabase(Config.DATABASE, user=Config.USER, password=Config.PASSWORD,
-                              host=Config.HOST, port=Config.PORT)
+database = PostgresqlDatabase(os.environ.get("POSTGRES_DB") or Config.DATABASE,
+                              user=os.environ.get("POSTGRES_USER") or Config.USER,
+                              password=os.environ.get("POSTGRES_PASSWORD") or Config.PASSWORD,
+                              host=os.environ.get("DB_HOST") or Config.HOST,
+                              port=int(os.environ.get("DB_PORT")) or Config.PORT)
 
 
 class BaseModel(Model):
