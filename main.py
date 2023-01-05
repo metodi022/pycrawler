@@ -41,6 +41,10 @@ def main() -> int:
     log_path: pathlib.Path = args.get('log') or Config.LOG
     urls_path: Optional[pathlib.Path] = args.get('urlspath')
     urls: Optional[List[Tuple[int, str]]] = args.get('urls')
+    
+    # Create log path if needed
+    if not log_path.exists():
+        os.mkdir(log_path)
 
     # Verify arguments
     if not (log_path.exists() and log_path.is_dir()):
