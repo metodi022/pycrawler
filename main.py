@@ -66,7 +66,7 @@ def main() -> int:
     log.addHandler(handler)
 
     # Prepare modules
-    modules: List[Type[Module]] = _get_modules((args.get('modules') or []))
+    modules: List[Type[Module]] = _get_modules((args.get('modules')))
 
     # Run setup if needed
     if (urls_path or urls) is not None:

@@ -125,10 +125,12 @@ def get_locator_count(locator: Optional[Locator], page: Optional[Page | Frame] =
 
 
 def get_locator_nth(locator: Optional[Locator], nth: int) -> Optional[Locator]:
-    if locator is None or get_locator_count(locator) < 1:
+    count: int = get_locator_count(locator)
+
+    if locator is None or count < 1:
         return None
 
-    if nth >= get_locator_count(locator):
+    if nth >= count:
         return None
 
     try:
