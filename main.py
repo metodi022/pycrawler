@@ -127,8 +127,7 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
         pass
 
     while url:
-        crawler: Process = Process(target=_start_crawler2,
-                                   args=(job_id, crawler_id, (url.url, 0, url.rank, []), log_path, modules))
+        crawler: Process = Process(target=_start_crawler2, args=(job_id, crawler_id, (url.url, 0, url.rank, []), log_path, modules))
         crawler.start()
 
         while crawler.is_alive():
@@ -152,23 +151,25 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
                 crawler.kill()
                 time.sleep(5)
 
-            crawler.close()
-
-            crawler: Process = Process(target=_start_crawler2,
-                                       args=(job_id, crawler_id, url, log_path, modules))
-            crawler.start()
-
+            if Config.RESTART and (Config.LOG / f"job{job_id}crawler{crawler_id}.cache").exists():
+                crawler.close()
+                crawler = Process(target=_start_crawler2, args=(job_id, crawler_id, url, log_path, modules))
+                crawler.start()
+        
         try:
             url = URL.get(job=job_id, crawler=crawler_id, code=None)
         except DoesNotExist:
             url = None
+        
+        crawler.close()
 
 
 def _start_crawler2(job_id: int, crawler_id: int, url: Tuple[str, int, int, List[Tuple[str, str]]],
                     log_path: pathlib.Path, modules: List[Type[Module]]) -> None:
     log = _get_logger(job_id, crawler_id, log_path)
     log.info('Start crawler')
-    Crawler(job_id, crawler_id, url, log, modules).start_crawl()
+    crawler: Crawler = Crawler(job_id, crawler_id, url, log, modules)
+    crawler.start_crawl()
     log.info('Stop crawler')
 
 
@@ -206,7 +207,7 @@ def _get_line_last(path: str | pathlib.Path) -> str:
                         return ''
                     break
 
-            line = file.readline()
+            line = file.readline() or ''
     return line.decode("utf-8", errors="ignore")
 
 

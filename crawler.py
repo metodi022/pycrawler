@@ -28,8 +28,7 @@ class Crawler:
         self._state: Dict[str, Any] = dict()
 
         # Load previous state
-        if Config.RESTART and (
-                Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
+        if Config.RESTART and (Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
             with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache",
                       mode="rb") as file:
                 self._state = pickle.load(file)
