@@ -130,8 +130,8 @@ class FindRegistrationForms(Module):
         except Error:
             return False
 
-        # If there are two password fields -> it's a registration form
-        if password_fields >= 2:
+        # If there are two or more password fields -> it's a registration form
+        if password_fields > 1:
             return True
 
         # Find if there are registration buttons
@@ -142,18 +142,11 @@ class FindRegistrationForms(Module):
         except Error:
             return False
 
-        # If there is less than one text field -> it's not a registration form
-        if text_fields < 1:
+        # If there are no text fields -> it's not a registration form
+        if text_fields == 0:
             return False
 
-        # Forms that are not registration or login forms
-        misc_form: bool = re.search(r'search|news.?letter|subscribe', get_outer_html(form) or '', flags=re.I) is not None
-
-        # It's not a login form, so return safely
-        if text_fields > 2:
-            return get_locator_count(button1) > 0 and not misc_form
-
-        # Find if there is login link
+        # Find if there is registration link
         button2: Optional[Locator] = None
         try:
             check_str = r'/regist|sing.?up/i'
@@ -161,6 +154,9 @@ class FindRegistrationForms(Module):
         except Error:
             # Ignored
             pass
+        
+        # Forms that are not registration or login forms
+        misc_form: bool = re.search(r'search|news.?letter|subscribe', get_outer_html(form) or '', flags=re.I) is not None
 
         # Return true if there is at least one registration button in the form and avoid false positives
         return get_locator_count(button1) > 0 and get_locator_count(button2) == 0 and not misc_form

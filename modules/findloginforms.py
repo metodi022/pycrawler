@@ -130,8 +130,8 @@ class FindLoginForms(Module):
             return False
 
         # If there is more than one password field -> it's not a login form
-        # If there are not one or two text fields -> it's not a login form
-        if password_fields > 1 or text_fields < 1 or text_fields > 2:
+        # If there are no text fields or more than two text fields -> it's not a login form
+        if password_fields > 1 or text_fields == 0 or text_fields > 2:
             return False
 
         # Find if there are login buttons
@@ -142,7 +142,7 @@ class FindLoginForms(Module):
         except Error:
             return False
 
-        # Find if there is registration link
+        # Find if there is login link
         button2: Optional[Locator] = None
         try:
             check_str = r'/log.?in|sing.?in|logge/i'
