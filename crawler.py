@@ -96,8 +96,7 @@ class Crawler:
             # Save state
             self._state['Crawler'] = context.storage_state()
             if Config.RESTART:
-                with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache",
-                          mode='wb') as file:
+                with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache", mode='wb') as file:
                     pickle.dump(self._state, file)
 
             # Close and open the context again (to avoid memory issues)
@@ -123,8 +122,7 @@ class Crawler:
         error_message: Optional[str] = None
 
         try:
-            response = page.goto(url[0], timeout=Config.LOAD_TIMEOUT,
-                                 wait_until=Config.WAIT_LOAD_UNTIL)
+            response = page.goto(url[0], timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
         except Error as error:
             error_message = error.message
             self._log.warning(error_message)
@@ -151,8 +149,7 @@ class Crawler:
         self._log.debug('Invoke module response handler')
 
         for module in self._modules:
-            module.receive_response(browser, context, page, responses, context_database, url,
-                                    page.url, start, self._modules, repetition)
+            module.receive_response(browser, context, page, responses, context_database, url, page.url, start, self._modules, repetition)
 
     def _initialize_modules(self, modules: List[Type[Module]], job_id: int, crawler_id: int,
                             log: Logger, state: Dict[str, Any]) -> List[Module]:
