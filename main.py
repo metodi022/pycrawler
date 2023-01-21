@@ -79,12 +79,12 @@ def main() -> int:
         with database.atomic():
             # Iterate over URLs and add them to database
             entry: Tuple[int, str]
+            count: int = 1
             for entry in (CSVLoader(urls_path) if urls_path is not None else urls):
-                if entry[0] <= 0:
-                    raise RuntimeError('Invalid site rank.')
-                crawler_id: int = ((entry[0] - 1) % args.get('crawlers')) + args.get('crawlerid')
-                url: str = ('https://' if 'http' not in entry[1] else '') + entry[1]
+                crawler_id: int = ((count - 1) % args.get('crawlers')) + args.get('crawlerid')
+                url: str = ('https://' if not entry[1].startswith('http') else '') + entry[1]
                 URL.create(job=job_id, crawler=crawler_id, url=url, rank=entry[0])
+                count += 1
 
         for module in modules:
             module.register_job(log)
