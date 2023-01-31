@@ -3,7 +3,7 @@
 PyCrawler is a Python-based extendible and modular crawling framework that uses the [Playwright](https://playwright.dev/) browser automation tool.
 
 ## Requirements
-1. Python 3
+1. Python 3.10
 2. PostgreSQL
 
 ## Installation Instructions

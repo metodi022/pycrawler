@@ -20,86 +20,72 @@ from loader.csvloader import CSVLoader
 from modules.module import Module
 
 
-def main() -> int:
-    # Preparing command line argument parser
-    args_parser = argparse.ArgumentParser()
-    args_parser.add_argument("-o", "--log", help="path to directory where output log will be saved",
-                             type=pathlib.Path)
-    args_parser.add_argument("-f", "--urlspath", help="path to file with urls", type=pathlib.Path)
-    args_parser.add_argument("-u", "--urls", help="urls to crawl", nargs='+', type=ast.literal_eval)
-    args_parser.add_argument("-m", "--modules", help="which modules the crawler will run",
-                             type=str, required=True, nargs='+')
-    args_parser.add_argument("-j", "--job", help="unique job id for crawl", type=int, required=True)
-    args_parser.add_argument("-c", "--crawlers", help="how many crawlers will run concurrently",
-                             type=int, required=True)
-    args_parser.add_argument("-i", "--crawlerid", default=1, type=int,
-                             help="starting crawler id (default 1); must be > 0")
+def main(job_id: int, crawlers_count: int, module_names: List[str], urls_path: Optional[pathlib.Path] = None, urls: Optional[List[Tuple[int, str]]] = None, log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1) -> int:
+    if urls_path is None and not bool(urls):
+        raise RuntimeError('No urls specified')
 
-    # Parse command line arguments
-    args = vars(args_parser.parse_args())
-    job_id: int = args.get('job') or 0
-    log_path: pathlib.Path = args.get('log') or Config.LOG
-    urls_path: Optional[pathlib.Path] = args.get('urlspath')
-    urls: Optional[List[Tuple[int, str]]] = args.get('urls')
-    
     # Create log path if needed
-    if not log_path.exists():
+    if log_path is not None and not log_path.exists():
         os.mkdir(log_path)
 
     # Verify arguments
-    if not (log_path.exists() and log_path.is_dir()):
+    if log_path is not None and not (log_path.exists() and log_path.is_dir()):
         raise RuntimeError('Path to directory for log output is incorrect')
 
     if urls_path is not None and not (urls_path.exists() or urls_path.is_dir()):
         raise RuntimeError('Path to file with urls is incorrect')
 
-    if args.get('crawlers') <= 0 or args.get('crawlerid') <= 0:
+    if crawlers_count <= 0 or starting_crawler_id <= 0:
         raise RuntimeError('Invalid number of crawlers or starting crawler id.')
 
-    # Main log
-    if not (log_path / 'screenshots').exists():
-        os.mkdir(log_path / 'screenshots')
-    handler: FileHandler = FileHandler(log_path / f"job{job_id}.log")
-    handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
+    # Prepare logger
     log: Logger = Logger(f"Job {job_id}")
     log.setLevel(Config.LOG_LEVEL)
-    log.addHandler(handler)
 
-    # Prepare modules
-    modules: List[Type[Module]] = _get_modules((args.get('modules')))
+    # Prepare auxiliary logger information
+    if log_path is not None:
+        if not (log_path / 'screenshots').exists():
+            os.mkdir(log_path / 'screenshots')
+        handler: FileHandler = FileHandler(log_path / f"job{job_id}.log")
+        handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
+        log.addHandler(handler)
 
-    # Run setup if needed
-    if (urls_path or urls) is not None:
-        log.info('Load database with URLs')
+    # Importing modules
+    log.info('Import modules')
+    modules: List[Type[Module]] = _get_modules(module_names)
 
-        with database:
-            database.create_tables([URL])
+    # Creating database
+    log.info('Load database')
+    with database.atomic():
+        database.create_tables([URL])
 
-        # Speedup by using atomic transaction
-        with database.atomic():
-            # Iterate over URLs and add them to database
-            entry: Tuple[int, str]
-            count: int = 1
-            for entry in (CSVLoader(urls_path) if urls_path is not None else urls):
-                crawler_id: int = ((count - 1) % args.get('crawlers')) + args.get('crawlerid')
-                url: str = ('https://' if not entry[1].startswith('http') else '') + entry[1]
-                URL.create(job=job_id, crawler=crawler_id, url=url, rank=entry[0])
-                count += 1
+    # Iterate over URLs and add them to database
+    with database.atomic():  # speedup by using atomic transaction
+        entry: Tuple[int, str]
+        count: int = 1
+        for entry in (CSVLoader(urls_path) if urls_path is not None else urls):
+            crawler_id: int = ((count - 1) % crawlers_count) + starting_crawler_id
+            url: str = ('https://' if not entry[1].startswith('http') else '') + entry[1]
+            URL.create(job=job_id, crawler=crawler_id, url=url, rank=entry[0])
+            count += 1
 
-        for module in modules:
-            module.register_job(log)
+    # Create modules database
+    log.info('Load modules database')
+    for module in modules:
+        module.register_job(log)
 
     # Prepare crawlers
     crawlers: List[Process] = []
-    for i in range(0, args.get('crawlers')):
-        process = Process(target=_start_crawler1, args=(job_id, i + args.get('crawlerid'), log_path, modules))
+    for i in range(0, crawlers_count):
+        process = Process(target=_start_crawler1, args=(job_id, i + starting_crawler_id, log_path, modules))
         crawlers.append(process)
 
     for i, crawler in enumerate(crawlers):
-        log.info(f"Start crawler {i + args.get('crawlerid')} with PID {crawler.pid}")
+        log.info(f"Start crawler {i + starting_crawler_id} with PID {crawler.pid}")
         crawler.start()
 
     # Wait for crawlers to finish
+    log.info('Waiting for crawlers to complete')
     for crawler in crawlers:
         crawler.join()
 
@@ -155,12 +141,12 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
                 crawler.close()
                 crawler = Process(target=_start_crawler2, args=(job_id, crawler_id, url, log_path, modules))
                 crawler.start()
-        
+
         try:
             url = URL.get(job=job_id, crawler=crawler_id, code=None)
         except DoesNotExist:
             url = None
-        
+
         crawler.close()
 
 
@@ -212,4 +198,31 @@ def _get_line_last(path: str | pathlib.Path) -> str:
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    # Preparing command line argument parser
+    args_parser = argparse.ArgumentParser()
+    args_parser.add_argument("-o", "--log", type=pathlib.Path,
+                             help="path to directory where output log will be saved")
+    args_parser.add_argument("-f", "--urlspath", type=pathlib.Path,
+                             help="path to file with urls",)
+    args_parser.add_argument("-u", "--urls", type=ast.literal_eval, nargs='+',
+                             help="urls to crawl", )
+    args_parser.add_argument("-m", "--modules", type=str, nargs='*',
+                             help="which modules the crawler will run")
+    args_parser.add_argument("-j", "--job", type=int, required=True,
+                             help="unique job id for crawl")
+    args_parser.add_argument("-c", "--crawlers", type=int, required=True,
+                             help="how many crawlers will run concurrently")
+    args_parser.add_argument("-i", "--crawlerid", type=int, default=1,
+                             help="starting crawler id (default 1); must be > 0")
+
+    # Parse command line arguments
+    args = vars(args_parser.parse_args())
+    sys.exit(main(
+        args.get('job'),
+        args.get('crawlers'),
+        args.get('modules'),
+        args.get('urlspath'),
+        args.get('urls'),
+        args.get('log') or Config.LOG,
+        args.get('crawlerid')
+    ))
