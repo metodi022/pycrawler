@@ -23,7 +23,7 @@ SSO: str = r'Facebook|Twitter|Google|Yahoo|Windows.?Live|Linked.?In|Git.?Hub|Pay
 
 def get_tld_object(url: str) -> Optional[tld.utils.Result]:
     try:
-        return tld.get_tld(url, as_object=True)  # type: ignore
+        return tld.get_tld(url, as_object=True)
     except (TldBadUrl, TldDomainNotFound):
         return None
 
@@ -35,7 +35,7 @@ def get_url_origin(url: Optional[tld.utils.Result]) -> str:
     return url.parsed_url.scheme + '://' + url.parsed_url.netloc
 
 
-def get_url_etldp1(url: Optional[tld.utils.Result]) -> str:
+def get_url_scheme_site(url: Optional[tld.utils.Result]) -> str:
     if url is None:
         return ''
 

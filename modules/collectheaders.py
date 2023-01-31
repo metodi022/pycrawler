@@ -13,7 +13,7 @@ class Header(BaseModel):
     rank = IntegerField()
     job = IntegerField()
     crawler = IntegerField()
-    site = CharField()
+    url = CharField()
     depth = IntegerField()
     code = IntegerField()
     method = CharField()
@@ -47,7 +47,7 @@ class CollectHeaders(Module):
             except ValueError:
                 headers = None
 
-            Header.create(rank=self.rank, job=self.job_id, crawler=self.crawler_id, site=self.site,
+            Header.create(rank=self.rank, job=self.job_id, crawler=self.crawler_id, url=self.url,
                           depth=self.depth, code=response.status, method=response.request.method,
                           type=response.headers.get('content-type', response.request.resource_type),
                           fromurl=self.currenturl, fromurlfinal=response.frame.url,

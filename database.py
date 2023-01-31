@@ -1,4 +1,3 @@
-import os
 from collections import deque
 from typing import Optional, Tuple, Deque, MutableSet, List
 
@@ -22,7 +21,9 @@ class BaseModel(Model):
 class URL(BaseModel):
     job = IntegerField()
     crawler = IntegerField()
+    site = CharField()
     url = CharField()
+    landing_page = CharField()
     rank = IntegerField()
     code = IntegerField(null=True)
     error = TextField(null=True)

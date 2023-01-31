@@ -81,8 +81,7 @@ class CollectURLs(Module):
                 continue
 
             # Check for same origin
-            if Config.SAME_ORIGIN and get_url_origin(parsed_url) != get_url_origin(
-                    parsed_link):
+            if Config.SAME_ORIGIN and get_url_origin(parsed_url) != get_url_origin(parsed_link):
                 continue
 
             # Check for same ETLD+1
@@ -94,8 +93,7 @@ class CollectURLs(Module):
                 continue
 
             # Check seen
-            parsed_link_full: str = get_url_full_with_query(
-                parsed_link) if Config.QUERY else get_url_full(parsed_link)
+            parsed_link_full: str = get_url_full_with_query(parsed_link) if Config.QUERY else get_url_full(parsed_link)
             if context_database.get_seen(parsed_link_full):
                 continue
             context_database.add_seen(parsed_link_full)
@@ -115,14 +113,11 @@ class CollectURLs(Module):
         self._log.info(f"Find {min(len(urls), self._max_urls)} URLs at depth {self.depth}")
 
         # Shuffle the URLs, so that we prioritize visiting the URLs that appear in the beginning and in the end of the page
-        urls = urls[:int(len(urls) * 0.15)] + urls[int(len(urls) * 0.85):] + urls[int(len(
-            urls) * 0.15):int(len(urls) * 0.85)]
+        urls = urls[:int(len(urls) * 0.15)] + urls[int(len(urls) * 0.85):] + urls[int(len(urls) * 0.15):int(len(urls) * 0.85)]
 
         # For each found URL, add it to the database, while making sure not to exceed the max URL limit
         for parsed_link in urls:
-            context_database.add_url_force((get_url_full_with_query_fragment(parsed_link),
-                                            self.depth + 1, self.rank,
-                                            url[3] + [(self.currenturl, final_url)]))
+            context_database.add_url_force((get_url_full_with_query_fragment(parsed_link), self.depth + 1, self.rank, url[3] + [(self.currenturl, final_url)]))
 
             self._max_urls -= 1
             if self._max_urls < 1:

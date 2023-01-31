@@ -52,7 +52,7 @@ class FindLoginForms(Module):
         self._found = self._state.get('FindLoginForms', self._found)
         self._state['FindLoginForms'] = self._found
 
-        temp: Optional[tld.utils.Result] = get_tld_object(self.site)
+        temp: Optional[tld.utils.Result] = get_tld_object(self.url)
         if temp is None:
             return
 

@@ -26,6 +26,7 @@ class Module:
         self.job_id: int = job_id
         self.crawler_id: int = crawler_id
         self.site: str = ''
+        self.url: str = ''
         self.currenturl: str = ''
         self.depth: int = 0
         self.rank: int = 0
@@ -58,9 +59,10 @@ class Module:
             modules (List[Module]): list of modules currently active modules
         """
         if not self.ready:
-            self.site = self._state.get('Module', url[0])
+            self.url = self._state.get('Module', url[0])
+            self.site = tld.get_tld(self.url, as_object=True).fld
             self.rank = url[2]
-            self._state['Module'] = url[0]
+            self._state['Module'] = self.url
 
         self.currenturl = url[0]
         self.depth = url[1]

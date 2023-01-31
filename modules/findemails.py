@@ -11,7 +11,7 @@ from playwright.sync_api import Browser, BrowserContext, Page, Response, Error
 from config import Config
 from database import DequeDB, BaseModel, database
 from modules.module import Module
-from utils import get_tld_object, get_url_origin
+from utils import get_tld_object, get_url_origin, get_url_scheme_site
 
 
 class Email(BaseModel):
@@ -55,8 +55,9 @@ class FindEmails(Module):
             return
 
         url_origin: str = get_url_origin(temp)
-        context_database.add_url(
-            (url_origin + '/.well-known/security.txt', Config.DEPTH, self.rank, []))
+        url_scheme_site: str = get_url_scheme_site(temp)
+        context_database.add_url((url_origin + '/.well-known/security.txt', Config.DEPTH, self.rank, []))
+        context_database.add_url((url_scheme_site + '/.well-known/security.txt', Config.DEPTH, self.rank, []))
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,

@@ -9,8 +9,9 @@ import time
 from datetime import datetime
 from logging import Logger, FileHandler, Formatter
 from multiprocessing import Process
-from typing import List, Type, Tuple, Optional, cast
+from typing import List, Type, Tuple, Optional
 
+import tld
 from peewee import DoesNotExist
 
 from config import Config
@@ -64,7 +65,8 @@ def main(job_id: int, crawlers_count: int, module_names: List[str], urls_path: O
         for entry in (CSVLoader(urls_path) if urls_path is not None else urls):
             crawler_id: int = ((count - 1) % crawlers_count) + starting_crawler_id
             url: str = ('https://' if not entry[1].startswith('http') else '') + entry[1]
-            URL.create(job=job_id, crawler=crawler_id, url=url, rank=entry[0])
+            site: str = tld.get_tld(url, as_object=True).fld
+            URL.create(job=job_id, crawler=crawler_id, site=site, url=url, landing_page=url, rank=entry[0])
             count += 1
 
     # Create modules database
