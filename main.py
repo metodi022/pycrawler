@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 from logging import Logger, FileHandler, Formatter
 from multiprocessing import Process
-from typing import List, Type, Tuple, Optional
+from typing import List, Type, Tuple, Optional, cast
 
 from peewee import DoesNotExist
 
@@ -25,11 +25,12 @@ def main(job_id: int, crawlers_count: int, module_names: List[str], urls_path: O
         raise RuntimeError('No urls specified')
 
     # Create log path if needed
-    if log_path is not None and not log_path.exists():
+    log_path: pathlib.Path = log_path or Config.LOG
+    if not log_path.exists():
         os.mkdir(log_path)
 
     # Verify arguments
-    if log_path is not None and not (log_path.exists() and log_path.is_dir()):
+    if not (log_path.exists() and log_path.is_dir()):
         raise RuntimeError('Path to directory for log output is incorrect')
 
     if urls_path is not None and not (urls_path.exists() or urls_path.is_dir()):
@@ -39,16 +40,13 @@ def main(job_id: int, crawlers_count: int, module_names: List[str], urls_path: O
         raise RuntimeError('Invalid number of crawlers or starting crawler id.')
 
     # Prepare logger
+    if not (log_path / 'screenshots').exists():
+        os.mkdir(log_path / 'screenshots')
+    handler: FileHandler = FileHandler(log_path / f"job{job_id}.log")
+    handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
     log: Logger = Logger(f"Job {job_id}")
     log.setLevel(Config.LOG_LEVEL)
-
-    # Prepare auxiliary logger information
-    if log_path is not None:
-        if not (log_path / 'screenshots').exists():
-            os.mkdir(log_path / 'screenshots')
-        handler: FileHandler = FileHandler(log_path / f"job{job_id}.log")
-        handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
-        log.addHandler(handler)
+    log.addHandler(handler)
 
     # Importing modules
     log.info('Import modules')
@@ -223,6 +221,6 @@ if __name__ == '__main__':
         args.get('modules'),
         args.get('urlspath'),
         args.get('urls'),
-        args.get('log') or Config.LOG,
+        args.get('log'),
         args.get('crawlerid')
     ))

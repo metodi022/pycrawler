@@ -1,6 +1,6 @@
 import pathlib
 from logging import INFO
-from typing import Literal, Dict, Optional
+from typing import Literal, Dict
 
 
 class Config:
@@ -10,7 +10,7 @@ class Config:
     HOST: str = 'localhost'  # database host
     PORT: str = '5432'  # database port
 
-    LOG: Optional[pathlib.Path] = None  # path for saving logs
+    LOG: pathlib.Path = pathlib.Path('/logs/')  # path for saving logs
     LOG_LEVEL = INFO  # DEBUG|INFO|WARNING|ERROR
 
     BROWSER: Literal['chromium', 'firefox', 'webkit'] = 'chromium'
