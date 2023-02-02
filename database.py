@@ -1,7 +1,7 @@
 from collections import deque
 from typing import Optional, Tuple, Deque, MutableSet, List
 
-from peewee import Model, CharField, IntegerField, TextField, PostgresqlDatabase
+from peewee import Model, IntegerField, TextField, PostgresqlDatabase
 
 from config import Config
 
@@ -10,7 +10,8 @@ database = PostgresqlDatabase(Config.DATABASE,
                               user=Config.USER,
                               password=Config.PASSWORD,
                               host=Config.HOST,
-                              port=Config.PORT)
+                              port=Config.PORT,
+                              autorollback=True)
 
 
 class BaseModel(Model):
@@ -19,11 +20,11 @@ class BaseModel(Model):
 
 
 class URL(BaseModel):
-    job = IntegerField()
+    job = TextField()
     crawler = IntegerField()
-    site = CharField()
-    url = CharField()
-    landing_page = CharField()
+    site = TextField()
+    url = TextField()
+    landing_page = TextField()
     rank = IntegerField()
     code = IntegerField(null=True)
     error = TextField(null=True)

@@ -5,7 +5,7 @@ from logging import Logger
 from typing import List, Optional, Tuple, Callable, Dict, Any
 
 import tld.utils
-from peewee import IntegerField, CharField, BooleanField
+from peewee import IntegerField, BooleanField, TextField
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
 
 from config import Config
@@ -17,12 +17,12 @@ from utils import get_tld_object, get_url_origin, get_locator_count, get_locator
 
 class LoginForm(BaseModel):
     rank = IntegerField()
-    job = IntegerField()
+    job = TextField()
     crawler = IntegerField()
-    site = CharField()
+    site = TextField()
     depth = IntegerField()
-    formurl = CharField()
-    formurlfinal = CharField()
+    formurl = TextField()
+    formurlfinal = TextField()
     success = BooleanField(null=True)
 
 
@@ -31,7 +31,7 @@ class FindLoginForms(Module):
         Module to automatically find login forms.
     """
 
-    def __init__(self, job_id: int, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
+    def __init__(self, job_id: str, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
         super().__init__(job_id, crawler_id, log, state)
         self._found: int = 0
 

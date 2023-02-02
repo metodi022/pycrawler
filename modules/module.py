@@ -13,17 +13,17 @@ class Module:
     A baseclass from which all modules inherit.
     """
 
-    def __init__(self, job_id: int, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
+    def __init__(self, job_id: str, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
         """
         Initializes module instance.
 
         Args:
-            job_id (int): job id
+            job_id (str): job id
             crawler_id (int): crawler id
             log (Logger): log
             state (Dict[str, Any]): state
         """
-        self.job_id: int = job_id
+        self.job_id: str = job_id
         self.crawler_id: int = crawler_id
         self.site: str = ''
         self.url: str = ''

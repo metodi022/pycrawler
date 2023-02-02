@@ -24,7 +24,7 @@ class AcceptCookies(Module):
     CHECK_GER: str = '/(\\W|^)(stimm|verstanden|versteh|akzeptier|ja(\\W|$)|weiter(\\W|$)|' \
                      'annehm|bestätig|willig|zulassen(\\W|$)|lasse)/i'
 
-    def __init__(self, job_id: int, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
+    def __init__(self, job_id: str, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
         super().__init__(job_id, crawler_id, log, state)
         self._urls: MutableSet[str] = set()
 

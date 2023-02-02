@@ -21,7 +21,7 @@ from loader.csvloader import CSVLoader
 from modules.module import Module
 
 
-def main(job_id: int, crawlers_count: int, module_names: List[str], urls_path: Optional[pathlib.Path] = None, urls: Optional[List[Tuple[int, str]]] = None, log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1) -> int:
+def main(job_id: str, crawlers_count: int, module_names: List[str], urls_path: Optional[pathlib.Path] = None, urls: Optional[List[Tuple[int, str]]] = None, log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1) -> int:
     if urls_path is None and not bool(urls):
         raise RuntimeError('No urls specified')
 
@@ -65,8 +65,10 @@ def main(job_id: int, crawlers_count: int, module_names: List[str], urls_path: O
         for entry in (CSVLoader(urls_path) if urls_path is not None else urls):
             crawler_id: int = ((count - 1) % crawlers_count) + starting_crawler_id
             url: str = ('https://' if not entry[1].startswith('http') else '') + entry[1]
+            landing_page: str = url + '/'
             site: str = tld.get_tld(url, as_object=True).fld
-            URL.create(job=job_id, crawler=crawler_id, site=site, url=url, landing_page=url, rank=entry[0])
+            # TODO: currently rank has no meaning? (as it could be tranco or crux?)
+            URL.create(job=job_id, crawler=crawler_id, site=site, url=url, landing_page=landing_page, rank=count)
             count += 1
 
     # Create modules database
@@ -101,7 +103,7 @@ def _get_modules(module_names: List[str]) -> List[Type[Module]]:
     return result
 
 
-def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
+def _start_crawler1(job_id: str, crawler_id: int, log_path: pathlib.Path,
                     modules: List[Type[Module]]) -> None:
 
     log = _get_logger(job_id, crawler_id, log_path)
@@ -150,7 +152,7 @@ def _start_crawler1(job_id: int, crawler_id: int, log_path: pathlib.Path,
         crawler.close()
 
 
-def _start_crawler2(job_id: int, crawler_id: int, url: Tuple[str, int, int, List[Tuple[str, str]]],
+def _start_crawler2(job_id: str, crawler_id: int, url: Tuple[str, int, int, List[Tuple[str, str]]],
                     log_path: pathlib.Path, modules: List[Type[Module]]) -> None:
     log = _get_logger(job_id, crawler_id, log_path)
     log.info('Start crawler')
@@ -159,7 +161,7 @@ def _start_crawler2(job_id: int, crawler_id: int, url: Tuple[str, int, int, List
     log.info('Stop crawler')
 
 
-def _get_logger(job_id: int, crawler_id: int, log_path: pathlib.Path) -> Logger:
+def _get_logger(job_id: str, crawler_id: int, log_path: pathlib.Path) -> Logger:
     handler: FileHandler = FileHandler(log_path / f"job{job_id}crawler{crawler_id}.log")
     handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
     log = Logger(f"Job {job_id} Crawler {crawler_id}")
@@ -208,7 +210,7 @@ if __name__ == '__main__':
                              help="urls to crawl", )
     args_parser.add_argument("-m", "--modules", type=str, nargs='*',
                              help="which modules the crawler will run")
-    args_parser.add_argument("-j", "--job", type=int, required=True,
+    args_parser.add_argument("-j", "--job", type=str, required=True,
                              help="unique job id for crawl")
     args_parser.add_argument("-c", "--crawlers", type=int, required=True,
                              help="how many crawlers will run concurrently")

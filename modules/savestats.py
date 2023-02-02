@@ -2,7 +2,7 @@ from datetime import datetime
 from logging import Logger
 from typing import List, Tuple, Optional
 
-from peewee import IntegerField, CharField, DateTimeField
+from peewee import IntegerField, DateTimeField, TextField
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
 from config import Config
@@ -12,13 +12,13 @@ from modules.module import Module
 
 class URLFeedback(BaseModel):
     rank = IntegerField()
-    job = IntegerField()
+    job = TextField()
     crawler = IntegerField()
-    site = CharField()
+    site = TextField()
     depth = IntegerField()
     code = IntegerField()
-    fromurl = CharField(null=True)
-    fromurlfinal = CharField(null=True)
+    fromurl = TextField(null=True)
+    fromurlfinal = TextField(null=True)
     start = DateTimeField()
     end = DateTimeField()
     repetition = IntegerField()

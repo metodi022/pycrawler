@@ -11,16 +11,16 @@ from modules.module import Module
 
 class Header(BaseModel):
     rank = IntegerField()
-    job = IntegerField()
+    job = TextField()
     crawler = IntegerField()
-    url = CharField()
+    url = TextField()
     depth = IntegerField()
     code = IntegerField()
     method = CharField()
     type = CharField()
-    fromurl = CharField()
-    fromurlfinal = CharField()
-    tourl = CharField()
+    fromurl = TextField()
+    fromurlfinal = TextField()
+    tourl = TextField()
     headers = TextField()
 
 

@@ -5,7 +5,7 @@ from logging import Logger
 from typing import Dict, Any, Tuple, List, Callable, Optional
 
 import tld
-from peewee import IntegerField, CharField
+from peewee import IntegerField, TextField
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
 
 from config import Config
@@ -17,12 +17,12 @@ from utils import get_url_full, get_locator_count, get_tld_object, get_url_origi
 
 class RegistrationForm(BaseModel):
     rank = IntegerField()
-    job = IntegerField()
+    job = TextField()
     crawler = IntegerField()
-    site = CharField()
+    site = TextField()
     depth = IntegerField()
-    formurl = CharField()
-    formurlfinal = CharField()
+    formurl = TextField()
+    formurlfinal = TextField()
 
 
 class FindRegistrationForms(Module):
@@ -30,7 +30,7 @@ class FindRegistrationForms(Module):
         Module to automatically find registration forms.
     """
 
-    def __init__(self, job_id: int, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
+    def __init__(self, job_id: str, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
         super().__init__(job_id, crawler_id, log, state)
         self._found: int = 0
 

@@ -17,11 +17,11 @@ from utils import get_screenshot
 
 
 class Crawler:
-    def __init__(self, job_id: int, crawler_id: int,
+    def __init__(self, job_id: str, crawler_id: int,
                  url: Tuple[str, int, int, List[Tuple[str, str]]], log: Logger,
                  modules: List[Type[Module]]) -> None:
         # Prepare database and log
-        self.job_id: int = job_id
+        self.job_id: str = job_id
         self.crawler_id: int = crawler_id
         self._url: Tuple[str, int, int, List[Tuple[str, str]]] = url
         self._log: Logger = log
@@ -151,7 +151,7 @@ class Crawler:
         for module in self._modules:
             module.receive_response(browser, context, page, responses, context_database, url, page.url, start, self._modules, repetition)
 
-    def _initialize_modules(self, modules: List[Type[Module]], job_id: int, crawler_id: int,
+    def _initialize_modules(self, modules: List[Type[Module]], job_id: str, crawler_id: int,
                             log: Logger, state: Dict[str, Any]) -> List[Module]:
         result: List[Module] = []
         for module in modules:

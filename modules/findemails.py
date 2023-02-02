@@ -5,7 +5,7 @@ from typing import List, Tuple, MutableSet, Optional, Dict, Any
 
 import nostril  # https://github.com/casics/nostril
 import tld.utils
-from peewee import IntegerField, CharField, BooleanField
+from peewee import IntegerField, BooleanField, TextField
 from playwright.sync_api import Browser, BrowserContext, Page, Response, Error
 
 from config import Config
@@ -16,20 +16,20 @@ from utils import get_tld_object, get_url_origin, get_url_scheme_site
 
 class Email(BaseModel):
     rank = IntegerField()
-    job = IntegerField()
+    job = TextField()
     crawler = IntegerField()
-    site = CharField()
+    site = TextField()
     depth = IntegerField()
-    email = CharField()
+    email = TextField()
     nonsense = BooleanField()
-    fromurl = CharField()
-    fromurlfinal = CharField()
+    fromurl = TextField()
+    fromurlfinal = TextField()
 
 
 class FindEmails(Module):
     EMAILSRE: str = r'[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+'
 
-    def __init__(self, job_id: int, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
+    def __init__(self, job_id: str, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
         super().__init__(job_id, crawler_id, log, state)
         self._seen: MutableSet[str] = set()
 
