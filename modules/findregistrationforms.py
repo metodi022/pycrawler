@@ -134,16 +134,16 @@ class FindRegistrationForms(Module):
         if password_fields > 1:
             return True
 
+        # If there are no text fields -> it's not a registration form
+        if text_fields == 0:
+            return False
+
         # Find if there are registration buttons
         try:
             check_str: str = r'/(regist|sign.?up|continue|next|weiter|melde|proceed|submit' \
                              r'fortfahren|anmeldung)/i'
             button1: Locator = form.locator(f"{CLICKABLES} >> text={check_str} >> visible=true")
         except Error:
-            return False
-
-        # If there are no text fields -> it's not a registration form
-        if text_fields == 0:
             return False
 
         # Find if there is registration link
@@ -154,7 +154,7 @@ class FindRegistrationForms(Module):
         except Error:
             # Ignored
             pass
-        
+
         # Forms that are not registration or login forms
         misc_form: bool = re.search(r'search|news.?letter|subscribe', get_outer_html(form) or '', flags=re.I) is not None
 
@@ -187,13 +187,9 @@ class FindRegistrationForms(Module):
         while form.count() == 1:
             # Get relevant fields
             passwords: int = get_locator_count(form.locator('input[type="password"]:visible'))
-            text_fields: int = get_locator_count(
-                form.locator('input[type="email"]:visible')) + get_locator_count(
-                form.locator('input[type="text"]:visible')) + get_locator_count(
-                form.locator('input:not([type]):visible'))
 
             # Stop earlier if it cannot be a registration form
-            if passwords > 2 or text_fields > 15:
+            if passwords > 2:
                 return None
 
             # Check if element tree is a registration form
@@ -204,7 +200,7 @@ class FindRegistrationForms(Module):
             try:
                 form = form.locator('..')
             except Error:
-                return None
+                break
 
         return None
 
