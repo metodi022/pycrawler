@@ -74,6 +74,23 @@ class FindLoginForms(Module):
         if response is None or response.status >= 400:
             return
 
+        # Parse current page URL
+        parsed_url: Optional[tld.utils.Result] = get_tld_object(page.url)
+        if parsed_url is None:
+            return
+
+        # Check for same origin
+        if Config.SAME_ORIGIN and get_url_origin(parsed_url) != self.origin:
+            return
+
+        # Check for same site
+        if Config.SAME_ETLDP1 and parsed_url.fld != self.site:
+            return
+
+        # TODO same entity
+        # if Config.SAME_ENTITY:
+        #     return
+
         # Find login forms
         form: Optional[Locator] = FindLoginForms.find_login_form(page, interact=(self._found >= 3))
         if form is not None:

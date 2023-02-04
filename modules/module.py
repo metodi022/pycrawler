@@ -6,6 +6,7 @@ import tld.utils
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
 from database import DequeDB
+from utils import get_url_origin
 
 
 class Module:
@@ -26,6 +27,7 @@ class Module:
         self.job_id: str = job_id
         self.crawler_id: int = crawler_id
         self.site: str = ''
+        self.origin: str = ''
         self.url: str = ''
         self.currenturl: str = ''
         self.depth: int = 0
@@ -61,6 +63,7 @@ class Module:
         if not self.ready:
             self.url = self._state.get('Module', url[0])
             self.site = tld.get_tld(self.url, as_object=True).fld
+            self.origin = get_url_origin(tld.get_tld(self.url, as_object=True))
             self.rank = url[2]
             self._state['Module'] = self.url
 

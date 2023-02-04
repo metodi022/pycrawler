@@ -18,7 +18,7 @@ class CollectURLs(Module):
     Module to automatically collect links to crawl further.
     """
 
-    def __init__(self, job_id: int, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
+    def __init__(self, job_id: str, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
         super().__init__(job_id, crawler_id, log, state)
         self._max_urls: int = 0
         self._url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
