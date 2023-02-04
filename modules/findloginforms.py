@@ -92,7 +92,7 @@ class FindLoginForms(Module):
         #     return
 
         # Find login forms
-        form: Optional[Locator] = FindLoginForms.find_login_form(page, interact=(self._found >= 3))
+        form: Optional[Locator] = FindLoginForms.find_login_form(page, interact=(self._found < 3))
         if form is not None:
             self._found += 1
             self._state['FindLoginForms'] = self._found
@@ -228,8 +228,7 @@ class FindLoginForms(Module):
         if form is not None:
             return form
 
-        # If you don't want to interact with the page
-        # and click on potential login buttons, stop here
+        # If you don't want to interact with the page and click on potential login buttons, stop here
         if not interact:
             return None
 
