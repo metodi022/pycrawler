@@ -218,6 +218,8 @@ def invoke_click(page: Page | Frame, clickable: Optional[Locator], timeout=30000
         clickable.hover(timeout=timeout)
         page.wait_for_timeout(500)
         clickable.click(delay=500, timeout=timeout)
+        page.wait_for_load_state(Config.WAIT_LOAD_UNTIL)
+        page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
     except Error:
         # Ignored
         pass

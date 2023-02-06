@@ -10,7 +10,7 @@ class Config:
     HOST: str = 'localhost'  # database host
     PORT: str = '5432'  # database port
 
-    LOG: pathlib.Path = pathlib.Path('/logs/')  # path for saving logs
+    LOG: pathlib.Path = pathlib.Path('./logs/')  # path for saving logs
     LOG_LEVEL = INFO  # DEBUG|INFO|WARNING|ERROR
 
     BROWSER: Literal['chromium', 'firefox', 'webkit'] = 'chromium'
@@ -32,7 +32,7 @@ class Config:
     WAIT_LOAD_UNTIL: Literal['commit', 'domcontentloaded', 'load', 'networkidle'] = 'load'
     LOAD_TIMEOUT: int = 30000  # URL page loading timeout in ms (0 = disable timeout)
     WAIT_AFTER_LOAD: int = 5000  # let page execute after loading in ms
-    RESTART_TIMEOUT: int = 300  # restart crawler if it hasn't done anything for ... seconds
+    RESTART_TIMEOUT: int = 600  # restart crawler if it hasn't done anything for ... seconds
 
     ACCEPT_COOKIES: bool = True  # Attempt to find cookie banners and accept them (unreliable)
 

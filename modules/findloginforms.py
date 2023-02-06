@@ -109,7 +109,7 @@ class FindLoginForms(Module):
             return
 
         # Finally, use search engine with login keyword
-        context_database.add_url((urllib.parse.quote(f"https://www.google.com/search?q=\"login\" site:{self.site}"), Config.DEPTH - 1, self.rank, []))
+        context_database.add_url(('https://www.google.com/search?q=' + urllib.parse.quote(f"\"login\" site:{self.site}"), Config.DEPTH - 1, self.rank, []))
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         def filt(url: tld.utils.Result) -> bool:
@@ -197,27 +197,31 @@ class FindLoginForms(Module):
             return None
 
         # Go up the node tree of the password field and search for login forms (w/o form tags)
-        while form.count() == 1:
-            # Get relevant fields
-            passwords: int = get_locator_count(form.locator('input[type="password"]:visible'))
-            text_fields: int = get_locator_count(
-                form.locator('input[type="email"]:visible')) + get_locator_count(
-                form.locator('input[type="text"]:visible')) + get_locator_count(
-                form.locator('input:not([type]):visible'))
+        try:
+            while form.count() >= 1:
+                # Get relevant fields
+                passwords: int = get_locator_count(form.locator('input[type="password"]:visible'))
+                text_fields: int = get_locator_count(
+                    form.locator('input[type="email"]:visible')) + get_locator_count(
+                    form.locator('input[type="text"]:visible')) + get_locator_count(
+                    form.locator('input:not([type]):visible'))
 
-            # Stop earlier if it cannot be a login form
-            if passwords != 1 or text_fields > 2:
-                return None
+                # Stop earlier if it cannot be a login form
+                if passwords != 1 or text_fields > 2:
+                    return None
 
-            # Check if element tree is a login form
-            if FindLoginForms.verify_login_form(form):
-                return form
+                # Check if element tree is a login form
+                if FindLoginForms.verify_login_form(form):
+                    return form
 
-            # Go up the node tree
-            try:
-                form = form.locator('..')
-            except Error:
-                return None
+                # Go up the node tree
+                try:
+                    form = form.locator('..')
+                except Error:
+                    return None
+        except Error:
+            # Ignored
+            pass
 
         return None
 

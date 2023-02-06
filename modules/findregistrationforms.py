@@ -109,7 +109,7 @@ class FindRegistrationForms(Module):
             return
 
         # Finally, use search engine with registration keyword
-        context_database.add_url((urllib.parse.quote(f"https://www.google.com/search?q=\"register\" site:{self.site}"), Config.DEPTH - 1, self.rank, []))
+        context_database.add_url(('https://www.google.com/search?q=' + urllib.parse.quote(f"\"register\" site:{self.site}"), Config.DEPTH - 1, self.rank, []))
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         def filt(url: tld.utils.Result) -> bool:
@@ -200,23 +200,27 @@ class FindRegistrationForms(Module):
             return None
 
         # Go up the node tree of the password field and search for registration forms (w/o form tags)
-        while form.count() == 1:
-            # Get relevant fields
-            passwords: int = get_locator_count(form.locator('input[type="password"]:visible'))
+        try:
+            while form.count() == 1:
+                # Get relevant fields
+                passwords: int = get_locator_count(form.locator('input[type="password"]:visible'))
 
-            # Stop earlier if it cannot be a registration form
-            if passwords > 2:
-                return None
+                # Stop earlier if it cannot be a registration form
+                if passwords > 2:
+                    return None
 
-            # Check if element tree is a registration form
-            if FindRegistrationForms.verify_registration_form(form):
-                return form
+                # Check if element tree is a registration form
+                if FindRegistrationForms.verify_registration_form(form):
+                    return form
 
-            # Go up the node tree
-            try:
-                form = form.locator('..')
-            except Error:
-                break
+                # Go up the node tree
+                try:
+                    form = form.locator('..')
+                except Error:
+                    break
+        except Error:
+            # Ignored
+            pass
 
         return None
 

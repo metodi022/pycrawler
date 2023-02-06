@@ -15,6 +15,8 @@ class URLFeedback(BaseModel):
     job = TextField()
     crawler = IntegerField()
     site = TextField()
+    url = TextField()
+    urlfinal = TextField()
     depth = IntegerField()
     code = IntegerField()
     fromurl = TextField(null=True)
@@ -44,6 +46,6 @@ class SaveStats(Module):
                 fromurl: Optional[str] = url[3][-1][0] if len(url[3]) > 0 else None
                 fromurlfinal: Optional[str] = url[3][-1][1] if len(url[3]) > 0 else None
                 URLFeedback.create(rank=self.rank, job=self.job_id, crawler=self.crawler_id,
-                                   site=self.site, depth=self.depth, code=code, fromurl=fromurl,
-                                   fromurlfinal=fromurlfinal, start=start[i], end=datetime.now(),
-                                   repetition=repetition)
+                                   site=self.site, url=url[0], urlfinal=page.url, depth=self.depth,
+                                   code=code, fromurl=fromurl, fromurlfinal=fromurlfinal,
+                                   start=start[i], end=datetime.now(), repetition=repetition)

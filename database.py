@@ -53,7 +53,7 @@ class DequeDB:
             self._seen.add(url + '/')
 
     def add_url(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
-        if url[0] in self._seen or len(url) == 0:
+        if url[0] in self._seen:
             return
 
         self.add_seen(url[0])

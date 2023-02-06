@@ -49,8 +49,12 @@ def main(job_id: str, crawlers_count: int, module_names: List[str], urls_path: O
     log.setLevel(Config.LOG_LEVEL)
     log.addHandler(handler)
 
+    # Fix for multiple modules not correctly parsed
+    if ' ' in module_names[0]:
+        module_names = module_names[0].split()
+
     # Importing modules
-    log.info('Import modules')
+    log.info(f"Import modules {module_names}")
     modules: List[Type[Module]] = _get_modules(module_names)
 
     # Creating database
@@ -106,12 +110,7 @@ def _start_crawler1(job_id: str, crawler_id: int, log_path: pathlib.Path,
                     modules: List[Type[Module]]) -> None:
 
     log = _get_logger(job_id, crawler_id, log_path)
-    url: Optional[URL] = None
-    try:
-        url = URL.get(job=job_id, crawler=crawler_id, code=None)
-    except DoesNotExist:
-        # Ignored
-        pass
+    url: Optional[URL] = URL.get_or_none(job=job_id, crawler=crawler_id, code=None)
 
     while url:
         crawler: Process = Process(target=_start_crawler2, args=(job_id, crawler_id, (url.url, 0, url.rank, []), log_path, modules))
@@ -143,12 +142,9 @@ def _start_crawler1(job_id: str, crawler_id: int, log_path: pathlib.Path,
                 crawler = Process(target=_start_crawler2, args=(job_id, crawler_id, url, log_path, modules))
                 crawler.start()
 
-        try:
-            url = URL.get(job=job_id, crawler=crawler_id, code=None)
-        except DoesNotExist:
-            url = None
-
         crawler.close()
+        
+        url = URL.get_or_none(job=job_id, crawler=crawler_id, code=None)
 
 
 def _start_crawler2(job_id: str, crawler_id: int, url: Tuple[str, int, int, List[Tuple[str, str]]],
