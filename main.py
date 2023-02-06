@@ -65,14 +65,13 @@ def main(job_id: str, crawlers_count: int, module_names: List[str], urls_path: O
         for entry in (CSVLoader(urls_path) if urls_path is not None else urls):
             crawler_id: int = ((count - 1) % crawlers_count) + starting_crawler_id
             url: str = ('https://' if not entry[1].startswith('http') else '') + entry[1]
-            landing_page: str = url + '/'
             site: str = tld.get_tld(url, as_object=True).fld
-            # TODO: currently rank has no meaning? (as it could be tranco or crux?)
-            URL.create(job=job_id, crawler=crawler_id, site=site, url=url, landing_page=landing_page, rank=count)
+            # TODO: currently rank has no meaning?
+            URL.create(job=job_id, crawler=crawler_id, site=site, url=url, landing_page=url, rank=count)
             count += 1
 
     # Create modules database
-    log.info('Load modules database')
+    log.info(f"Load modules database {modules}")
     for module in modules:
         module.register_job(log)
 
@@ -83,7 +82,7 @@ def main(job_id: str, crawlers_count: int, module_names: List[str], urls_path: O
         crawlers.append(process)
 
     for i, crawler in enumerate(crawlers):
-        log.info(f"Start crawler {i + starting_crawler_id} with PID {crawler.pid}")
+        log.info(f"Start crawler {i + starting_crawler_id} with JOBID {job_id} PID {crawler.pid}")
         crawler.start()
 
     # Wait for crawlers to finish
