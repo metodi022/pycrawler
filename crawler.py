@@ -23,6 +23,7 @@ class Crawler:
         # Prepare database and log
         self.job_id: str = job_id
         self.crawler_id: int = crawler_id
+        self._site = tld.get_tld(url[0], as_object=True).fld
         self._url: Tuple[str, int, int, List[Tuple[str, str]]] = url
         self._log: Logger = log
         self._state: Dict[str, Any] = dict()
@@ -84,7 +85,7 @@ class Crawler:
 
                 # Wait after page is loaded
                 page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                get_screenshot(page, (Config.LOG / f"screenshots/job{self.job_id}rank{url[2]}.png"), False)
+                get_screenshot(page, (Config.LOG / f"screenshots/job{self.job_id}-{self._site}.png"), False)
 
                 # Run modules response handler
                 self._invoke_response_handler(browser, context, page, [response], url, context_database, [datetime.now()], repetition + 1)

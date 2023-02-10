@@ -50,14 +50,8 @@ class FindEmails(Module):
         self._seen = self._state.get('FindContactsEmail', self._seen)
         self._state['FindContactsEmail'] = self._seen
 
-        temp: Optional[tld.utils.Result] = get_tld_object(self.site)
-        if temp is None:
-            return
-
-        url_origin: str = get_url_origin(temp)
-        url_scheme_site: str = get_url_scheme_site(temp)
-        context_database.add_url((url_origin + '/.well-known/security.txt', Config.DEPTH, self.rank, []))
-        context_database.add_url((url_scheme_site + '/.well-known/security.txt', Config.DEPTH, self.rank, []))
+        context_database.add_url((self.origin + '/.well-known/security.txt', Config.DEPTH, self.rank, []))
+        context_database.add_url((self.scheme_site + '/.well-known/security.txt', Config.DEPTH, self.rank, []))
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,

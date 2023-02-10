@@ -258,17 +258,11 @@ def clear_cache(restart: bool, path: pathlib.Path):
         os.remove(path)
 
 
-def refresh_page(page: Page, url: str, responses: List[Optional[Response]], start: List[datetime]):
-    temp: datetime = datetime.now()
+def refresh_page(page: Page, url: str) -> Optional[Response]:
     try:
         response = page.goto(url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+        page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
     except Error:
-        start.append(temp)
-        responses.append(None)
-        return
+        return None
 
-    page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-
-    # Make sure to add the new response for the following models
-    start.append(temp)
-    responses.append(response)
+    return response

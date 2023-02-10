@@ -12,7 +12,6 @@ from multiprocessing import Process
 from typing import List, Type, Tuple, Optional
 
 import tld
-from peewee import DoesNotExist
 
 from config import Config
 from crawler import Crawler
@@ -93,6 +92,7 @@ def main(job_id: str, crawlers_count: int, module_names: List[str], urls_path: O
     log.info('Waiting for crawlers to complete')
     for crawler in crawlers:
         crawler.join()
+        crawler.close()
 
     # Exit code
     return 0

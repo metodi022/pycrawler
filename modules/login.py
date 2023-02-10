@@ -37,12 +37,11 @@ class Login(Module):
     LOGOUTKEYWORDS = r'log.?out|sign.?out|log.?off|sign.?off|exit|quit|invalidate|ab.?melden|' \
                      r'aus.?loggen|ab.?meldung|verlassen|aus.?treten|annullieren'
 
-    def __init__(self, job_id: int, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
+    def __init__(self, job_id: str, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
         super().__init__(job_id, crawler_id, log, state)
         self.login = False
         self.loginurl: Optional[str] = None
         self._account: Optional[Account] = None
-        self._cookies: Optional[AcceptCookies] = None
 
     @staticmethod
     def register_job(log: Logger) -> None:
@@ -58,9 +57,6 @@ class Login(Module):
 
         if self.ready:
             return
-
-        if Config.ACCEPT_COOKIES:
-            self._cookies = cast(AcceptCookies, modules[0])
 
         # Get account from database
         try:
@@ -94,7 +90,7 @@ class Login(Module):
         for formurl in formsurls:
             self._log.info(f"Get login URL {formurl.formurl}")
 
-            if not Login.login(browser, context, self.site, formurl.formurl, self._cookies, account):
+            if not Login.login(browser, context, self.url, formurl.formurl, account):
                 if formurl.success is None:
                     formurl.success = False
                     formurl.save()
@@ -132,12 +128,11 @@ class Login(Module):
 
     @staticmethod
     def login(browser: Browser, context: BrowserContext, domainurl: str, loginurl: str,
-              cookies: Optional[AcceptCookies], account: Tuple[str, str, str, str, str]) -> bool:
+              account: Tuple[str, str, str, str, str]) -> bool:
         # Navigate to login form URL
         page: Page = context.new_page()
         try:
-            response: Optional[Response] = page.goto(loginurl, timeout=Config.LOAD_TIMEOUT,
-                                                     wait_until=Config.WAIT_LOAD_UNTIL)
+            response: Optional[Response] = page.goto(loginurl, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
         except Error:
             page.close()
             return False
@@ -150,10 +145,8 @@ class Login(Module):
         page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
         # Accept cookie banners, sometimes they block login forms
-        if Config.ACCEPT_COOKIES and cookies is not None:
-            cookies = cast(AcceptCookies, cookies)
-            cookies.receive_response(browser, context, page, [response], DequeDB(),
-                                     (loginurl, 0, 0, []), page.url, [], [], 1, force=True)
+        if Config.ACCEPT_COOKIES:
+            AcceptCookies.accept(page, loginurl)
 
         # Find login form
         form: Optional[Locator] = FindLoginForms.find_login_form(page)
@@ -172,7 +165,7 @@ class Login(Module):
             return False
 
         # Verify that login is successful
-        result: bool = Login.verify_login_after_post(browser, context, page, form, domainurl, loginurl, cookies, account)
+        result: bool = Login.verify_login_after_post(browser, context, page, form, domainurl, loginurl, account)
         page.close()
         return result
 
@@ -259,15 +252,7 @@ class Login(Module):
                     continue
 
                 # Click on a button
-                try:
-                    invoke_click(page, button, 5000)
-                    page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                    page.wait_for_load_state(timeout=Config.LOAD_TIMEOUT,
-                                             state=Config.WAIT_LOAD_UNTIL)
-                    page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                except Error:
-                    # Ignored
-                    pass
+                invoke_click(page, button, 5000)
 
                 break
             else:
@@ -320,14 +305,7 @@ class Login(Module):
                 continue
 
             # Click on button
-            try:
-                invoke_click(page, button, 5000)
-                page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                page.wait_for_load_state(timeout=Config.LOAD_TIMEOUT, state=Config.WAIT_LOAD_UNTIL)
-                page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-            except Error:
-                # Ignored
-                pass
+            invoke_click(page, button, 5000)
 
             break
         else:
@@ -337,8 +315,7 @@ class Login(Module):
 
     @staticmethod
     def verify_login_after_post(browser: Browser, context: BrowserContext, page: Page,
-                                form: Locator, domainurl: str, loginurl: Optional[str],
-                                cookies: Optional[AcceptCookies],
+                                form: Locator, domainurl: str, loginurl: str,
                                 account: Tuple[str, str, str, str, str]) -> bool:
         # Initialize variables
         error_message: bool = False
@@ -377,12 +354,11 @@ class Login(Module):
             return False
 
         # If no error messages, captcha or verification exist, verify login successful
-        return Login.verify_login(browser, context, domainurl, loginurl, cookies, account)
+        return Login.verify_login(browser, context, domainurl, loginurl, account)
 
     @staticmethod
     def verify_login(browser: Browser, context: BrowserContext, domainurl: str,
-                     loginurl: Optional[str], cookies: Optional[AcceptCookies],
-                     account: Tuple[str, str, str, str, str]):
+                     loginurl: str, account: Tuple[str, str, str, str, str]):
         # Create a fresh context
         context_alt: BrowserContext = browser.new_context()
         page_alt: Page = context_alt.new_page()
@@ -390,12 +366,8 @@ class Login(Module):
 
         # Navigate to landing page
         try:
-            response: Optional[Response] = page.goto(domainurl, timeout=Config.LOAD_TIMEOUT,
-                                                     wait_until=Config.WAIT_LOAD_UNTIL)
-            page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-
-            response_alt: Optional[Response] = page_alt.goto(domainurl, timeout=Config.LOAD_TIMEOUT,
-                                                             wait_until=Config.WAIT_LOAD_UNTIL)
+            response: Optional[Response] = page.goto(domainurl, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+            response_alt: Optional[Response] = page_alt.goto(domainurl, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
             page_alt.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error:
             page.close()
@@ -418,12 +390,9 @@ class Login(Module):
             return False
 
         # Accept cookies if needed
-        if Config.ACCEPT_COOKIES and cookies is not None:
-            cookies = cast(AcceptCookies, cookies)
-            cookies.receive_response(browser, context, page, [response], DequeDB(), (page.url, 0, 0, []),
-                                     page.url, [], [], 1, force=True)
-            cookies.receive_response(browser, context_alt, page_alt, [response_alt], DequeDB(),
-                                     (page_alt.url, 0, 0, []), page_alt.url, [], [], 1, force=True)
+        if Config.ACCEPT_COOKIES:
+            AcceptCookies.accept(page, domainurl)
+            AcceptCookies.accept(page_alt, domainurl)
 
         # Search page HTML for account indicators (name, username, email)
         if Login._verify_account_indicator(page, account[0], account[1], account[3], account[4]) and not Login._verify_account_indicator(page_alt, account[0], account[1], account[3], account[4]):
@@ -447,15 +416,7 @@ class Login(Module):
 
         # Check if login page is still accessible
         try:
-            response = page.goto(loginurl, timeout=Config.LOAD_TIMEOUT,
-                                 wait_until=Config.WAIT_LOAD_UNTIL)
-            page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-        except Error:
-            return True
-
-        try:
-            response_alt = page_alt.goto(loginurl, timeout=Config.LOAD_TIMEOUT,
-                                         wait_until=Config.WAIT_LOAD_UNTIL)
+            response_alt = page_alt.goto(loginurl, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
             page_alt.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error:
             return False
@@ -463,11 +424,23 @@ class Login(Module):
         if response_alt is None or response_alt.status >= 400:
             return False
 
+        try:
+            response = page.goto(loginurl, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+            page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+        except Error:
+            return True
+
         if response is None or response.status >= 400:
             return True
 
         # Try to find login forms
         form = FindLoginForms.find_login_form(page)
+
+        # Close pages
+        page.close()
+        page_alt.close()
+        context_alt.close()
+
         return form is None
 
     @staticmethod
