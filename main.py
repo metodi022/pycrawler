@@ -64,14 +64,11 @@ def main(job_id: str, crawlers_count: int, module_names: List[str], urls_path: O
     # Iterate over URLs and add them to database
     with database.atomic():  # speedup by using atomic transaction
         entry: Tuple[int, str]
-        count: int = 1
-        for entry in (CSVLoader(urls_path) if urls_path is not None else urls):
-            crawler_id: int = ((count - 1) % crawlers_count) + starting_crawler_id
+        for count, entry in enumerate((CSVLoader(urls_path) if urls_path is not None else urls)):
+            crawler_id: int = (count % crawlers_count) + starting_crawler_id
             url: str = ('https://' if not entry[1].startswith('http') else '') + entry[1]
             site: str = tld.get_tld(url, as_object=True).fld
-            # TODO: currently rank has no meaning?
-            URL.create(job=job_id, crawler=crawler_id, site=site, url=url, landing_page=url, rank=count)
-            count += 1
+            URL.create(job=job_id, crawler=None, site=site, url=url, landing_page=url, rank=int(entry[0]))
 
     # Create modules database
     log.info(f"Load modules database {modules}")
@@ -106,11 +103,21 @@ def _get_modules(module_names: List[str]) -> List[Type[Module]]:
     return result
 
 
+def _get_url(crawler_id: int) -> Optional[URL]:
+    with database.atomic():
+        url: Optional[URL] = URL.get_or_none(crawler=None)
+        if url is not None:
+            url.crawler = crawler_id
+            url.save()
+
+    return url
+
+
 def _start_crawler1(job_id: str, crawler_id: int, log_path: pathlib.Path,
                     modules: List[Type[Module]]) -> None:
 
     log = _get_logger(job_id, crawler_id, log_path)
-    url: Optional[URL] = URL.get_or_none(job=job_id, crawler=crawler_id, code=None)
+    url: Optional[URL] = _get_url(crawler_id)
 
     while url:
         crawler: Process = Process(target=_start_crawler2, args=(job_id, crawler_id, (url.url, 0, url.rank, []), log_path, modules))
@@ -144,7 +151,7 @@ def _start_crawler1(job_id: str, crawler_id: int, log_path: pathlib.Path,
 
         crawler.close()
         
-        url = URL.get_or_none(job=job_id, crawler=crawler_id, code=None)
+        url = _get_url(crawler_id)
 
 
 def _start_crawler2(job_id: str, crawler_id: int, url: Tuple[str, int, int, List[Tuple[str, str]]],

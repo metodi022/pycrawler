@@ -38,13 +38,11 @@ class CollectURLs(Module):
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module], repetition: int) -> None:
-        super().receive_response(browser, context, page, responses, context_database, url,
-                                 final_url, start, modules, repetition)
+        super().receive_response(browser, context, page, responses, context_database, url, final_url, start, modules, repetition)
 
         # Make sure to add page as seen
         parsed_url_final: Optional[tld.utils.Result] = get_tld_object(final_url)
-        context_database.add_seen(
-            get_url_full(parsed_url_final) if parsed_url_final is not None else final_url)
+        context_database.add_seen(get_url_full(parsed_url_final) if parsed_url_final is not None else final_url)
 
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
@@ -75,8 +73,7 @@ class CollectURLs(Module):
                 continue
 
             # Parse attribute
-            parsed_link: Optional[tld.utils.Result] = get_url_from_href(link.strip(),
-                                                                        parsed_url_final)
+            parsed_link: Optional[tld.utils.Result] = get_url_from_href(link.strip(), parsed_url_final)
             if parsed_link is None:
                 continue
 

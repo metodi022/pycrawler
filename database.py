@@ -21,7 +21,7 @@ class BaseModel(Model):
 
 class URL(BaseModel):
     job = TextField()
-    crawler = IntegerField()
+    crawler = IntegerField(null=True)
     site = TextField()
     url = TextField()
     landing_page = TextField()
