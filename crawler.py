@@ -30,8 +30,7 @@ class Crawler:
 
         # Load previous state
         if Config.RESTART and (Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
-            with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache",
-                      mode="rb") as file:
+            with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache", mode="rb") as file:
                 self._state = pickle.load(file)
 
         # Prepare modules
@@ -48,7 +47,7 @@ class Crawler:
     def start_crawl(self):
         url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = self._url
         if url is None:
-            self._log.info(f"Get URL {url[0] if url is not None else url}")
+            self._log.info(f"Get URL None")
             return
 
         # Initiate playwright, browser, context, and page

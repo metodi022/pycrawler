@@ -20,10 +20,7 @@ from loader.csvloader import CSVLoader
 from modules.module import Module
 
 
-def main(job_id: str, crawlers_count: int, module_names: List[str], urls_path: Optional[pathlib.Path] = None, urls: Optional[List[Tuple[int, str]]] = None, log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1) -> int:
-    if urls_path is None and not bool(urls):
-        raise RuntimeError('No urls specified')
-
+def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Optional[pathlib.Path] = None, urls: Optional[List[Tuple[int, str]]] = None, log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1) -> int:
     # Create log path if needed
     log_path: pathlib.Path = log_path or Config.LOG
     if not log_path.exists():
@@ -42,9 +39,9 @@ def main(job_id: str, crawlers_count: int, module_names: List[str], urls_path: O
     # Prepare logger
     if not (log_path / 'screenshots').exists():
         os.mkdir(log_path / 'screenshots')
-    handler: FileHandler = FileHandler(log_path / f"job{job_id}.log")
+    handler: FileHandler = FileHandler(log_path / f"job{job}.log")
     handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
-    log: Logger = Logger(f"Job {job_id}")
+    log: Logger = Logger(f"Job {job}")
     log.setLevel(Config.LOG_LEVEL)
     log.addHandler(handler)
 
@@ -62,13 +59,14 @@ def main(job_id: str, crawlers_count: int, module_names: List[str], urls_path: O
         database.create_tables([URL])
 
     # Iterate over URLs and add them to database
-    with database.atomic():  # speedup by using atomic transaction
-        entry: Tuple[int, str]
-        for count, entry in enumerate((CSVLoader(urls_path) if urls_path is not None else urls)):
-            crawler_id: int = (count % crawlers_count) + starting_crawler_id
-            url: str = ('https://' if not entry[1].startswith('http') else '') + entry[1]
-            site: str = tld.get_tld(url, as_object=True).fld
-            URL.create(job=job_id, crawler=None, site=site, url=url, landing_page=url, rank=int(entry[0]))
+    if urls_path is not None or urls:
+        with database.atomic():  # speedup by using atomic transaction
+            entry: Tuple[int, str]
+            for count, entry in enumerate((CSVLoader(urls_path) if urls_path is not None else urls)):
+                crawler_id: int = (count % crawlers_count) + starting_crawler_id
+                url: str = ('https://' if not entry[1].startswith('http') else '') + entry[1]
+                site: str = tld.get_tld(url, as_object=True).fld
+                URL.create(job=job, crawler=None, site=site, url=url, landing_page=url, rank=int(entry[0]))
 
     # Create modules database
     log.info(f"Load modules database {modules}")
@@ -78,11 +76,11 @@ def main(job_id: str, crawlers_count: int, module_names: List[str], urls_path: O
     # Prepare crawlers
     crawlers: List[Process] = []
     for i in range(0, crawlers_count):
-        process = Process(target=_start_crawler1, args=(job_id, i + starting_crawler_id, log_path, modules))
+        process = Process(target=_start_crawler1, args=(job, i + starting_crawler_id, log_path, modules))
         crawlers.append(process)
 
     for i, crawler in enumerate(crawlers):
-        log.info(f"Start crawler {i + starting_crawler_id} with JOBID {job_id} PID {crawler.pid}")
+        log.info(f"Start crawler {i + starting_crawler_id} with JOBID {job} PID {crawler.pid}")
         crawler.start()
 
     # Wait for crawlers to finish
@@ -103,30 +101,31 @@ def _get_modules(module_names: List[str]) -> List[Type[Module]]:
     return result
 
 
-def _get_url(crawler_id: int) -> Optional[URL]:
+def _get_url(job: str, crawler_id: int) -> Optional[URL]:
     with database.atomic():
-        url: Optional[URL] = URL.get_or_none(crawler=None)
+        url: Optional[URL] = URL.get_or_none(job=job, crawler=None)
         if url is not None:
             url.crawler = crawler_id
+            url.status = 'progress'
             url.save()
 
     return url
 
 
-def _start_crawler1(job_id: str, crawler_id: int, log_path: pathlib.Path,
+def _start_crawler1(job: str, crawler_id: int, log_path: pathlib.Path,
                     modules: List[Type[Module]]) -> None:
 
-    log = _get_logger(job_id, crawler_id, log_path)
-    url: Optional[URL] = _get_url(crawler_id)
+    log = _get_logger(job, crawler_id, log_path)
+    url: Optional[URL] = _get_url(job, crawler_id)
 
     while url:
-        crawler: Process = Process(target=_start_crawler2, args=(job_id, crawler_id, (url.url, 0, url.rank, []), log_path, modules))
+        crawler: Process = Process(target=_start_crawler2, args=(job, crawler_id, (url.url, 0, url.rank, []), log_path, modules))
         crawler.start()
 
         while crawler.is_alive():
             crawler.join(timeout=Config.RESTART_TIMEOUT)
 
-            line = _get_line_last(log_path / f"job{job_id}crawler{crawler_id}.log").split()
+            line = _get_line_last(log_path / f"job{job}crawler{crawler_id}.log").split()
 
             if len(line) > 1:
                 date1: datetime = datetime.today()
@@ -144,29 +143,31 @@ def _start_crawler1(job_id: str, crawler_id: int, log_path: pathlib.Path,
                 crawler.kill()
                 time.sleep(5)
 
-            if Config.RESTART and (Config.LOG / f"job{job_id}crawler{crawler_id}.cache").exists():
+            if Config.RESTART and (Config.LOG / f"job{job}crawler{crawler_id}.cache").exists():
                 crawler.close()
-                crawler = Process(target=_start_crawler2, args=(job_id, crawler_id, url, log_path, modules))
+                crawler = Process(target=_start_crawler2, args=(job, crawler_id, url, log_path, modules))
                 crawler.start()
 
         crawler.close()
-        
-        url = _get_url(crawler_id)
+
+        url.status = 'complete'
+        url.save()
+        url = _get_url(job, crawler_id)
 
 
-def _start_crawler2(job_id: str, crawler_id: int, url: Tuple[str, int, int, List[Tuple[str, str]]],
+def _start_crawler2(job: str, crawler_id: int, url: Tuple[str, int, int, List[Tuple[str, str]]],
                     log_path: pathlib.Path, modules: List[Type[Module]]) -> None:
-    log = _get_logger(job_id, crawler_id, log_path)
+    log = _get_logger(job, crawler_id, log_path)
     log.info('Start crawler')
-    crawler: Crawler = Crawler(job_id, crawler_id, url, log, modules)
+    crawler: Crawler = Crawler(job, crawler_id, url, log, modules)
     crawler.start_crawl()
     log.info('Stop crawler')
 
 
-def _get_logger(job_id: str, crawler_id: int, log_path: pathlib.Path) -> Logger:
-    handler: FileHandler = FileHandler(log_path / f"job{job_id}crawler{crawler_id}.log")
+def _get_logger(job: str, crawler_id: int, log_path: pathlib.Path) -> Logger:
+    handler: FileHandler = FileHandler(log_path / f"job{job}crawler{crawler_id}.log")
     handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
-    log = Logger(f"Job {job_id} Crawler {crawler_id}")
+    log = Logger(f"Job {job} Crawler {crawler_id}")
     log.setLevel(Config.LOG_LEVEL)
     log.addHandler(handler)
     return log
