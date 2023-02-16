@@ -26,7 +26,7 @@ class URL(BaseModel):
     url = TextField()
     landing_page = TextField()
     rank = IntegerField()
-    status = TextField(default='free')
+    state = TextField(default='free')
     code = IntegerField(null=True)
     error = TextField(null=True)
 

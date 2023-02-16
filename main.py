@@ -106,7 +106,7 @@ def _get_url(job: str, crawler_id: int) -> Optional[URL]:
         url: Optional[URL] = URL.get_or_none(job=job, crawler=None)
         if url is not None:
             url.crawler = crawler_id
-            url.status = 'progress'
+            url.state = 'progress'
             url.save()
 
     return url
@@ -150,7 +150,7 @@ def _start_crawler1(job: str, crawler_id: int, log_path: pathlib.Path,
 
         crawler.close()
 
-        url.status = 'complete'
+        url.state = 'complete'
         url.save()
         url = _get_url(job, crawler_id)
 
