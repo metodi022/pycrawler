@@ -97,9 +97,8 @@ class Crawler:
             # Save state
             try:
                 self._state['Crawler'] = context.storage_state()
-            except Exception:
-                # Ignored
-                pass
+            except Exception as e:
+                self._log.warning(e)
 
             if Config.RESTART:
                 with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache", mode='wb') as file:
