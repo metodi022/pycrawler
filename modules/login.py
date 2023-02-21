@@ -156,11 +156,15 @@ class Login(Module):
 
         # If filling of login form fails, continue to next login form URL
         if not Login._fill_login_form(page, form, account):
+            # TODO screenshot
             page.close()
             return False
 
+        # TODO screenshot
+
         # If posting login form fails, continue to next login form URL
         if not Login._post_login_form(page, form):
+            # TODO screenshot
             page.close()
             return False
 

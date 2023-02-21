@@ -103,7 +103,7 @@ def _get_modules(module_names: List[str]) -> List[Type[Module]]:
 
 def _get_url(job: str, crawler_id: int) -> Optional[URL]:
     with database.atomic():
-        url: Optional[URL] = URL.get_or_none(job=job, crawler=None)
+        url: Optional[URL] = URL.get_or_none(job=job, state='free')
         if url is not None:
             url.crawler = crawler_id
             url.state = 'progress'

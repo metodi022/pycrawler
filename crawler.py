@@ -29,6 +29,7 @@ class Crawler:
         self._state: Dict[str, Any] = dict()
 
         # Load previous state
+        self._state['Crawler'] = None
         if Config.RESTART and (Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
             with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache", mode="rb") as file:
                 self._state = pickle.load(file)
@@ -94,7 +95,12 @@ class Crawler:
             self._log.info(f"Get URL {url[0] if url is not None else url}")
 
             # Save state
-            self._state['Crawler'] = context.storage_state()
+            try:
+                self._state['Crawler'] = context.storage_state()
+            except Exception:
+                # Ignored
+                pass
+
             if Config.RESTART:
                 with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache", mode='wb') as file:
                     pickle.dump(self._state, file)
