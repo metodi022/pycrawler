@@ -6,21 +6,29 @@ import pathlib
 import re
 import sys
 import time
+import traceback
 from datetime import datetime
-from logging import Logger, FileHandler, Formatter
+from logging import FileHandler, Formatter, Logger
 from multiprocessing import Process
-from typing import List, Type, Tuple, Optional
+from typing import List, Optional, Tuple, Type
 
 import tld
 
-from config import Config
 from crawler import Crawler
-from database import database, URL
+from database import URL, database
 from loader.csvloader import CSVLoader
 from modules.module import Module
 
 
 def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Optional[pathlib.Path] = None, urls: Optional[List[Tuple[int, str]]] = None, log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1) -> int:
+    try:
+        from config import Config
+    except Exception as e:
+        traceback.print_exc()
+        print(e)
+        print("Prepare the config.py file. You can use the config.py.example as a start.")
+        return
+
     # Create log path if needed
     log_path: pathlib.Path = log_path or Config.LOG
     if not log_path.exists():
