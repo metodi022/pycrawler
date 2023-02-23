@@ -1,7 +1,7 @@
 from collections import deque
-from typing import Optional, Tuple, Deque, MutableSet, List
+from typing import Deque, List, MutableSet, Optional, Tuple
 
-from peewee import Model, IntegerField, TextField, PostgresqlDatabase
+from peewee import IntegerField, Model, PostgresqlDatabase, TextField
 
 from config import Config
 

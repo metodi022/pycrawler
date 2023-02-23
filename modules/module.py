@@ -1,8 +1,8 @@
 from datetime import datetime
 from logging import Logger
-from typing import List, Tuple, Callable, Optional, Dict, Any
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-import tld.utils
+import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
 from database import DequeDB

@@ -2,17 +2,16 @@ import re
 import urllib.parse
 from datetime import datetime
 from logging import Logger
-from typing import Dict, Any, Tuple, List, Callable, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import tld
 from peewee import IntegerField, TextField
-from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
+from playwright.sync_api import Browser, BrowserContext, Error, Locator, Page, Response
 
 from config import Config
-from database import DequeDB, BaseModel, database
+from database import BaseModel, DequeDB, database
 from modules.module import Module
-from utils import get_url_full, get_locator_count, get_tld_object, get_url_origin, CLICKABLES, \
-    get_outer_html, get_locator_nth, SSO, invoke_click
+from utils import CLICKABLES, SSO, get_locator_count, get_locator_nth, get_outer_html, get_tld_object, get_url_full, get_url_origin, invoke_click
 
 
 class RegistrationForm(BaseModel):

@@ -1,15 +1,14 @@
 import re
 from datetime import datetime
 from logging import Logger
-from typing import List, Tuple, MutableSet, Optional, Dict, Any
+from typing import Any, Dict, List, MutableSet, Optional, Tuple
 
 import nostril  # https://github.com/casics/nostril
-import tld.utils
-from peewee import IntegerField, BooleanField, TextField
-from playwright.sync_api import Browser, BrowserContext, Page, Response, Error
+from peewee import BooleanField, IntegerField, TextField
+from playwright.sync_api import Browser, BrowserContext, Error, Page, Response
 
 from config import Config
-from database import DequeDB, BaseModel, database
+from database import BaseModel, DequeDB, database
 from modules.module import Module
 from utils import get_tld_object, get_url_origin, get_url_scheme_site
 

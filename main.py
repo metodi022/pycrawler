@@ -26,11 +26,11 @@ def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Opti
     except Exception as e:
         traceback.print_exc()
         print(e)
-        print("Prepare the config.py file. You can use the config.py.example as a start.")
-        return
+        print("Prepare the config.py file. You can use the config-example.py as a start.")
+        return 1
 
     # Create log path if needed
-    log_path: pathlib.Path = log_path or Config.LOG
+    log_path = log_path or Config.LOG
     if not log_path.exists():
         os.mkdir(log_path)
 
@@ -206,7 +206,7 @@ def _get_line_last(path: str | pathlib.Path) -> str:
                         return ''
                     break
 
-            line = file.readline() or ''
+            line = file.readline() or b''
     return line.decode("utf-8", errors="ignore")
 
 

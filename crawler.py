@@ -2,14 +2,13 @@ import os
 import pickle
 from datetime import datetime
 from logging import Logger
-from typing import Optional, Tuple, List, Type, Callable, Dict, Any
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import tld
-from playwright.sync_api import sync_playwright, Playwright, Browser, BrowserContext, Page, \
-    Response, Error
+from playwright.sync_api import Browser, BrowserContext, Error, Page, Playwright, Response, sync_playwright
 
 from config import Config
-from database import DequeDB, URL
+from database import URL, DequeDB
 from modules.acceptcookies import AcceptCookies
 from modules.collecturls import CollectURLs
 from modules.module import Module

@@ -2,11 +2,11 @@ import os
 import pathlib
 import re
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 
 import numpy
 import tld
-from playwright.sync_api import Page, Locator, Error, Frame, Response
+from playwright.sync_api import Error, Frame, Locator, Page, Response
 from sklearn.cluster import dbscan
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
@@ -258,7 +258,7 @@ def clear_cache(restart: bool, path: pathlib.Path):
         os.remove(path)
 
 
-def refresh_page(page: Page, url: str) -> Optional[Response]:
+def refresh_page(page: Page | Frame, url: str) -> Optional[Response]:
     try:
         response = page.goto(url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
         page.wait_for_timeout(Config.WAIT_AFTER_LOAD)

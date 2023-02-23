@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 from peewee import CharField, IntegerField, TextField
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
-from database import DequeDB, BaseModel, database
+from database import BaseModel, DequeDB, database
 from modules.module import Module
 
 

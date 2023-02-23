@@ -1,16 +1,14 @@
 from datetime import datetime
 from logging import Logger
-from typing import Optional, List, Tuple, Callable, Dict, Any
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import tld
-from playwright.sync_api import Browser, BrowserContext, Page, Response, Locator, Error
+from playwright.sync_api import Browser, BrowserContext, Error, Locator, Page, Response
 
 from config import Config
 from database import DequeDB
 from modules.module import Module
-from utils import get_tld_object, get_url_from_href, get_url_origin, get_url_full, \
-    get_locator_count, get_locator_nth, get_locator_attribute, get_url_full_with_query_fragment, \
-    get_url_entity, get_url_full_with_query
+from utils import get_locator_attribute, get_locator_count, get_locator_nth, get_tld_object, get_url_entity, get_url_from_href, get_url_full, get_url_full_with_query, get_url_full_with_query_fragment, get_url_origin
 
 
 class CollectURLs(Module):

@@ -1,12 +1,12 @@
 from datetime import datetime
 from logging import Logger
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
-from peewee import IntegerField, DateTimeField, TextField
+from peewee import DateTimeField, IntegerField, TextField
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
 from config import Config
-from database import DequeDB, BaseModel, database
+from database import BaseModel, DequeDB, database
 from modules.module import Module
 
 
