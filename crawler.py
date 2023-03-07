@@ -47,20 +47,27 @@ class Crawler:
     def start_crawl(self):
         url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = self._url
         if url is None:
-            self._log.info(f"Get URL None")
+            self._log.info("Get URL None")
             return
 
         # Initiate playwright, browser, context, and page
         playwright: Playwright = sync_playwright().start()
-        browser: Browser = playwright.firefox.launch(
-            headless=Config.HEADLESS) if Config.BROWSER == 'firefox' else (playwright.webkit.launch(
-            headless=Config.HEADLESS) if Config.BROWSER == 'webkit' else playwright.chromium.launch(
-            headless=Config.HEADLESS))
+
+        browser: Browser
+        if Config.BROWSER == 'firefox':
+            browser = playwright.firefox.launch(headless=Config.HEADLESS)
+        elif Config.BROWSER == 'webkit':
+            browser = playwright.webkit.launch(headless=Config.HEADLESS)
+        else:
+            browser = playwright.chromium.launch(headless=Config.HEADLESS)
+
         context: BrowserContext = browser.new_context(
             storage_state=self._state.get('Crawler', None),
             **playwright.devices[Config.DEVICE],
             locale=Config.LOCALE,
-            timezone_id=Config.TIMEZONE)
+            timezone_id=Config.TIMEZONE
+        )
+
         context_database: DequeDB = DequeDB()
         page: Page = context.new_page()
         self._log.info(f"Start {Config.BROWSER.capitalize()} {browser.version}")
@@ -107,10 +114,26 @@ class Crawler:
                 with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache", mode='wb') as file:
                     pickle.dump(self._state, file)
 
-            # Close and open the context again (to avoid memory issues)
+            # Close everything (to avoid memory issues)
             page.close()
             context.close()
-            context = browser.new_context(storage_state=self._state['Crawler'])
+            browser.close()
+            
+            # Re-open stuff
+            if Config.BROWSER == 'firefox':
+                browser = playwright.firefox.launch(headless=Config.HEADLESS)
+            elif Config.BROWSER == 'webkit':
+                browser = playwright.webkit.launch(headless=Config.HEADLESS)
+            else:
+                browser = playwright.chromium.launch(headless=Config.HEADLESS)
+            
+            context = browser.new_context(
+                storage_state=self._state.get('Crawler', None),
+                **playwright.devices[Config.DEVICE],
+                locale=Config.LOCALE,
+                timezone_id=Config.TIMEZONE
+            )
+            
             page = context.new_page()
 
         # Close everything

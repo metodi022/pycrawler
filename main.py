@@ -153,7 +153,7 @@ def _start_crawler1(job: str, crawler_id: int, log_path: pathlib.Path,
 
             if Config.RESTART and (Config.LOG / f"job{job}crawler{crawler_id}.cache").exists():
                 crawler.close()
-                crawler = Process(target=_start_crawler2, args=(job, crawler_id, url, log_path, modules))
+                crawler = Process(target=_start_crawler2, args=(job, crawler_id, (url.url, 0, url.rank, []), log_path, modules))
                 crawler.start()
 
         crawler.close()
