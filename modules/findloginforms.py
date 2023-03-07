@@ -71,6 +71,9 @@ class FindLoginForms(Module):
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
+            # Add search engine if needed
+            if self._found <= 0 and len(context_database) <= 0 and Config.RECURSIVE:
+                context_database.add_url(('https://www.google.com/search?q=' + urllib.parse.quote(f"\"login\" site:{self.site}"), Config.DEPTH - 1, self.rank, []))
             return
 
         # Parse current page URL
@@ -104,7 +107,7 @@ class FindLoginForms(Module):
             return
 
         # Do not use search engine without recursive option
-        if not Config.RECURSIVE or Config.DEPTH <= 0:
+        if not Config.RECURSIVE:
             return
 
         # Finally, use search engine with login keyword

@@ -178,8 +178,7 @@ class Login(Module):
         # Find relevant fields
         try:
             password_field: Locator = form.locator('input[type="password"]:visible')
-            text_fields: Locator = form.locator(
-                'input[type="email"],input[type="text"],input:not([type]):visible')
+            text_fields: Locator = form.locator('input[type="email"],input[type="text"],input:not([type]):visible')
         except Error:
             return False
 

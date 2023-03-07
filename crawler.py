@@ -115,6 +115,7 @@ class Crawler:
                     pickle.dump(self._state, file)
 
             # Close everything (to avoid memory issues)
+            self._log.info("Restart page, context and browser")
             page.close()
             context.close()
             browser.close()
@@ -141,14 +142,13 @@ class Crawler:
         context.close()
         browser.close()
         playwright.stop()
-        self._log.info(f"Close Chromium")
+        self._log.info("Close page, context and browser")
 
         # Delete old cache
         if Config.RESTART and (Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
             os.remove(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
 
-    def _open_url(self, page: Page, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> \
-            Optional[Response]:
+    def _open_url(self, page: Page, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> Optional[Response]:
         response: Optional[Response] = None
         error_message: Optional[str] = None
 
@@ -160,7 +160,7 @@ class Crawler:
 
         if url[1] == 0 and self._url[0] == url[0]:
             code: int = response.status if response is not None else Config.ERROR_CODES['response_error']
-            URL.update(landing_page=page.url, code=code, error=error_message).where((URL.job == self.job_id) & (URL.crawler == self.crawler_id) & (URL.url == url[0]) & (URL.rank == url[2])).execute()
+            URL.update(landing_page=page.url, code=code, error=error_message).where((URL.job == self.job_id) & (URL.crawler == self.crawler_id) & (URL.url == url[0])).execute()
 
         return response
 

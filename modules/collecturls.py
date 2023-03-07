@@ -18,7 +18,7 @@ class CollectURLs(Module):
 
     def __init__(self, job_id: str, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
         super().__init__(job_id, crawler_id, log, state)
-        self._max_urls: int = 0
+        self._max_urls: int = Config.MAX_URLS
         self._url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
@@ -51,8 +51,7 @@ class CollectURLs(Module):
         if self.depth >= Config.DEPTH or self._max_urls < 1:
             return
 
-        parsed_url: Optional[tld.utils.Result] = get_tld_object(self.currenturl)
-        if parsed_url is None or parsed_url_final is None:
+        if parsed_url_final is None:
             return
 
         # Get all <a> tags with a href
@@ -76,16 +75,16 @@ class CollectURLs(Module):
                 continue
 
             # Check for same origin
-            if Config.SAME_ORIGIN and get_url_origin(parsed_url) != get_url_origin(parsed_link):
+            if Config.SAME_ORIGIN and self.origin != get_url_origin(parsed_link):
                 continue
 
             # Check for same ETLD+1
-            if Config.SAME_ETLDP1 and parsed_url.fld != parsed_link.fld:
+            if Config.SAME_ETLDP1 and self.site != parsed_link.fld:
                 continue
 
-            # Check for same entity
-            if Config.SAME_ENTITY and get_url_entity(parsed_url) != get_url_entity(parsed_link):
-                continue
+            # TODO: Check for same entity
+            # if Config.SAME_ENTITY and get_url_entity(parsed_url) != get_url_entity(parsed_link):
+            #    continue
 
             # Check seen
             parsed_link_full: str = get_url_full_with_query(parsed_link) if Config.QUERY else get_url_full(parsed_link)
