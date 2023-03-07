@@ -1,6 +1,6 @@
 import csv
 from pathlib import Path
-from typing import Tuple, Iterator
+from typing import Iterator, Tuple
 
 from loader.loader import Loader
 
@@ -10,8 +10,8 @@ class CSVLoader(Loader):
         super().__init__(source)
         self._length: int = 0
 
-        with open(source, mode='r', encoding='utf-8', newline='') as file:
-            self._length = sum(1 for _ in file)
+        # with open(source, mode='r', encoding='utf-8', newline='') as file:
+        #     self._length = sum(1 for _ in file)
 
     def __iter__(self) -> Iterator[Tuple[int, str]]:
         def result(source: Path) -> Iterator[Tuple[int, str]]:

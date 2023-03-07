@@ -56,7 +56,11 @@ class Crawler:
             headless=Config.HEADLESS) if Config.BROWSER == 'firefox' else (playwright.webkit.launch(
             headless=Config.HEADLESS) if Config.BROWSER == 'webkit' else playwright.chromium.launch(
             headless=Config.HEADLESS))
-        context: BrowserContext = browser.new_context(storage_state=self._state.get('Crawler', None))
+        context: BrowserContext = browser.new_context(
+            storage_state=self._state.get('Crawler', None),
+            **playwright.devices[Config.DEVICE],
+            locale=Config.LOCALE,
+            timezone_id=Config.TIMEZONE)
         context_database: DequeDB = DequeDB()
         page: Page = context.new_page()
         self._log.info(f"Start {Config.BROWSER.capitalize()} {browser.version}")

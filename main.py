@@ -19,16 +19,16 @@ from database import URL, database
 from loader.csvloader import CSVLoader
 from modules.module import Module
 
+try:
+    Config = importlib.import_module('config').Config
+except ModuleNotFoundError as e:
+    traceback.print_exc()
+    print(e)
+    print("Prepare the config.py file. You can use the config-example.py as a start.")
+    sys.exit(1)
+
 
 def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Optional[pathlib.Path] = None, urls: Optional[List[Tuple[int, str]]] = None, log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1) -> int:
-    try:
-        from config import Config
-    except Exception as e:
-        traceback.print_exc()
-        print(e)
-        print("Prepare the config.py file. You can use the config-example.py as a start.")
-        return 1
-
     # Create log path if needed
     log_path = log_path or Config.LOG
     if not log_path.exists():
@@ -70,7 +70,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Opti
     if urls_path is not None or urls:
         with database.atomic():  # speedup by using atomic transaction
             entry: Tuple[int, str]
-            for count, entry in enumerate((CSVLoader(urls_path) if urls_path is not None else urls)):
+            for count, entry in enumerate(CSVLoader(urls_path) if urls_path is not None else urls):
                 crawler_id: int = (count % crawlers_count) + starting_crawler_id
                 url: str = ('https://' if not entry[1].startswith('http') else '') + entry[1]
                 site: str = tld.get_tld(url, as_object=True).fld

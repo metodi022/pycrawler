@@ -14,10 +14,11 @@ class Config:
     LOG_LEVEL = INFO  # DEBUG|INFO|WARNING|ERROR
 
     BROWSER: Literal['chromium', 'firefox', 'webkit'] = 'chromium'
+    DEVICE: str = 'Desktop Chrome'  # A device supported by playwright (https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/deviceDescriptorsSource.json)
+    LOCALE: str = 'de-DE'
+    TIMEZONE: str = 'Europe/Berlin'
     HEADLESS: bool = True  # Headless browser
-    RESTART: bool = True  # If the browser crashes, try to restore the crawling process using a
-    # cached file and continue with the next URL in line for the domain, otherwise continue with
-    # the next domain
+    RESTART: bool = True  # If the browser crashes, try to restore the crawler
 
     RECURSIVE: bool = True  # Discover additional URLs while crawling
     QUERY: bool = False  # The same URLs that have different query strings are unique
