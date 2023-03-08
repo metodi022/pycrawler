@@ -96,6 +96,7 @@ class FindLoginForms(Module):
         # Find login forms
         form: Optional[Locator] = FindLoginForms.find_login_form(page, interact=(self._found < 3))
         if form is not None:
+            self._log.info("Found a login form")
             self._found += 1
             self._state['FindLoginForms'] = self._found
             LoginForm.create(rank=self.rank, job=self.job_id, crawler=self.crawler_id,

@@ -1,4 +1,3 @@
-import json
 from logging import Logger
 from typing import List, Optional, Tuple
 
@@ -10,18 +9,19 @@ from modules.module import Module
 
 
 class Header(BaseModel):
-    rank = IntegerField()
     job = TextField()
     crawler = IntegerField()
+    site = TextField()
     url = TextField()
     depth = IntegerField()
     code = IntegerField()
     method = CharField()
-    type = CharField()
+    content = CharField(null=True)
+    resource = CharField()
     fromurl = TextField()
     fromurlfinal = TextField()
     tourl = TextField()
-    headers = TextField()
+    headers = TextField(null=True)
 
 
 class CollectHeaders(Module):
@@ -43,14 +43,16 @@ class CollectHeaders(Module):
         def handler(response: Response):
             headers: Optional[str]
             try:
-                headers = json.dumps(response.headers_array())
-            except ValueError:
+                headers = str(response.headers_array())
+            except Exception as error:
+                self._log.warning(f"Get headers fail: {error}")
                 headers = None
 
-            Header.create(rank=self.rank, job=self.job_id, crawler=self.crawler_id, url=self.url,
+            Header.create(job=self.job_id, crawler=self.crawler_id, site=self.site, url=self.url,
                           depth=self.depth, code=response.status, method=response.request.method,
-                          type=response.headers.get('content-type', response.request.resource_type),
-                          fromurl=self.currenturl, fromurlfinal=response.frame.url,
-                          tourl=response.url, headers=headers)
+                          content=response.headers.get('content-type', None),
+                          resource=response.request.resource_type,
+                          fromurl=self.currenturl, fromurlfinal=page.url, tourl=response.url,
+                          headers=headers)
 
         page.on('response', handler)

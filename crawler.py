@@ -30,6 +30,7 @@ class Crawler:
         # Load previous state
         self._state['Crawler'] = None
         if Config.RESTART and (Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
+            self._log.debug("Loading old cache")
             with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache", mode="rb") as file:
                 self._state = pickle.load(file)
 
@@ -38,6 +39,7 @@ class Crawler:
         self._modules += [AcceptCookies(job_id, crawler_id, log, self._state)] if Config.ACCEPT_COOKIES else []
         self._modules += [CollectURLs(job_id, crawler_id, log, self._state)] if Config.RECURSIVE else []
         self._modules += self._initialize_modules(modules, job_id, crawler_id, log, self._state)
+        self._log.debug(f"Prepared modules: {self._modules}")
 
         # Prepare filters
         url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
@@ -108,14 +110,13 @@ class Crawler:
             try:
                 self._state['Crawler'] = context.storage_state()
             except Exception as e:
-                self._log.warning(e)
+                self._log.warning(f"Get context fail: {e}")
 
             if Config.RESTART:
                 with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache", mode='wb') as file:
                     pickle.dump(self._state, file)
 
             # Close everything (to avoid memory issues)
-            self._log.info("Restart page, context and browser")
             page.close()
             context.close()
             browser.close()
@@ -142,10 +143,10 @@ class Crawler:
         context.close()
         browser.close()
         playwright.stop()
-        self._log.info("Close page, context and browser")
 
         # Delete old cache
         if Config.RESTART and (Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
+            self._log.debug("Deleting cache")
             os.remove(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
 
     def _open_url(self, page: Page, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> Optional[Response]:
@@ -160,7 +161,7 @@ class Crawler:
 
         if url[1] == 0 and self._url[0] == url[0]:
             code: int = response.status if response is not None else Config.ERROR_CODES['response_error']
-            URL.update(landing_page=page.url, code=code, error=error_message).where((URL.job == self.job_id) & (URL.crawler == self.crawler_id) & (URL.url == url[0])).execute()
+            URL.update(landing_page=page.url, code=code, error=error_message).where((URL.job == self.job_id) & (URL.crawler == self.crawler_id) & (URL.url == url[0]) & (URL.state == 'progress')).execute()
 
         return response
 
