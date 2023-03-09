@@ -1,31 +1,17 @@
 import re
 from datetime import datetime
 from logging import Logger
-from typing import List, Tuple, Callable, Optional, cast, Dict, Any
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import tld
-from peewee import CharField, DateField, DoesNotExist
-from playwright.sync_api import Browser, BrowserContext, Page, Response, Error, Locator
+from playwright.sync_api import Browser, BrowserContext, Error, Locator, Page, Response
 
 from config import Config
-from database import DequeDB, BaseModel, database
+from database import DequeDB
 from modules.acceptcookies import AcceptCookies
 from modules.findloginforms import FindLoginForms, LoginForm
 from modules.module import Module
-from utils import get_locator_count, get_locator_nth, CLICKABLES, \
-    get_locator_attribute, get_outer_html, invoke_click, SSO, get_label_for, \
-    get_url_full_with_query_fragment, get_visible_extra
-
-
-class Account(BaseModel):
-    site = CharField()
-    email = CharField()
-    username = CharField()
-    password = CharField()
-    firstname = CharField()
-    lastname = CharField()
-    birthday = DateField()
-    gender = CharField()
+from utils import CLICKABLES, SSO, get_label_for, get_locator_attribute, get_locator_count, get_locator_nth, get_outer_html, get_url_full_with_query_fragment, get_visible_extra, invoke_click
 
 
 class Login(Module):
@@ -39,16 +25,13 @@ class Login(Module):
 
     def __init__(self, job_id: str, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
         super().__init__(job_id, crawler_id, log, state)
-        self.login = False
+        self.loginsuccess: bool = False
         self.loginurl: Optional[str] = None
-        self._account: Optional[Account] = None
+        self.account: Optional[Tuple[str, str, str, str, str]] = None
 
     @staticmethod
     def register_job(log: Logger) -> None:
         FindLoginForms.register_job(log)
-        log.info('Create accounts table')
-        with database:
-            database.create_tables([Account])
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
                      context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
@@ -58,18 +41,15 @@ class Login(Module):
         if self.ready:
             return
 
-        # Get account from database
-        try:
-            self._account = Account.get(site=self.site)
-        except DoesNotExist:
-            self._log.info(f"Found no credentials for {self.site}")
+        # TODO: Get account somehow
+
+        if self.account is None:
+            self._log.info(f"Found no account for {self.site}")
             return
 
-        self._account = cast(Account, self._account)
-
         if self._state.get('Login', None) is not None:
-            self.login = True
-            self.loginurl = self._state['Login']
+            self.loginsuccess = True
+            self.loginurl, self.account = self._state['Login']
             return
 
         # Get URLs with login forms for given site
@@ -78,28 +58,20 @@ class Login(Module):
             self._log.info(f"Found no login URLs for {self.site}")
             return
 
-        account: Tuple[str, str, str, str, str] = cast(Tuple[str, str, str, str, str],
-                                                       (self._account.email,
-                                                        self._account.username,
-                                                        self._account.password,
-                                                        self._account.firstname,
-                                                        self._account.lastname))
-
         # Iterate over login form URLs
         formurl: LoginForm
         for formurl in formsurls:
             self._log.info(f"Get login URL {formurl.formurl}")
 
-            if not Login.login(browser, context, self.url, formurl.formurl, account):
-                if formurl.success is None:
-                    formurl.success = False
-                    formurl.save()
+            if not Login.login(browser, context, self.url, formurl.formurl, self.account):
+                formurl.success = False
+                formurl.save()
                 continue
 
             self._log.info(f"Login success {formurl.formurl}")
-            self.login = True
-            self.loginurl = formurl
-            self._state['Login'] = self.loginurl
+            self.loginsuccess = True
+            self.loginurl = formurl.formurl
+            self._state['Login'] = (self.loginurl, self.account)
             formurl.success = True
             formurl.save()
             return
@@ -108,15 +80,17 @@ class Login(Module):
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], modules: List[Module], repetition: int) -> None:
-        super().receive_response(browser, context, page, responses, context_database, url,
-                                 final_url, start, modules, repetition)
+        super().receive_response(browser, context, page, responses, context_database, url, final_url, start, modules, repetition)
+
+        # TODO screenshots + better feedback
 
         # Check if we are at the end of the crawl
         if len(context_database) > 0 or repetition < Config.REPETITIONS:
             return
 
-        # TODO At the end of the crawl check if we are still logged-in
-        # TODO screenshots + better feedback
+        # At the end of the crawl check if we are still logged-in
+        if self.loginsuccess and self.loginurl is not None and self.account is not None:
+            self.loginsuccess = Login.verify_login(browser, context, self.url, self.loginurl, self.account)
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         # Ignore URLs which could lead to logout
