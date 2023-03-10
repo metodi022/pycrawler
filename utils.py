@@ -1,8 +1,7 @@
 import os
 import pathlib
 import re
-from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 import numpy
 import tld

@@ -22,13 +22,11 @@ class Crawler:
         # Prepare database and log
         self.job_id: str = job_id
         self.crawler_id: int = crawler_id
-        self._site = tld.get_tld(url[0], as_object=True).fld
         self._url: Tuple[str, int, int, List[Tuple[str, str]]] = url
         self._log: Logger = log
         self._state: Dict[str, Any] = dict()
 
         # Load previous state
-        self._state['Crawler'] = None
         if Config.RESTART and (Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
             self._log.debug("Loading old cache")
             with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache", mode="rb") as file:
@@ -38,13 +36,15 @@ class Crawler:
         self._modules: List[Module] = []
         self._modules += [AcceptCookies(job_id, crawler_id, log, self._state)] if Config.ACCEPT_COOKIES else []
         self._modules += [CollectURLs(job_id, crawler_id, log, self._state)] if Config.RECURSIVE else []
-        self._modules += self._initialize_modules(modules, job_id, crawler_id, log, self._state)
+        for module in modules:
+            self._modules.append(module(self.job_id, self.crawler_id, self._log, self._state))
         self._log.debug(f"Prepared modules: {self._modules}")
 
         # Prepare filters
         url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
         for module in self._modules:
             module.add_url_filter_out(url_filter_out)
+        self._log.debug("Prepared filters")
 
     def start_crawl(self):
         url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = self._url
@@ -72,7 +72,7 @@ class Crawler:
 
         context_database: DequeDB = DequeDB()
         page: Page = context.new_page()
-        self._log.info(f"Start {Config.BROWSER.capitalize()} {browser.version}")
+        self._log.debug(f"Start {Config.BROWSER.capitalize()} {browser.version}")
 
         if 'DequeDB' in self._state:
             context_database._data = self._state['DequeDB'][0]
@@ -97,7 +97,7 @@ class Crawler:
 
                 # Wait after page is loaded
                 page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                get_screenshot(page, (Config.LOG / f"screenshots/job{self.job_id}-{self._site}.png"), False)
+                get_screenshot(page, (Config.LOG / f"screenshots/job{self.job_id}-{tld.get_tld(self._url[0], as_object=True).fld}.png"), False)
 
                 # Run modules response handler
                 self._invoke_response_handler(browser, context, page, [response], url, context_database, [datetime.now()], repetition + 1)
@@ -109,8 +109,8 @@ class Crawler:
             # Save state
             try:
                 self._state['Crawler'] = context.storage_state()
-            except Exception as e:
-                self._log.warning(f"Get context fail: {e}")
+            except Exception as error:
+                self._log.warning(f"Get context fail: {error}")
 
             if Config.RESTART:
                 with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache", mode='wb') as file:
@@ -182,10 +182,3 @@ class Crawler:
 
         for module in self._modules:
             module.receive_response(browser, context, page, responses, context_database, url, page.url, start, self._modules, repetition)
-
-    def _initialize_modules(self, modules: List[Type[Module]], job_id: str, crawler_id: int,
-                            log: Logger, state: Dict[str, Any]) -> List[Module]:
-        result: List[Module] = []
-        for module in modules:
-            result.append(module(job_id, crawler_id, log, state))
-        return result

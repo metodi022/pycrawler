@@ -13,6 +13,7 @@ from multiprocessing import Process
 from typing import List, Optional, Tuple, Type
 
 import tld
+from tld.exceptions import TldBadUrl, TldDomainNotFound
 
 from crawler import Crawler
 from database import URL, database
@@ -58,7 +59,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Opti
         module_names = module_names[0].split()
 
     # Importing modules
-    log.info(f"Import modules {module_names}")
+    log.info("Import modules %s", str(module_names))
     modules: List[Type[Module]] = _get_modules(module_names)
 
     # Creating database
@@ -70,14 +71,16 @@ def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Opti
     if urls_path is not None or urls:
         with database.atomic():  # speedup by using atomic transaction
             entry: Tuple[int, str]
-            for count, entry in enumerate(CSVLoader(urls_path) if urls_path is not None else urls):
-                crawler_id: int = (count % crawlers_count) + starting_crawler_id
+            for entry in (CSVLoader(urls_path) if urls_path is not None else urls):
                 url: str = ('https://' if not entry[1].startswith('http') else '') + entry[1]
-                site: str = tld.get_tld(url, as_object=True).fld
+                try:
+                    site: str = tld.get_tld(url, as_object=True).fld
+                except (TldBadUrl, TldDomainNotFound):
+                    log.warning("Could not parse %s", url)
+                    continue
                 URL.create(job=job, crawler=None, site=site, url=url, landing_page=url, rank=int(entry[0]))
 
     # Create modules database
-    log.info(f"Load modules database {modules}")
     for module in modules:
         module.register_job(log)
 
