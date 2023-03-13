@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from logging import Logger
-from typing import Any, Dict, List, MutableSet, Optional, Tuple
+from typing import List, MutableSet, Optional, Tuple
 
 import nostril  # https://github.com/casics/nostril
 from peewee import BooleanField, IntegerField, TextField
@@ -10,7 +10,7 @@ from playwright.sync_api import Browser, BrowserContext, Error, Page, Response
 from config import Config
 from database import BaseModel, DequeDB, database
 from modules.module import Module
-from utils import get_tld_object, get_url_origin, get_url_scheme_site
+from utils import get_tld_object
 
 
 class Email(BaseModel):
@@ -28,9 +28,11 @@ class Email(BaseModel):
 class FindEmails(Module):
     EMAILSRE: str = r'[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+'
 
-    def __init__(self, job_id: str, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
-        super().__init__(job_id, crawler_id, log, state)
-        self._seen: MutableSet[str] = set()
+    def __init__(self, crawler) -> None:
+        super().__init__(crawler)
+        self._seen: MutableSet[str] = self.crawler.state.get('FindContactsEmail', set())
+
+        self.crawler.state['FindContactsEmail'] = self._seen
 
     @staticmethod
     def register_job(log: Logger) -> None:
@@ -39,24 +41,18 @@ class FindEmails(Module):
             database.create_tables([Email])
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
-                     modules: List[Module]) -> None:
-        super().add_handlers(browser, context, page, context_database, url, modules)
+                     context_database: DequeDB,
+                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+        super().add_handlers(browser, context, page, context_database, url)
 
-        if self.ready:
-            return
-
-        self._seen = self._state.get('FindContactsEmail', self._seen)
-        self._state['FindContactsEmail'] = self._seen
-
-        context_database.add_url((self.origin + '/.well-known/security.txt', Config.DEPTH, self.rank, []))
-        context_database.add_url((self.scheme_site + '/.well-known/security.txt', Config.DEPTH, self.rank, []))
+        context_database.add_url((self.crawler.origin + '/.well-known/security.txt', Config.DEPTH, self.crawler.rank, []))
+        context_database.add_url((f"{self.crawler.scheme}://{self.crawler.site}" + '/.well-known/security.txt', Config.DEPTH, self.crawler.rank, []))
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List[Module], repetition: int) -> None:
-        super().receive_response(browser, context, page, responses, context_database, url, final_url, start, modules, repetition)
+                         start: List[datetime], repetition: int) -> None:
+        super().receive_response(browser, context, page, responses, context_database, url, final_url, start, repetition)
 
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
@@ -87,6 +83,7 @@ class FindEmails(Module):
                 # Ignored
                 pass
 
-            Email.create(rank=self.rank, job=self.job_id, crawler=self.crawler_id, site=self.site,
-                         depth=self.depth, email=email, nonsense=nonsense, fromurl=self.currenturl,
-                         finalurl=page.url)
+            Email.create(rank=self.crawler.rank, job=self.crawler.job_id,
+                         crawler=self.crawler.crawler_id, site=self.crawler.site,
+                         depth=self.crawler.depth, email=email, nonsense=nonsense,
+                         fromurl=self.crawler.currenturl, finalurl=page.url)

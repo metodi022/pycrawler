@@ -36,16 +36,16 @@ class SaveStats(Module):
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List[Module], repetition: int) -> None:
-        super().receive_response(browser, context, page, responses, context_database, url,
-                                 final_url, start, modules, repetition)
+                         start: List[datetime], repetition: int) -> None:
+        super().receive_response(browser, context, page, responses, context_database, url, final_url, start, repetition)
 
         with database.atomic():
             for i, response in enumerate((responses if len(responses) > 0 else [None])):
                 code: int = response.status if response is not None else Config.ERROR_CODES['response_error']
                 fromurl: Optional[str] = url[3][-1][0] if len(url[3]) > 0 else None
                 fromurlfinal: Optional[str] = url[3][-1][1] if len(url[3]) > 0 else None
-                URLFeedback.create(rank=self.rank, job=self.job_id, crawler=self.crawler_id,
-                                   site=self.site, url=url[0], urlfinal=page.url, depth=self.depth,
+                URLFeedback.create(rank=self.crawler.rank, job=self.crawler.job_id,
+                                   crawler=self.crawler.crawler_id, site=self.crawler.site,
+                                   url=url[0], urlfinal=page.url, depth=self.crawler.depth,
                                    code=code, fromurl=fromurl, fromurlfinal=fromurlfinal,
                                    start=start[i], end=datetime.now(), repetition=repetition)

@@ -1,12 +1,11 @@
 from datetime import datetime
 from logging import Logger
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Page, Response
 
 from database import DequeDB
-from utils import get_url_origin, get_url_scheme_site
 
 
 class Module:
@@ -14,28 +13,15 @@ class Module:
     A baseclass from which all modules inherit.
     """
 
-    def __init__(self, job_id: str, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
+    def __init__(self, crawler) -> None:
         """
         Initializes module instance.
 
         Args:
-            job_id (str): job id
-            crawler_id (int): crawler id
-            log (Logger): log
-            state (Dict[str, Any]): state
-        """
-        self.job_id: str = job_id
-        self.crawler_id: int = crawler_id
-        self.site: str = ''
-        self.scheme_site: str = ''
-        self.origin: str = ''
-        self.url: str = ''
-        self.currenturl: str = ''
-        self.depth: int = 0
-        self.rank: int = 0
-        self.ready: bool = False
-        self._log: Logger = log
-        self._state: Dict[str, Any] = state
+            crawler (Crawler): crawler that owns this module
+        # """
+        from crawler import Crawler
+        self.crawler: Crawler = crawler
 
     @staticmethod
     def register_job(log: Logger) -> None:
@@ -45,11 +31,10 @@ class Module:
         Args:
             log (Logger): log
         """
-        pass
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
-                     modules: List['Module']) -> None:
+                     context_database: DequeDB,
+                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
         """
         Add event handlers before navigating to a page.
 
@@ -61,21 +46,11 @@ class Module:
             url (Tuple[str, int, int, List[Tuple[str, str]]]): URL, depth, rank, previous URL
             modules (List[Module]): list of modules currently active modules
         """
-        if not self.ready:
-            self.url = self._state.get('Module', url[0])
-            self.site = tld.get_tld(self.url, as_object=True).fld
-            self.scheme_site = get_url_scheme_site(tld.get_tld(self.url, as_object=True))
-            self.origin = get_url_origin(tld.get_tld(self.url, as_object=True))
-            self.rank = url[2]
-            self._state['Module'] = self.url
-
-        self.currenturl = url[0]
-        self.depth = url[1]
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List['Module'], repetition: int) -> None:
+                         start: List[datetime], repetition: int) -> None:
         """
         Receive response from server.
 
@@ -91,7 +66,6 @@ class Module:
             modules (List[Module]): list of modules currently active modules
             repetition (int): current URL visited repetition
         """
-        self.ready = True
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         """
@@ -101,4 +75,3 @@ class Module:
         Args:
             filters (List[Callable[[tld.utils.Result], bool]]): shared list of already existing filters
         """
-        pass

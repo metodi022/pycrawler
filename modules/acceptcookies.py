@@ -1,7 +1,6 @@
 import re
 from datetime import datetime
-from logging import Logger
-from typing import Any, Dict, List, MutableSet, Optional, Tuple, cast
+from typing import List, MutableSet, Optional, Tuple, cast
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Error, Frame, Locator, Page, Response
@@ -22,26 +21,17 @@ class AcceptCookies(Module):
     CHECK_GER: str = '/(\\W|^)(stimm|verstanden|versteh|akzeptier|ja(\\W|$)|weiter(\\W|$)|' \
                      'annehm|bestätig|willig|zulassen(\\W|$)|lasse)/i'
 
-    def __init__(self, job_id: str, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
-        super().__init__(job_id, crawler_id, log, state)
-        self._urls: MutableSet[str] = set()
+    def __init__(self, crawler) -> None:
+        super().__init__(crawler)
+        self._urls: MutableSet[str] = self.crawler.state.get('AcceptCookies', set())
 
-    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
-                     modules: List[Module]) -> None:
-        super().add_handlers(browser, context, page, context_database, url, modules)
-
-        if self.ready:
-            return
-
-        self._urls = self._state.get('AcceptCookies', self._urls)
-        self._state['AcceptCookies'] = self._urls
+        self.crawler.state['AcceptCookies'] = self._urls
 
     def receive_response(self, browser: Browser, context: BrowserContext, page: Page | Frame,
                          responses: List[Optional[Response]], context_database: DequeDB,
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List[Module], repetition: int, force=False) -> None | bool:
-        super().receive_response(browser, context, page, responses, context_database, url, final_url, start, modules, repetition)
+                         start: List[datetime], repetition: int, force=False) -> None | bool:
+        super().receive_response(browser, context, page, responses, context_database, url, final_url, start, repetition)
 
         # Verify that response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None

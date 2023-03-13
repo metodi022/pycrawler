@@ -55,7 +55,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Opti
     log.addHandler(handler)
 
     # Fix for multiple modules not correctly parsed
-    if ' ' in module_names[0]:
+    if module_names and ' ' in module_names[0]:
         module_names = module_names[0].split()
 
     # Importing modules
@@ -130,7 +130,7 @@ def _start_crawler1(job: str, crawler_id: int, log_path: pathlib.Path,
     url: Optional[URL] = _get_url(job, crawler_id)
 
     while url:
-        crawler: Process = Process(target=_start_crawler2, args=(job, crawler_id, (url.url, 0, url.rank, []), log_path, modules))
+        crawler: Process = Process(target=_start_crawler2, args=(job, crawler_id, url.url, url.rank, log_path, modules))
         crawler.start()
 
         while crawler.is_alive():
@@ -156,7 +156,7 @@ def _start_crawler1(job: str, crawler_id: int, log_path: pathlib.Path,
 
             if Config.RESTART and (Config.LOG / f"job{job}crawler{crawler_id}.cache").exists():
                 crawler.close()
-                crawler = Process(target=_start_crawler2, args=(job, crawler_id, (url.url, 0, url.rank, []), log_path, modules))
+                crawler = Process(target=_start_crawler2, args=(job, crawler_id, url.url, url.rank, log_path, modules))
                 crawler.start()
 
         crawler.close()
@@ -166,11 +166,11 @@ def _start_crawler1(job: str, crawler_id: int, log_path: pathlib.Path,
         url = _get_url(job, crawler_id)
 
 
-def _start_crawler2(job: str, crawler_id: int, url: Tuple[str, int, int, List[Tuple[str, str]]],
-                    log_path: pathlib.Path, modules: List[Type[Module]]) -> None:
+def _start_crawler2(job: str, crawler_id: int, url: str, rank: int, log_path: pathlib.Path,
+                    modules: List[Type[Module]]) -> None:
     log = _get_logger(job, crawler_id, log_path)
     log.info('Start crawler')
-    crawler: Crawler = Crawler(job, crawler_id, url, log, modules)
+    crawler: Crawler = Crawler(job, crawler_id, url, rank, log, modules)
     crawler.start_crawl()
     log.info('Stop crawler')
 
@@ -236,7 +236,7 @@ if __name__ == '__main__':
     sys.exit(main(
         args.get('job'),
         args.get('crawlers'),
-        args.get('modules'),
+        args.get('modules') or [],
         args.get('urlspath'),
         args.get('urls'),
         args.get('log'),

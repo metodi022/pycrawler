@@ -36,23 +36,23 @@ class CollectHeaders(Module):
             database.create_tables([Header])
 
     def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
-                     modules: List['Module']) -> None:
-        super().add_handlers(browser, context, page, context_database, url, modules)
+                     context_database: DequeDB,
+                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+        super().add_handlers(browser, context, page, context_database, url)
 
         def handler(response: Response):
             headers: Optional[str]
             try:
                 headers = str(response.headers_array())
             except Exception as error:
-                self._log.warning(f"Get headers fail: {error}")
+                self.crawler.log.warning(f"Get headers fail: {error}")
                 headers = None
 
-            Header.create(job=self.job_id, crawler=self.crawler_id, site=self.site, url=self.url,
-                          depth=self.depth, code=response.status, method=response.request.method,
+            Header.create(job=self.crawler.job_id, crawler=self.crawler.crawler_id,
+                          site=self.crawler.site, url=self.crawler.url, depth=self.crawler.depth,
+                          code=response.status, method=response.request.method,
                           content=response.headers.get('content-type', None),
-                          resource=response.request.resource_type,
-                          fromurl=self.currenturl, fromurlfinal=page.url, tourl=response.url,
-                          headers=headers)
+                          resource=response.request.resource_type, fromurl=self.crawler.currenturl,
+                          fromurlfinal=page.url, tourl=response.url, headers=headers)
 
         page.on('response', handler)
