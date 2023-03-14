@@ -1,17 +1,27 @@
 import re
 from datetime import datetime
 from logging import Logger
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import tld
+from peewee import BooleanField, ForeignKeyField, IntegerField, TextField
 from playwright.sync_api import Browser, BrowserContext, Error, Locator, Page, Response
 
 from config import Config
-from database import DequeDB
+from database import BaseModel, database
 from modules.acceptcookies import AcceptCookies
 from modules.findloginforms import FindLoginForms, LoginForm
 from modules.module import Module
 from utils import CLICKABLES, SSO, get_label_for, get_locator_attribute, get_locator_count, get_locator_nth, get_outer_html, get_url_full_with_query_fragment, get_visible_extra, invoke_click
+
+
+class LoginAttempt(BaseModel):
+    job = TextField()
+    crawler = IntegerField()
+    site = TextField()
+    loginform = ForeignKeyField(LoginForm, backref='attempts')
+    loginsuccess = BooleanField(default=True)
+    endsuccess = BooleanField(null=True)
 
 
 class Login(Module):
@@ -23,80 +33,93 @@ class Login(Module):
     LOGOUTKEYWORDS = r'log.?out|sign.?out|log.?off|sign.?off|exit|quit|invalidate|ab.?melden|' \
                      r'aus.?loggen|ab.?meldung|verlassen|aus.?treten|annullieren'
 
-    def __init__(self, job_id: str, crawler_id: int, log: Logger, state: Dict[str, Any]) -> None:
-        super().__init__(job_id, crawler_id, log, state)
+    def __init__(self, crawler) -> None:
+        super().__init__(crawler)
+
         self.loginsuccess: bool = False
+        self.endsuccess: bool = False
         self.loginurl: Optional[str] = None
         self.account: Optional[Tuple[str, str, str, str, str]] = None
 
-    @staticmethod
-    def register_job(log: Logger) -> None:
-        FindLoginForms.register_job(log)
-
-    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
-                     modules: List[Module]) -> None:
-        super().add_handlers(browser, context, page, context_database, url, modules)
-
-        if self.ready:
-            return
-
-        # TODO: Get account somehow
-
-        if self.account is None:
-            self._log.info(f"Found no account for {self.site}")
-            return
-
-        if self._state.get('Login', None) is not None:
+        if 'Login' in self.crawler.state:
             self.loginsuccess = True
-            self.loginurl, self.account = self._state['Login']
+            self.loginurl = self.crawler.state['Login'][0]
+            self.account = self.crawler.state['Login'][1]
+
+        # Try login
+        if not self.loginsuccess:
+            self.setup()
+
+    def setup(self) -> None:
+        # TODO get account
+        # ...
+
+        if not self.account:
+            self.crawler.log.info("Found no account")
             return
 
         # Get URLs with login forms for given site
-        formsurls = LoginForm.select().where(LoginForm.site == self.site).execute()
+        formsurls = LoginForm.select().where(LoginForm.site == self.crawler.site).execute()
         if formsurls.count == 0:
-            self._log.info(f"Found no login URLs for {self.site}")
+            self.crawler.log.info("Found no login URLs")
             return
 
         # Iterate over login form URLs
         formurl: LoginForm
         for formurl in formsurls:
-            self._log.info(f"Get login URL {formurl.formurl}")
+            self.crawler.log.debug(f"Get login URL {formurl.formurl}")
 
-            if not Login.login(browser, context, self.url, formurl.formurl, self.account):
+            if not Login.login(self.crawler.browser, self.crawler.context, self.crawler.url, formurl.formurl, self.account):
                 formurl.success = False
                 formurl.save()
                 continue
 
-            self._log.info(f"Login success {formurl.formurl}")
+            self.crawler.log.info(f"Login success {formurl.formurl}")
             self.loginsuccess = True
             self.loginurl = formurl.formurl
-            self._state['Login'] = (self.loginurl, self.account)
+            self.crawler.state['Login'] = (self.loginurl, self.account)
+
             formurl.success = True
             formurl.save()
-            return
 
-    def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         responses: List[Optional[Response]], context_database: DequeDB,
+            LoginAttempt.create(rank=self.crawler.rank, job=self.crawler.job_id,
+                                crawler=self.crawler.crawler_id, site=self.crawler.site,
+                                loginform=formurl)
+
+            break
+        else:
+            self.crawler.log.info("Login fail")
+
+
+    @staticmethod
+    def register_job(log: Logger) -> None:
+        FindLoginForms.register_job(log)
+        log.info('Create login attempt table')
+        with database:
+            database.create_tables([LoginAttempt])
+
+    def receive_response(self, responses: List[Optional[Response]],
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List[Module], repetition: int) -> None:
-        super().receive_response(browser, context, page, responses, context_database, url, final_url, start, modules, repetition)
+                         start: List[datetime], repetition: int) -> None:
+        super().receive_response(responses, url, final_url, start, repetition)
 
         # TODO screenshots + better feedback
 
         # Check if we are at the end of the crawl
-        if len(context_database) > 0 or repetition < Config.REPETITIONS:
-            return
-
-        # At the end of the crawl check if we are still logged-in
-        if self.loginsuccess and self.loginurl is not None and self.account is not None:
-            self.loginsuccess = Login.verify_login(browser, context, self.url, self.loginurl, self.account)
+        if len(self.crawler.context_database) == 0 and self.crawler.repetition == Config.REPETITIONS:
+            # At the end of the crawl check if we are still logged-in
+            if self.loginsuccess and self.loginurl is not None and self.account is not None:
+                self.endsuccess = Login.verify_login(self.crawler.browser, self.crawler.context, self.crawler.url, self.loginurl, self.account)
+            
+            loginform: LoginForm = LoginForm.get(site=self.crawler.site, formurl=self.loginurl)
+            loginattempt: LoginAttempt = LoginAttempt.get(job=self.crawler.job_id, crawler=self.crawler.crawler_id, site=self.crawler.site, loginform=loginform)
+            loginattempt.endsuccess = self.endsuccess
+            loginattempt.save()
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         # Ignore URLs which could lead to logout
         def filt(url: tld.utils.Result) -> bool:
-            return re.search(Login.LOGOUTKEYWORDS, get_url_full_with_query_fragment(url),
-                             flags=re.I) is not None
+            return re.search(Login.LOGOUTKEYWORDS, get_url_full_with_query_fragment(url), flags=re.I) is not None
 
         filters.append(filt)
 

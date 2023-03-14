@@ -95,7 +95,8 @@ class CollectURLs(Module):
         self.crawler.log.info(f"Find {min(len(urls), self._max_urls)} URLs at depth {self.crawler.depth}")
 
         # Shuffle the URLs, so that we prioritize visiting the URLs that appear in the beginning and in the end of the page
-        urls = urls[:int(len(urls) * 0.15)] + urls[int(len(urls) * 0.85):] + urls[int(len(urls) * 0.15):int(len(urls) * 0.85)]
+        if Config.FOCUS_FILTER:
+            urls = urls[:int(len(urls) * 0.15)] + urls[int(len(urls) * 0.85):] + urls[int(len(urls) * 0.15):int(len(urls) * 0.85)]
 
         # For each found URL, add it to the database, while making sure not to exceed the max URL limit
         for parsed_link in urls:

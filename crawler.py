@@ -31,15 +31,18 @@ class Crawler:
                 self.state = pickle.load(file)
 
         # Prepare rest of variables
-        self.url = self.state.get('Module', url)
+        self.url: str = self.state.get('Module', url)
         self.state['Module'] = self.url
         self.scheme: str = 'https' if url.startswith('https') else 'http'
         self.site: str = tld.get_tld(self.url, as_object=True).fld
         self.origin: str = get_url_origin(tld.get_tld(self.url, as_object=True))
         self.currenturl: str = url
 
-        self.rank = rank
-        self.depth = 0
+        self.rank: int = rank
+        self.depth: int = 0
+        self.repetition: int = 1
+
+        self.stop: bool = False
 
         self.playwright: Playwright = None
         self.browser: Browser = None
@@ -70,6 +73,13 @@ class Crawler:
         self.log.debug("Prepared filters")
 
     def start_crawl(self):
+        # Stop crawler earlier if stop flag is set
+        if self.stop:
+            if Config.RESTART and (Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
+                self.log.debug("Deleting cache")
+                os.remove(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
+            return
+
         if self.url is None:
             self.log.info("Get URL None")
             return
@@ -99,7 +109,7 @@ class Crawler:
         self.log.info(f"Get URL {url[0] if url is not None else url}")
 
         # Main loop
-        while url is not None:
+        while url is not None and not self.stop:
             # Update variables
             self.currenturl = url[0]
             self.depth = url[1]
@@ -108,7 +118,9 @@ class Crawler:
             self._invoke_page_handler(url)
 
             # Repetition loop
-            for repetition in range(Config.REPETITIONS):
+            for repetition in range(1, Config.REPETITIONS + 1):
+                self.repetition = repetition
+
                 # Navigate to page
                 response: Optional[Response] = self._open_url(url)
                 self.log.info(f"Response status {response if response is None else response.status} repetition {repetition + 1}")

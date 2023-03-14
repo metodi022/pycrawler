@@ -22,6 +22,7 @@ class Header(BaseModel):
     fromurlfinal = TextField()
     tourl = TextField()
     headers = TextField(null=True)
+    repetition = IntegerField()
 
 
 class CollectHeaders(Module):
@@ -51,6 +52,7 @@ class CollectHeaders(Module):
                           code=response.status, method=response.request.method,
                           content=response.headers.get('content-type', None),
                           resource=response.request.resource_type, fromurl=self.crawler.currenturl,
-                          fromurlfinal=self.crawler.page.url, tourl=response.url, headers=headers)
+                          fromurlfinal=self.crawler.page.url, tourl=response.url, headers=headers,
+                          repetition=self.crawler.repetition)
 
         self.crawler.page.on('response', handler)

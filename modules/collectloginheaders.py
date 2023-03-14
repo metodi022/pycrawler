@@ -1,85 +1,44 @@
-import sys
 from datetime import datetime
 from logging import Logger
-from typing import List, Optional, Tuple, Callable, cast, Dict, Any
+from typing import Callable, List, Optional, Tuple
 
-from playwright.sync_api import Browser, BrowserContext, Page, Response, Error
+from peewee import CharField
+from playwright.sync_api import BrowserContext, Error, Page, Response
 
 from config import Config
-from database.dequedb import DequeDB
-from database.postgres import Postgres
+from database import database
 from modules.acceptcookies import AcceptCookies
+from modules.collectheaders import Header
 from modules.login import Login
-from modules.module import Module
-from utils import clear_cache
+
+
+class LoginHeader(Header):
+    state = CharField()
 
 
 class CollectLoginHeaders(Login):
-    def __init__(self, job_id: int, crawler_id: int, database: Postgres, log: Logger,
-                 state: Dict[str, Any]) -> None:
-        super().__init__(job_id, crawler_id, database, log, state)
-        self._context_alt: Optional[BrowserContext] = None
-        self._page_alt: Optional[Page] = None
-        self._cookies: Optional[AcceptCookies] = None
+    def __init__(self, crawler) -> None:
+        super().__init__(crawler)
+        self._context_alt: BrowserContext = None
+        self._page_alt: Page = None
         self._repetition: int = 1
 
+        self.setup()
+
+        if not self.loginsuccess:
+            self.crawler.stop = True
+
     @staticmethod
-    def register_job(database: Postgres, log: Logger) -> None:
-        Login.register_job(database, log)
+    def register_job(log: Logger) -> None:
+        Login.register_job(log)
 
-        database.invoke_transaction(
-            "CREATE TABLE IF NOT EXISTS LOGINHEADERS (rank INT NOT NULL, job INT NOT NULL,"
-            "crawler INT NOT NULL, url VARCHAR(255) NOT NULL, fromurl TEXT NOT NULL, "
-            "tourl TEXT NOT NULL, code INT NOT NULL, headers TEXT, login BOOLEAN NOT NULL, "
-            "repetition INT NOT NULL)",
-            None, False)
-        log.info('Create LOGINHEADERS table IF NOT EXISTS')
+        log.info('Create login headers table')
+        with database:
+            database.create_tables([LoginHeader])
 
-    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB, url: Tuple[str, int, int, List[Tuple[str, str]]],
-                     modules: List[Module]) -> None:
-        if not self.setup:
-            if Config.ACCEPT_COOKIES:
-                self._cookies = cast(AcceptCookies, modules[0])
-
-            # Log in
-            super().add_handlers(browser, context, page, context_database, url, modules)
-
-            # Check if login is successful
-            if not self.login:
-                self._log.info('Login failed')
-                self._log.info('Close Browser')
-                page.close()
-                context.close()
-                browser.close()
-                clear_cache(Config.RESTART,
-                            Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
-                sys.exit()
-
-            # Create a fresh context to emulate a not logged-in user
-            self._context_alt = browser.new_context(storage_state=(
-                self._state[
-                    'CollectLoginHeaders'] if 'CollectLoginHeaders' in self._state else None))
-            self._page_alt = self._context_alt.new_page()
-
-            response_alt: Optional[Response] = None
-            try:
-                response_alt = self._page_alt.goto(url[0], timeout=Config.LOAD_TIMEOUT,
-                                                   wait_until=Config.WAIT_LOAD_UNTIL)
-            except Error as error:
-                self._log.error(error.message)
-                pass
-
-            self._page_alt.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-
-            if Config.ACCEPT_COOKIES:
-                self._cookies = cast(AcceptCookies, self._cookies)
-                self._cookies.receive_response(browser, self._context_alt, self._page_alt,
-                                               [response_alt], context_database, url, page.url, [],
-                                               [],
-                                               1, force=True)
-
-            self._state['CollectLoginHeaders'] = self._context_alt.storage_state()
+    def add_handlers(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+        # Log in
+        super().add_handlers(url)
 
         # Create response listener that saves all headers
         def handler(login: bool) -> Callable[[Response], None]:
@@ -87,52 +46,66 @@ class CollectLoginHeaders(Login):
                 headers: Optional[str]
                 try:
                     headers = str(response.headers_array())
-                except Exception:
+                except Exception as error:
+                    self.crawler.log.warning(f"Get headers fail for {'login' if login else 'logout'}: {error}")
                     headers = None
 
-                self._database.invoke_transaction(
-                    "INSERT INTO LOGINHEADERS VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (
-                        self._rank, self.job_id, self.crawler_id, self._url, page.url, response.url,
-                        response.status, headers, login, self._repetition), False)
+                LoginHeader.create(job=self.crawler.job_id, crawler=self.crawler.crawler_id,
+                                   site=self.crawler.site, url=self.crawler.url,
+                                   depth=self.crawler.depth, code=response.status,
+                                   method=response.request.method,
+                                   content=response.headers.get('content-type', None),
+                                   resource=response.request.resource_type,
+                                   fromurl=self.crawler.currenturl,
+                                   fromurlfinal=self.crawler.page.url, tourl=response.url,
+                                   headers=headers, repetition=self.crawler.repetition,
+                                   state=('login' if login else 'logout'))
 
             return helper
 
-        # Register response listener
-        page.on('response', handler(True))
+        # Create a fresh context and page to emulate a not logged-in user
+        self._context_alt = self.crawler.browser.new_context(
+            storage_state=self.crawler.state.get('CollectLoginHeaders', None)
+            **self.crawler.playwright.devices[Config.DEVICE],
+            locale=Config.LOCALE,
+            timezone_id=Config.TIMEZONE
+        )
+
+        self._page_alt = self._context_alt.new_page()
+
+        # TODO Accept cookies once?
+        # try:
+        #     response_alt: Optional[Response] = self._page_alt.goto(self.url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+        #     if response_alt is None or response_alt.status >= 400:
+        #         raise Exception(f"Response status {response_alt.status if response_alt is not None else None}")
+
+        #     self._page_alt.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+
+        #     if Config.ACCEPT_COOKIES:
+        #         AcceptCookies.accept(self._page_alt, self.url)
+        # except Exception as error:
+        #     self._log.warning(f"Could not accept cookies for alt page. {error}")
+
+        # Register handlers
+        self.crawler.page.on('response', handler(True))
         self._page_alt.on('response', handler(False))
 
-    def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         responses: List[Optional[Response]], context_database: DequeDB,
+    def receive_response(self, responses: List[Optional[Response]],
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], modules: List[Module], repetition: int) -> None:
-        self._page_alt = cast(Page, self._page_alt)
-
-        super().receive_response(browser, context, page, responses, context_database, url,
-                                 final_url, start, modules, repetition)
+                         start: List[datetime], repetition: int) -> None:
+        super().receive_response(responses, url, final_url, start, repetition)
 
         # Navigate with the fresh context to the same page
         try:
-            self._page_alt.goto(url[0], timeout=Config.LOAD_TIMEOUT,
-                                wait_until=Config.WAIT_LOAD_UNTIL)
-            page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+            self._page_alt.goto(url[0], timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+            self._page_alt.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error:
             # Ignored
             pass
 
         # Save state
-        self._state['CollectLoginHeaders'] = self._context_alt.storage_state()
+        self.crawler.state['CollectLoginHeaders'] = self._context_alt.storage_state()
 
         # Close the context (to avoid memory issues)
         self._page_alt.close()
         self._context_alt.close()
-
-        # Check if we are at the end of the crawl
-        if len(context_database) == 0 and repetition == Config.REPETITIONS:
-            return
-
-        # Open the context again
-        self._context_alt = browser.new_context(storage_state=self._state['CollectLoginHeaders'])
-        self._page_alt = self._context_alt.new_page()
-
-        # Update repetition
-        self._repetition = (self._repetition % Config.REPETITIONS) + 1

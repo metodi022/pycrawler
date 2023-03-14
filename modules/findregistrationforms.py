@@ -15,12 +15,11 @@ from utils import CLICKABLES, SSO, get_locator_count, get_locator_nth, get_outer
 
 
 class RegistrationForm(BaseModel):
-    rank = IntegerField()
     job = TextField()
     crawler = IntegerField()
     site = TextField()
     depth = IntegerField()
-    formurl = TextField()
+    formurl = TextField(unique=True)
     formurlfinal = TextField()
 
 
@@ -93,10 +92,9 @@ class FindRegistrationForms(Module):
             self.crawler.log.info("Found a registration form")
             self._found += 1
             self.crawler.state['FindRegistrationForms'] = self._found
-            RegistrationForm.create(rank=self.crawler.rank, job=self.crawler.job_id,
-                                    crawler=self.crawler.crawler_id, site=self.crawler.site,
-                                    depth=self.crawler.depth, formurl=self.crawler.currenturl,
-                                    formurlfinal=self.crawler.page.url)
+            RegistrationForm.create(job=self.crawler.job_id, crawler=self.crawler.crawler_id,
+                                    site=self.crawler.site, depth=self.crawler.depth,
+                                    formurl=self.crawler.currenturl, formurlfinal=self.crawler.page.url)
 
         # If we already found entries or there are still URLs left -> stop here
         if self._found > 0 or len(self.crawler.context_database) > 0:

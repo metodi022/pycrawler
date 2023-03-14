@@ -39,7 +39,7 @@ class Config:
 
     # TODO more options
     # OBEY_ROBOTS: bool = False  # obey robots.txt
-    # FOCUS_FILTER: bool = False  # prioritize visiting "interesting" URLS (experimental)
+    FOCUS_FILTER: bool = False  # prioritize visiting "interesting" URLS (experimental)
     # ADULT_FILTER: bool = False  # avoid visiting adult sites
 
     # Usually the code of the response in DB will be the response status (200, 404, etc.); if an
