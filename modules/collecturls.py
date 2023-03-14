@@ -2,10 +2,9 @@ from datetime import datetime
 from typing import Callable, List, Optional, Tuple
 
 import tld
-from playwright.sync_api import Browser, BrowserContext, Error, Locator, Page, Response
+from playwright.sync_api import Error, Locator, Response
 
 from config import Config
-from database import DequeDB
 from modules.module import Module
 from utils import get_locator_attribute, get_locator_count, get_locator_nth, get_tld_object, get_url_from_href, get_url_full, get_url_full_with_query, get_url_full_with_query_fragment, get_url_origin
 
@@ -22,15 +21,14 @@ class CollectURLs(Module):
 
         self.crawler.state['CollectUrls'] = self._max_urls
 
-    def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         responses: List[Optional[Response]], context_database: DequeDB,
+    def receive_response(self, responses: List[Optional[Response]],
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], repetition: int) -> None:
-        super().receive_response(browser, context, page, responses, context_database, url, final_url, start, repetition)
+        super().receive_response(responses, url, final_url, start, repetition)
 
         # Make sure to add page as seen
         parsed_url_final: Optional[tld.utils.Result] = get_tld_object(final_url)
-        context_database.add_seen(get_url_full(parsed_url_final) if parsed_url_final is not None else final_url)
+        self.crawler.context_database.add_seen(get_url_full(parsed_url_final) if parsed_url_final is not None else final_url)
 
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
@@ -46,7 +44,7 @@ class CollectURLs(Module):
 
         # Get all <a> tags with a href
         try:
-            links: Locator = page.locator('a[href]')
+            links: Locator = self.crawler.page.locator('a[href]')
         except Error:
             return
 
@@ -78,9 +76,9 @@ class CollectURLs(Module):
 
             # Check seen
             parsed_link_full: str = get_url_full_with_query(parsed_link) if Config.QUERY else get_url_full(parsed_link)
-            if context_database.get_seen(parsed_link_full):
+            if self.crawler.context_database.get_seen(parsed_link_full):
                 continue
-            context_database.add_seen(parsed_link_full)
+            self.crawler.context_database.add_seen(parsed_link_full)
 
             # Filter out unwanted entries
             filter_out: bool = False
@@ -101,7 +99,7 @@ class CollectURLs(Module):
 
         # For each found URL, add it to the database, while making sure not to exceed the max URL limit
         for parsed_link in urls:
-            context_database.add_url_force((get_url_full_with_query_fragment(parsed_link), self.crawler.depth + 1, self.crawler.rank, url[3] + [(self.crawler.currenturl, final_url)]))
+            self.crawler.context_database.add_url_force((get_url_full_with_query_fragment(parsed_link), self.crawler.depth + 1, self.crawler.rank, url[3] + [(self.crawler.currenturl, final_url)]))
 
             self._max_urls -= 1
             if self._max_urls < 1:

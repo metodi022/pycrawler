@@ -6,10 +6,10 @@ from typing import Callable, List, Optional, Tuple
 
 import tld
 from peewee import IntegerField, TextField
-from playwright.sync_api import Browser, BrowserContext, Error, Locator, Page, Response
+from playwright.sync_api import Error, Locator, Page, Response
 
 from config import Config
-from database import BaseModel, DequeDB, database
+from database import BaseModel, database
 from modules.module import Module
 from utils import CLICKABLES, SSO, get_locator_count, get_locator_nth, get_outer_html, get_tld_object, get_url_full, get_url_origin, invoke_click
 
@@ -41,40 +41,37 @@ class FindRegistrationForms(Module):
         with database:
             database.create_tables([RegistrationForm])
 
-    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB,
-                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
-        super().add_handlers(browser, context, page, context_database, url)
-
-        temp: Optional[tld.utils.Result] = get_tld_object(self.crawler.url)
-        if temp is None:
-            return
+    def add_handlers(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+        super().add_handlers(url)
 
         # Add common URLs for registration
-        url_origin: str = get_url_origin(temp)
-        context_database.add_url((url_origin + '/register/', Config.DEPTH, self.crawler.rank, []))
-        context_database.add_url((url_origin + '/registration/', Config.DEPTH, self.crawler.rank, []))
-        context_database.add_url((url_origin + '/signup/', Config.DEPTH, self.crawler.rank, []))
-        context_database.add_url((url_origin + '/account/', Config.DEPTH, self.crawler.rank, []))
-        context_database.add_url((url_origin + '/profile/', Config.DEPTH, self.crawler.rank, []))
+        self.crawler.context_database.add_url((self.crawler.origin + '/register/', Config.DEPTH, self.crawler.rank, []))
+        self.crawler.context_database.add_url((self.crawler.origin + '/registration/', Config.DEPTH, self.crawler.rank, []))
+        self.crawler.context_database.add_url((self.crawler.origin + '/signup/', Config.DEPTH, self.crawler.rank, []))
+        self.crawler.context_database.add_url((self.crawler.origin + '/account/', Config.DEPTH, self.crawler.rank, []))
+        self.crawler.context_database.add_url((self.crawler.origin + '/profile/', Config.DEPTH, self.crawler.rank, []))
 
         # TODO add site common urls?
+        # self.crawler.context_database.add_url((self.crawler.site + '/register/', Config.DEPTH, self.crawler.rank, []))
+        # self.crawler.context_database.add_url((self.crawler.site + '/registration/', Config.DEPTH, self.crawler.rank, []))
+        # self.crawler.context_database.add_url((self.crawler.site + '/signup/', Config.DEPTH, self.crawler.rank, []))
+        # self.crawler.context_database.add_url((self.crawler.site + '/account/', Config.DEPTH, self.crawler.rank, []))
+        # self.crawler.context_database.add_url((self.crawler.site + '/profile/', Config.DEPTH, self.crawler.rank, []))
 
-    def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         responses: List[Optional[Response]], context_database: DequeDB,
+    def receive_response(self, responses: List[Optional[Response]],
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], repetition: int) -> None:
-        super().receive_response(browser, context, page, responses, context_database, url, final_url, start, repetition)
+        super().receive_response(responses, url, final_url, start, repetition)
 
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         if response is None or response.status >= 400:
-            if self._found <= 0 and len(context_database) <= 0 and Config.RECURSIVE:
-                context_database.add_url(('https://www.google.com/search?q=' + urllib.parse.quote(f"\"register\" site:{self.crawler.site}"), Config.DEPTH - 1, self.crawler.rank, []))
+            if self._found <= 0 and len(self.crawler.context_database) <= 0 and Config.RECURSIVE:
+                self.crawler.context_database.add_url(('https://www.google.com/search?q=' + urllib.parse.quote(f"\"register\" site:{self.crawler.site}"), Config.DEPTH - 1, self.crawler.rank, []))
             return
 
         # Parse current page URL
-        parsed_url: Optional[tld.utils.Result] = get_tld_object(page.url)
+        parsed_url: Optional[tld.utils.Result] = get_tld_object(self.crawler.page.url)
         if parsed_url is None:
             return
 
@@ -87,11 +84,11 @@ class FindRegistrationForms(Module):
             return
 
         # TODO same entity
-        # if Config.SAME_ENTITY:
+        # if Config.SAME_ENTITY and ...:
         #     return
 
         # Find registration forms
-        form: Optional[Locator] = FindRegistrationForms.find_registration_form(page, interact=(self._found < 3))
+        form: Optional[Locator] = FindRegistrationForms.find_registration_form(self.crawler.page, interact=(self._found < 3))
         if form is not None:
             self.crawler.log.info("Found a registration form")
             self._found += 1
@@ -99,10 +96,10 @@ class FindRegistrationForms(Module):
             RegistrationForm.create(rank=self.crawler.rank, job=self.crawler.job_id,
                                     crawler=self.crawler.crawler_id, site=self.crawler.site,
                                     depth=self.crawler.depth, formurl=self.crawler.currenturl,
-                                    formurlfinal=page.url)
+                                    formurlfinal=self.crawler.page.url)
 
         # If we already found entries or there are still URLs left -> stop here
-        if self._found > 0 or len(context_database) > 0:
+        if self._found > 0 or len(self.crawler.context_database) > 0:
             return
 
         # Do not use search engine without recursive option
@@ -110,7 +107,7 @@ class FindRegistrationForms(Module):
             return
 
         # Finally, use search engine with registration keyword
-        context_database.add_url(('https://www.google.com/search?q=' + urllib.parse.quote(f"\"register\" site:{self.crawler.site}"), Config.DEPTH - 1, self.crawler.rank, []))
+        self.crawler.context_database.add_url(('https://www.google.com/search?q=' + urllib.parse.quote(f"\"register\" site:{self.crawler.site}"), Config.DEPTH - 1, self.crawler.rank, []))
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         def filt(url: tld.utils.Result) -> bool:

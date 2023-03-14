@@ -3,9 +3,7 @@ from logging import Logger
 from typing import Callable, List, Optional, Tuple
 
 import tld
-from playwright.sync_api import Browser, BrowserContext, Page, Response
-
-from database import DequeDB
+from playwright.sync_api import Response
 
 
 class Module:
@@ -32,38 +30,25 @@ class Module:
             log (Logger): log
         """
 
-    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB,
-                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+    def add_handlers(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
         """
         Add event handlers before navigating to a page.
 
         Args:
-            browser (Browser): browser
-            context (BrowserContext): context
-            page (Page): page
-            context_database (DequeDB): context database
             url (Tuple[str, int, int, List[Tuple[str, str]]]): URL, depth, rank, previous URL
-            modules (List[Module]): list of modules currently active modules
         """
 
-    def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         responses: List[Optional[Response]], context_database: DequeDB,
+    def receive_response(self, responses: List[Optional[Response]],
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], repetition: int) -> None:
         """
         Receive response from server.
 
         Args:
-            browser (Browser): browser
-            context (BrowserContext): context
-            page (Page): page
             responses (List[Optional[Response]]): list of responses from crawler and modules
-            context_database (DequeDB): context database
             url (Tuple[str, int, int, List[Tuple[str, str]]]): URL, depth, rank, previous URL
             final_url (str): final url after redirections
             start (List[datetime]): start times for crawl and for each module response initiation
-            modules (List[Module]): list of modules currently active modules
             repetition (int): current URL visited repetition
         """
 

@@ -3,9 +3,8 @@ from datetime import datetime
 from typing import List, MutableSet, Optional, Tuple, cast
 
 import tld
-from playwright.sync_api import Browser, BrowserContext, Error, Frame, Locator, Page, Response
+from playwright.sync_api import Error, Frame, Locator, Page, Response
 
-from database import DequeDB
 from modules.module import Module
 from utils import CLICKABLES, SSO, get_locator_count, get_locator_nth, get_outer_html, get_tld_object, get_url_origin, invoke_click, refresh_page
 
@@ -27,11 +26,10 @@ class AcceptCookies(Module):
 
         self.crawler.state['AcceptCookies'] = self._urls
 
-    def receive_response(self, browser: Browser, context: BrowserContext, page: Page | Frame,
-                         responses: List[Optional[Response]], context_database: DequeDB,
+    def receive_response(self, responses: List[Optional[Response]],
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], repetition: int, force=False) -> None | bool:
-        super().receive_response(browser, context, page, responses, context_database, url, final_url, start, repetition)
+                         start: List[datetime], repetition: int) -> None:
+        super().receive_response(responses, url, final_url, start, repetition)
 
         # Verify that response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
@@ -40,12 +38,12 @@ class AcceptCookies(Module):
 
         # Check if we already accepted cookies for origin
         url_origin: Optional[tld.utils.Result] = get_tld_object(final_url)
-        if ((url_origin is None) or (get_url_origin(url_origin) in self._urls)) and not force:
+        if (url_origin is None) or (get_url_origin(url_origin) in self._urls):
             return
         self._urls.add(get_url_origin(url_origin))
 
         # Accept cookies for origin
-        AcceptCookies.accept(page, url[0], inframe=False, responses=responses, start=start)
+        AcceptCookies.accept(self.crawler.page, url[0], inframe=False, responses=responses, start=start)
 
     @staticmethod
     def accept(page: Page | Frame, url: str, inframe: bool = False,

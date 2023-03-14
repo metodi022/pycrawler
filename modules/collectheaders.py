@@ -2,9 +2,9 @@ from logging import Logger
 from typing import List, Optional, Tuple
 
 from peewee import CharField, IntegerField, TextField
-from playwright.sync_api import Browser, BrowserContext, Page, Response
+from playwright.sync_api import Response
 
-from database import BaseModel, DequeDB, database
+from database import BaseModel, database
 from modules.module import Module
 
 
@@ -35,10 +35,8 @@ class CollectHeaders(Module):
         with database:
             database.create_tables([Header])
 
-    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB,
-                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
-        super().add_handlers(browser, context, page, context_database, url)
+    def add_handlers(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+        super().add_handlers(url)
 
         def handler(response: Response):
             headers: Optional[str]
@@ -53,6 +51,6 @@ class CollectHeaders(Module):
                           code=response.status, method=response.request.method,
                           content=response.headers.get('content-type', None),
                           resource=response.request.resource_type, fromurl=self.crawler.currenturl,
-                          fromurlfinal=page.url, tourl=response.url, headers=headers)
+                          fromurlfinal=self.crawler.page.url, tourl=response.url, headers=headers)
 
-        page.on('response', handler)
+        self.crawler.page.on('response', handler)

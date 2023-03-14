@@ -5,10 +5,10 @@ from typing import List, MutableSet, Optional, Tuple
 
 import nostril  # https://github.com/casics/nostril
 from peewee import BooleanField, IntegerField, TextField
-from playwright.sync_api import Browser, BrowserContext, Error, Page, Response
+from playwright.sync_api import Error, Response
 
 from config import Config
-from database import BaseModel, DequeDB, database
+from database import BaseModel, database
 from modules.module import Module
 from utils import get_tld_object
 
@@ -40,19 +40,16 @@ class FindEmails(Module):
         with database:
             database.create_tables([Email])
 
-    def add_handlers(self, browser: Browser, context: BrowserContext, page: Page,
-                     context_database: DequeDB,
-                     url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
-        super().add_handlers(browser, context, page, context_database, url)
+    def add_handlers(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+        super().add_handlers(url)
 
-        context_database.add_url((self.crawler.origin + '/.well-known/security.txt', Config.DEPTH, self.crawler.rank, []))
-        context_database.add_url((f"{self.crawler.scheme}://{self.crawler.site}" + '/.well-known/security.txt', Config.DEPTH, self.crawler.rank, []))
+        self.crawler.context_database.add_url((self.crawler.origin + '/.well-known/security.txt', Config.DEPTH, self.crawler.rank, []))
+        self.crawler.context_database.add_url((f"{self.crawler.scheme}://{self.crawler.site}" + '/.well-known/security.txt', Config.DEPTH, self.crawler.rank, []))
 
-    def receive_response(self, browser: Browser, context: BrowserContext, page: Page,
-                         responses: List[Optional[Response]], context_database: DequeDB,
+    def receive_response(self, responses: List[Optional[Response]],
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
                          start: List[datetime], repetition: int) -> None:
-        super().receive_response(browser, context, page, responses, context_database, url, final_url, start, repetition)
+        super().receive_response(responses, url, final_url, start, repetition)
 
         # Check if response is valid
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
@@ -60,7 +57,7 @@ class FindEmails(Module):
             return
 
         try:
-            html: str = page.content()
+            html: str = self.crawler.page.content()
         except Error:
             return
 
@@ -86,4 +83,4 @@ class FindEmails(Module):
             Email.create(rank=self.crawler.rank, job=self.crawler.job_id,
                          crawler=self.crawler.crawler_id, site=self.crawler.site,
                          depth=self.crawler.depth, email=email, nonsense=nonsense,
-                         fromurl=self.crawler.currenturl, finalurl=page.url)
+                         fromurl=self.crawler.currenturl, finalurl=self.crawler.page.url)
