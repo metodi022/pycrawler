@@ -100,10 +100,6 @@ class FindLoginForms(Module):
         if self._found > 0 or len(self.crawler.context_database) > 0:
             return
 
-        # Do not use search engine without recursive option
-        if not Config.RECURSIVE:
-            return
-
         # Finally, use search engine with login keyword
         self.crawler.context_database.add_url(('https://www.google.com/search?q=' + urllib.parse.quote(f"\"login\" site:{self.crawler.site}"), Config.DEPTH - 1, self.crawler.rank, []))
 
