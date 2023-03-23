@@ -21,7 +21,6 @@ class Config:
     RESTART: bool = True  # If the browser crashes, try to restore the crawler
 
     RECURSIVE: bool = True  # Discover additional URLs while crawling
-    QUERY: bool = False  # The same URLs that have different query strings are unique
     SAME_ORIGIN: bool = False  # URL discovery for same-origin only
     SAME_ETLDP1: bool = True  # URL discovery for same ETLD+1 only
     SAME_ENTITY: bool = False  # URL discovery for same entity only (ETLD+1 or company, owner, etc.)

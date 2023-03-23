@@ -1,4 +1,5 @@
 from datetime import datetime
+import random
 from typing import Callable, List, Optional, Tuple
 
 import tld
@@ -75,7 +76,7 @@ class CollectURLs(Module):
             #    continue
 
             # Check seen
-            parsed_link_full: str = get_url_full_with_query(parsed_link) if Config.QUERY else get_url_full(parsed_link)
+            parsed_link_full: str = get_url_full(parsed_link)
             if self.crawler.context_database.get_seen(parsed_link_full):
                 continue
             self.crawler.context_database.add_seen(parsed_link_full)
@@ -94,9 +95,11 @@ class CollectURLs(Module):
 
         self.crawler.log.info(f"Find {min(len(urls), self._max_urls)} URLs at depth {self.crawler.depth}")
 
-        # Shuffle the URLs, so that we prioritize visiting the URLs that appear in the beginning and in the end of the page
+        # Shuffle the URLs
         if Config.FOCUS_FILTER:
             urls = urls[:int(len(urls) * 0.15)] + urls[int(len(urls) * 0.85):] + urls[int(len(urls) * 0.15):int(len(urls) * 0.85)]
+        else:
+            random.shuffle(urls)
 
         # For each found URL, add it to the database, while making sure not to exceed the max URL limit
         for parsed_link in urls:

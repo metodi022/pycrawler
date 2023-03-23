@@ -9,6 +9,7 @@ from config import Config
 from database import database
 from modules.acceptcookies import AcceptCookies
 from modules.collectheaders import Header
+from modules.collecturls import CollectURLs
 from modules.login import Login
 
 
@@ -23,6 +24,7 @@ class CollectLoginHeaders(Login):
         self._page_alt: Page = None
         self._repetition: int = 1
 
+        # Login
         self.setup()
 
         if not self.loginsuccess:
@@ -37,7 +39,6 @@ class CollectLoginHeaders(Login):
             database.create_tables([LoginHeader])
 
     def add_handlers(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
-        # Log in
         super().add_handlers(url)
 
         # Create response listener that saves all headers
@@ -97,8 +98,13 @@ class CollectLoginHeaders(Login):
 
         # Navigate with the fresh context to the same page
         try:
-            self._page_alt.goto(url[0], timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+            response_alt: Optional[Response] = self._page_alt.goto(url[0], timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
             self._page_alt.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+
+            # Collect URLs from logout variant
+            if Config.RECURSIVE:
+                module: CollectURLs = next((module for module in self.crawler.modules if isinstance(module, CollectURLs)), None)
+                module.receive_response([response_alt], url, self._page_alt.url, [], self.crawler.repetition)
         except Error:
             # Ignored
             pass
