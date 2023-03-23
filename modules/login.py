@@ -19,9 +19,9 @@ class LoginAttempt(BaseModel):
     job = TextField()
     crawler = IntegerField()
     site = TextField()
-    loginform = ForeignKeyField(LoginForm, backref='attempts')
+    loginform = ForeignKeyField(LoginForm, backref='attempts', null=True, default=None)
     loginsuccess = BooleanField(default=True)
-    endsuccess = BooleanField(null=True)
+    endsuccess = BooleanField(null=True, default=None)
 
 
 class Login(Module):

@@ -115,6 +115,7 @@ class Crawler:
             self.depth = url[1]
 
             # Initiate modules
+            self.log.debug('Invoke module page handler')
             self._invoke_page_handler(url)
 
             # Repetition loop
@@ -125,11 +126,8 @@ class Crawler:
                 response: Optional[Response] = self._open_url(url)
                 self.log.info(f"Response status {response if response is None else response.status} repetition {repetition + 1}")
 
-                # Wait after page is loaded
-                self.page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-                get_screenshot(self.page, (Config.LOG / f"screenshots/job{self.job_id}-{tld.get_tld(self.url, as_object=True).fld}.png"), False)
-
                 # Run modules response handler
+                self.log.debug('Invoke module response handler')
                 self._invoke_response_handler([response], url, [datetime.now()], repetition + 1)
 
             # Get next URL to crawl
@@ -185,6 +183,7 @@ class Crawler:
 
         try:
             response = self.page.goto(url[0], timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+            self.page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error as error:
             error_message = error.message
             self.log.warning(error_message)
@@ -195,19 +194,16 @@ class Crawler:
             tempurl.code = response.status if response is not None else Config.ERROR_CODES['response_error']
             tempurl.error = error_message
             tempurl.save()
+            get_screenshot(self.page, (Config.LOG / f"screenshots/{self.site}-{self.job_id}.png"), False)
 
         return response
 
     def _invoke_page_handler(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
-        self.log.debug('Invoke module page handler')
-
         for module in self.modules:
             module.add_handlers(url)
 
     def _invoke_response_handler(self, responses: List[Optional[Response]],
                                  url: Tuple[str, int, int, List[Tuple[str, str]]],
                                  start: List[datetime], repetition: int) -> None:
-        self.log.debug('Invoke module response handler')
-
         for module in self.modules:
             module.receive_response(responses, url, self.page.url, start, repetition)
