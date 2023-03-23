@@ -19,7 +19,7 @@ class LoginForm(BaseModel):
     crawler = IntegerField()
     site = TextField()
     depth = IntegerField()
-    formurl = TextField(unique=True)
+    formurl = TextField()
     formurlfinal = TextField()
     success = BooleanField(null=True)
 
