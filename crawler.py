@@ -31,15 +31,14 @@ class Crawler:
                 self.state = pickle.load(file)
 
         # Prepare rest of variables
-        self.url: str = self.state.get('Module', url)
-        self.state['Module'] = self.url
+        self.url: str = url
         self.scheme: str = 'https' if url.startswith('https') else 'http'
         self.site: str = tld.get_tld(self.url, as_object=True).fld
         self.origin: str = get_url_origin(tld.get_tld(self.url, as_object=True))
-        self.currenturl: str = url
+        self.currenturl: str = (self.state.get('Crawler')[0]) if 'Crawler' in self.state else url
 
         self.rank: int = rank
-        self.depth: int = 0
+        self.depth: int = (self.state.get('Crawler')[1]) if 'Crawler' in self.state else 0
         self.repetition: int = 1
 
         self.stop: bool = False
@@ -56,7 +55,7 @@ class Crawler:
         else:
             self.state['DequeDB'] = [self.context_database._data, self.context_database._seen]
 
-        self.context_database.add_url((self.url, 0, self.rank, []))
+        self.context_database.add_url((self.url, self.depth, self.rank, []))
 
         # Prepare modules
         self.modules: List[Module] = []
@@ -81,7 +80,7 @@ class Crawler:
             return
 
         if self.url is None:
-            self.log.info("Get URL None")
+            self.log.info(f"Get URL None depth {self.depth}")
             return
 
         # Initiate playwright, browser, context, and page
@@ -106,14 +105,16 @@ class Crawler:
         self.page = self.context.new_page()
 
         url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = self.context_database.get_url()
-        self.log.info(f"Get URL {url[0] if url is not None else url}")
+        self.log.info(f"Get URL {url[0] if url is not None else url} depth {url[1] if url is not None else self.depth}")
+
+        # Update variables
+        if url is not None:
+            self.currenturl = url[0]
+            self.depth = url[1]
+            self.state['Crawler'] = (self.currenturl, self.depth)
 
         # Main loop
         while url is not None and not self.stop:
-            # Update variables
-            self.currenturl = url[0]
-            self.depth = url[1]
-
             # Initiate modules
             self.log.debug('Invoke module page handler')
             self._invoke_page_handler(url)
@@ -124,21 +125,28 @@ class Crawler:
 
                 # Navigate to page
                 response: Optional[Response] = self._open_url(url)
-                self.log.info(f"Response status {response if response is None else response.status} repetition {repetition + 1}")
+                self.log.info(f"Response status {response if response is None else response.status} repetition {repetition}")
 
                 # Run modules response handler
                 self.log.debug('Invoke module response handler')
-                self._invoke_response_handler([response], url, [datetime.now()], repetition + 1)
+                self._invoke_response_handler([response], url, [datetime.now()], repetition)
 
             # Get next URL to crawl
             url = self.context_database.get_url()
-            self.log.info(f"Get URL {url[0] if url is not None else url}")
+            self.log.info(f"Get URL {url[0] if url is not None else url} depth {url[1] if url is not None else self.depth}")
 
-            # Save state
-            try:
-                self.state['Context'] = self.context.storage_state()
-            except Exception as error:
-                self.log.warning(f"Get context fail: {error}")
+            # Update variables
+            if url is not None:
+                self.currenturl = url[0]
+                self.depth = url[1]
+                self.state['Crawler'] = (self.currenturl, self.depth)
+
+            # Save state once
+            if 'Context' not in self.state:
+                try:
+                    self.state['Context'] = self.context.storage_state()
+                except Exception as error:
+                    self.log.warning(f"Get main context fail: {error}")
 
             if Config.RESTART:
                 with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache", mode='wb') as file:
@@ -157,14 +165,14 @@ class Crawler:
             else:
                 self.browser = self.playwright.chromium.launch(headless=Config.HEADLESS)
 
-            context = self.browser.new_context(
+            self.context = self.browser.new_context(
                 storage_state=self.state.get('Context', None),
                 **self.playwright.devices[Config.DEVICE],
                 locale=Config.LOCALE,
                 timezone_id=Config.TIMEZONE
             )
 
-            self.page = context.new_page()
+            self.page = self.context.new_page()
 
         # Close everything
         self.page.close()
@@ -185,10 +193,9 @@ class Crawler:
             response = self.page.goto(url[0], timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
             self.page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error as error:
-            error_message = error.message
-            self.log.warning(error_message)
+            self.log.warning(error)
 
-        if url[1] == 0 and self.url == url[0]:
+        if url[1] == 0 and self.url == url[0] and self.repetition == 1 and self.depth == 0:
             tempurl: URL = URL.get(job=self.job_id, crawler=self.crawler_id, state='progress')
             tempurl.landing_page = self.page.url
             tempurl.code = response.status if response is not None else Config.ERROR_CODES['response_error']

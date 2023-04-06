@@ -29,7 +29,7 @@ except ModuleNotFoundError as e:
     sys.exit(1)
 
 
-def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Optional[pathlib.Path] = None, urls: Optional[List[Tuple[int, str]]] = None, log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1) -> int:
+def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Optional[pathlib.Path] = None, urls: Optional[List[Tuple[int, str]]] = None, log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1, listen: bool = False) -> int:
     # Create log path if needed
     log_path = log_path or Config.LOG
     if not log_path.exists():
@@ -87,7 +87,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Opti
     # Prepare crawlers
     crawlers: List[Process] = []
     for i in range(0, crawlers_count):
-        process = Process(target=_start_crawler1, args=(job, i + starting_crawler_id, log_path, modules))
+        process = Process(target=_start_crawler1, args=(job, i + starting_crawler_id, log_path, modules, listen))
         crawlers.append(process)
 
     for i, crawler in enumerate(crawlers):
@@ -99,6 +99,8 @@ def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Opti
     for crawler in crawlers:
         crawler.join()
         crawler.close()
+
+    log.info('Crawl complete')
 
     # Exit code
     return 0
@@ -112,24 +114,35 @@ def _get_modules(module_names: List[str]) -> List[Type[Module]]:
     return result
 
 
-def _get_url(job: str, crawler_id: int) -> Optional[URL]:
+def _get_url(job: str, crawler_id: int, log) -> Optional[URL]:
+    url: Optional[URL] = URL.get_or_none(job=job, crawler=crawler_id, state='progress')
+    if url is not None:
+        log.debug("Loading progress URL")
+        return url
+    
     with database.atomic():
-        url: Optional[URL] = URL.get_or_none(job=job, state='free')
+        url = URL.get_or_none(job=job, crawler=crawler_id, state='free')
+        url = url or URL.get_or_none(job=job, crawler=None, state='free')
+        url = url or URL.get_or_none(job=job, state='free')
         if url is not None:
+            log.debug("Loading free URL")
             url.crawler = crawler_id
             url.state = 'progress'
             url.save()
-
+    
     return url
 
 
-def _start_crawler1(job: str, crawler_id: int, log_path: pathlib.Path,
-                    modules: List[Type[Module]]) -> None:
-
+def _start_crawler1(job: str, crawler_id: int, log_path: pathlib.Path, modules: List[Type[Module]], listen: bool) -> None:
     log = _get_logger(job, crawler_id, log_path)
-    url: Optional[URL] = _get_url(job, crawler_id)
+    url: Optional[URL] = _get_url(job, crawler_id, log)
 
-    while url:
+    while url or listen:
+        if not url and listen:
+            time.sleep(30)
+            url = _get_url(job, crawler_id, log)
+            continue
+
         crawler: Process = Process(target=_start_crawler2, args=(job, crawler_id, url.url, url.rank, log_path, modules))
         crawler.start()
 
@@ -163,7 +176,7 @@ def _start_crawler1(job: str, crawler_id: int, log_path: pathlib.Path,
 
         url.state = 'complete'
         url.save()
-        url = _get_url(job, crawler_id)
+        url = _get_url(job, crawler_id, log)
 
 
 def _start_crawler2(job: str, crawler_id: int, url: str, rank: int, log_path: pathlib.Path,
@@ -230,6 +243,8 @@ if __name__ == '__main__':
                              help="how many crawlers will run concurrently")
     args_parser.add_argument("-i", "--crawlerid", type=int, default=1,
                              help="starting crawler id (default 1); must be > 0")
+    args_parser.add_argument("-l", "--listen", default=False, action='store_true',
+                             help="crawler will not stop if there is no job; query and sleep until a job is found")
 
     # Parse command line arguments
     args = vars(args_parser.parse_args())
@@ -240,5 +255,6 @@ if __name__ == '__main__':
         args.get('urlspath'),
         args.get('urls'),
         args.get('log'),
-        args.get('crawlerid')
+        args.get('crawlerid'),
+        args.get('listen')
     ))

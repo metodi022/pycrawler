@@ -1,7 +1,8 @@
 from collections import deque
+from datetime import datetime
 from typing import Deque, List, MutableSet, Optional, Tuple
 
-from peewee import IntegerField, Model, PostgresqlDatabase, TextField
+from peewee import DateTimeField, IntegerField, Model, PostgresqlDatabase, TextField
 
 from config import Config
 
@@ -15,6 +16,14 @@ database = PostgresqlDatabase(Config.DATABASE,
 
 
 class BaseModel(Model):
+    created = DateTimeField(default=datetime.now)
+    updated = DateTimeField(default=datetime.now)
+    note = TextField(default=None, null=True)
+
+    def save(self, *args, **kwargs):
+        self.updated = datetime.now()
+        return super(BaseModel, self).save(*args, **kwargs)
+
     class Meta:
         database = database
 

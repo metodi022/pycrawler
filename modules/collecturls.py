@@ -27,6 +27,10 @@ class CollectURLs(Module):
                          start: List[datetime], repetition: int) -> None:
         super().receive_response(responses, url, final_url, start, repetition)
 
+        # Speedup by ignoring repetitive URL collection from the same page
+        if self.crawler.repetition > 1:
+            return
+
         # Make sure to add page as seen
         parsed_url_final: Optional[tld.utils.Result] = get_tld_object(final_url)
         self.crawler.context_database.add_seen(get_url_full(parsed_url_final) if parsed_url_final is not None else final_url)
@@ -60,7 +64,7 @@ class CollectURLs(Module):
 
             # Parse attribute
             parsed_link: Optional[tld.utils.Result] = get_url_from_href(link.strip(), parsed_url_final)
-            if parsed_link is None:
+            if not parsed_link:
                 continue
 
             # Check for same origin
@@ -93,7 +97,7 @@ class CollectURLs(Module):
             # Add link
             urls.append(parsed_link)
 
-        self.crawler.log.info(f"Find {min(len(urls), self._max_urls)} URLs at depth {self.crawler.depth}")
+        self.crawler.log.info(f"Find {min(len(urls), self._max_urls)} URLs")
 
         # Shuffle the URLs
         if Config.FOCUS_FILTER:

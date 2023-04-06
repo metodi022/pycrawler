@@ -1,3 +1,4 @@
+from asyncio import CancelledError
 from logging import Logger
 from typing import List, Optional, Tuple
 
@@ -43,7 +44,7 @@ class CollectHeaders(Module):
             headers: Optional[str]
             try:
                 headers = str(response.headers_array())
-            except Exception as error:
+            except (Exception, CancelledError) as error:
                 self.crawler.log.warning(f"Get headers fail: {error}")
                 headers = None
 
