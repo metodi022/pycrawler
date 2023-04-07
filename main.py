@@ -120,14 +120,14 @@ def _get_url(job: str, crawler_id: int, log) -> Optional[URL]:
         log.debug("Loading progress URL")
         return url
     
-    log.debug("Loading free URL")
     with database.atomic():
         result = database.execute_sql(f"SELECT id FROM url WHERE state='free' AND job=%s FOR UPDATE SKIP LOCKED LIMIT 1", (job,)).fetchall()
         if len(result) == 0:
-            return None
-
-        database.execute_sql(f"UPDATE url SET crawler=%s, state='progress' WHERE id=%s", (crawler_id, result[0]))
-        url = URL.get(id=result[0])
+            url = None
+        else:
+            log.debug("Loading free URL")
+            database.execute_sql(f"UPDATE url SET crawler=%s, state='progress' WHERE id=%s", (crawler_id, result[0]))
+            url = URL.get(id=result[0])
     
     return url
 
