@@ -35,6 +35,13 @@ class AcceptCookies(Module):
             self.extension = True
             if not (path / 'manifest.json').exists():
                 shutil.copy((path / 'manifest_v2.json'), (path / 'manifest.json'))
+        
+        # Check if it's the start of crawl
+        if self.crawler.url == self.crawler.currenturl and self.crawler.repetition == 1 and self.crawler.depth == 0:
+            path = (Config.LOG / f"persistentchromium{self.crawler.job_id}{self.crawler.crawler_id}")
+            if path.exists():
+                self.crawler.log.debug('Deleting old Chromium persistent user data')
+                shutil.rmtree(path)
 
 
     def add_handlers(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
@@ -47,7 +54,7 @@ class AcceptCookies(Module):
             path: str = str((pathlib.Path(__file__).parent.parent / 'extensions/I-Still-Dont-Care-About-Cookies/src').resolve())
 
             self.crawler.context = self.crawler.playwright.chromium.launch_persistent_context(
-                (Config.LOG / 'persistentcontextchromium'),
+                (Config.LOG / f"persistentchromium{self.crawler.job_id}{self.crawler.crawler_id}"),
                 user_agent=self.crawler.playwright.devices[Config.DEVICE]['user_agent'],
                 screen=self.crawler.playwright.devices[Config.DEVICE].get('screen', {"width": 1920, "height": 1080}),
                 viewport=self.crawler.playwright.devices[Config.DEVICE]['viewport'],

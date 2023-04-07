@@ -120,7 +120,7 @@ class Crawler:
             self._invoke_page_handler(url)
 
             # Repetition loop
-            for repetition in range(1, Config.REPETITIONS + 1):
+            for repetition in range(1, Config.REPETITIONS):
                 self.repetition = repetition
 
                 # Navigate to page
