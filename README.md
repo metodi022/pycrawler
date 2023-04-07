@@ -38,9 +38,9 @@ options:
 ```
 
 For example, if we want to start a single crawler to find login forms, we use the following command:
-`main.py -m FindLoginForms -j 1 -c 1`
+`main.py -m FindLoginForms -j <your-job-id> -c 1`
 
-The `-f` option requires you to specify a list of sites which the crawler will be visiting. The sites follow the [Tranco List](https://tranco-list.eu/) CSV format (`rank, domain`).
+The `-f` and `-u` options allows you to specify a list of sites which the crawler will be visiting. The sites follow the [Tranco List](https://tranco-list.eu/) CSV format (`rank, domain`).
 
 ## Modules
 You can find existing modules in the `./modules` directory. Additionally, you can create your own modules to do something specific. To do that:
