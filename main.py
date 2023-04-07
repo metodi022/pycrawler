@@ -31,7 +31,7 @@ except ModuleNotFoundError as e:
 
 def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Optional[pathlib.Path] = None, urls: Optional[List[Tuple[int, str]]] = None, log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1, listen: bool = False) -> int:
     # Create log path if needed
-    log_path = log_path or Config.LOG
+    log_path = (log_path or Config.LOG).resolve()
     if not log_path.exists():
         os.mkdir(log_path)
 
