@@ -30,6 +30,11 @@ class AcceptCookies(Module):
 
         self.crawler.state['AcceptCookies'] = self._urls
 
+        # Don't activate extension if we restart context
+        if Config.RESTARTCONTEXT:
+            return
+
+        # Initialize manifest
         path: pathlib.Path = (pathlib.Path(__file__).parent.parent / 'extensions/I-Still-Dont-Care-About-Cookies/src')
         if Config.BROWSER == 'chromium' and path.exists():
             self.extension = True

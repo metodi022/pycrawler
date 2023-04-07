@@ -17,8 +17,10 @@ class Config:
     DEVICE: str = 'Desktop Chrome'  # A device supported by playwright (https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/deviceDescriptorsSource.json)
     LOCALE: str = 'de-DE'
     TIMEZONE: str = 'Europe/Berlin'
+
     HEADLESS: bool = True  # Headless browser
     RESTART: bool = True  # If the browser crashes, try to restore the crawler
+    RESTARTCONTEXT: bool = False # requires RESTART=True; If the browser crashes, try to restore context; considerable performance slowdown
 
     RECURSIVE: bool = True  # Discover additional URLs while crawling
     SAME_ORIGIN: bool = False  # URL discovery for same-origin only

@@ -141,8 +141,8 @@ class Crawler:
                 self.depth = url[1]
                 self.state['Crawler'] = (self.currenturl, self.depth)
 
-            # Save state once
-            if 'Context' not in self.state:
+            # Save state if needed
+            if (Config.RESTART and Config.RESTARTCONTEXT) or (Config.RESTART and ('Context' not in self.state)):
                 try:
                     self.state['Context'] = self.context.storage_state()
                 except Exception as error:
