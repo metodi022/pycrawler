@@ -40,6 +40,7 @@ class CollectHeaders(Module):
     def add_handlers(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
         super().add_handlers(url)
 
+        # Create response listener that saves all headers
         def handler(response: Response):
             headers: Optional[str]
             try:
@@ -56,4 +57,5 @@ class CollectHeaders(Module):
                           fromurlfinal=self.crawler.page.url, tourl=response.url, headers=headers,
                           repetition=self.crawler.repetition)
 
+        # Register response handlers
         self.crawler.page.on('response', handler)

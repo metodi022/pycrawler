@@ -142,7 +142,7 @@ class Login(Module):
         page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
         # Accept cookie banners, sometimes they block login forms
-        if Config.ACCEPT_COOKIES:
+        if Config.COOKIES != 'Ignore':
             AcceptCookies.accept(page, loginurl)
 
         # Find login form
@@ -390,7 +390,7 @@ class Login(Module):
             return False
 
         # Accept cookies if needed
-        if Config.ACCEPT_COOKIES:
+        if Config.COOKIES != 'Ignore':
             AcceptCookies.accept(page, domainurl)
             AcceptCookies.accept(page_alt, domainurl)
 

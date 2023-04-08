@@ -36,7 +36,7 @@ class Config:
     WAIT_AFTER_LOAD: int = 5000  # let page execute after loading in ms
     RESTART_TIMEOUT: int = 600  # restart crawler if it hasn't done anything for ... seconds
 
-    ACCEPT_COOKIES: bool = True  # Attempt to find cookie banners and accept them (unreliable)
+    COOKIES: Literal['Accept', 'Bypass', 'Ignore'] = 'Bypass'  # Attempt to find cookie banners and accept them (unreliable)
 
     # TODO more options
     # OBEY_ROBOTS: bool = False  # obey robots.txt

@@ -1,3 +1,4 @@
+from logging import Logger
 import pathlib
 import re
 from datetime import datetime
@@ -25,28 +26,25 @@ class AcceptCookies(Module):
 
     def __init__(self, crawler) -> None:
         super().__init__(crawler)
-        self._urls: MutableSet[str] = self.crawler.state.get('AcceptCookies', set())
+        self._seen: MutableSet[str] = self.crawler.state.get('AcceptCookies', set())
         self.extension: bool = False
 
-        self.crawler.state['AcceptCookies'] = self._urls
-
-        # Don't activate extension if we restart context
         if Config.RESTARTCONTEXT:
+            self.crawler.state['AcceptCookies'] = self._seen
+        else:
             return
 
+        path: pathlib.Path = (pathlib.Path(__file__).parent.parent / 'extensions/I-Still-Dont-Care-About-Cookies/src')
+        if Config.BROWSER == 'chromium' and path.exists() and Config.COOKIES == 'Bypass':
+            self.extension = True
+
+
+    @staticmethod
+    def register_job(log: Logger) -> None:
         # Initialize manifest
         path: pathlib.Path = (pathlib.Path(__file__).parent.parent / 'extensions/I-Still-Dont-Care-About-Cookies/src')
-        if Config.BROWSER == 'chromium' and path.exists():
-            self.extension = True
-            if not (path / 'manifest.json').exists():
-                shutil.copy((path / 'manifest_v2.json'), (path / 'manifest.json'))
-        
-        # Check if it's the start of crawl
-        if self.crawler.url == self.crawler.currenturl and self.crawler.repetition == 1 and self.crawler.depth == 0:
-            path = (Config.LOG / f"persistentchromium{self.crawler.job_id}{self.crawler.crawler_id}")
-            if path.exists():
-                self.crawler.log.debug('Deleting old Chromium persistent user data')
-                shutil.rmtree(path)
+        if path.exists() and not (path / 'manifest.json').exists():
+            shutil.copy((path / 'manifest_v2.json'), (path / 'manifest.json'))
 
 
     def add_handlers(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
@@ -59,7 +57,7 @@ class AcceptCookies(Module):
             path: str = str((pathlib.Path(__file__).parent.parent / 'extensions/I-Still-Dont-Care-About-Cookies/src').resolve())
 
             self.crawler.context = self.crawler.playwright.chromium.launch_persistent_context(
-                (Config.LOG / f"persistentchromium{self.crawler.job_id}{self.crawler.crawler_id}"),
+                (Config.LOG / f"{Config.BROWSER}{self.crawler.job_id}{self.crawler.crawler_id}"),
                 user_agent=self.crawler.playwright.devices[Config.DEVICE]['user_agent'],
                 screen=self.crawler.playwright.devices[Config.DEVICE].get('screen', {"width": 1920, "height": 1080}),
                 viewport=self.crawler.playwright.devices[Config.DEVICE]['viewport'],
@@ -87,9 +85,9 @@ class AcceptCookies(Module):
 
         # Check if we already accepted cookies for origin
         url_origin: Optional[tld.utils.Result] = get_tld_object(final_url)
-        if (url_origin is None) or (get_url_origin(url_origin) in self._urls):
+        if (url_origin is None) or (get_url_origin(url_origin) in self._seen):
             return
-        self._urls.add(get_url_origin(url_origin))
+        self._seen.add(get_url_origin(url_origin))
 
         # Accept cookies for origin
         AcceptCookies.accept(self.crawler.page, url[0], inframe=False, responses=responses, start=start, extension=self.extension)

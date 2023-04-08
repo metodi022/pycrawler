@@ -2,6 +2,7 @@ import os
 import pickle
 from datetime import datetime
 from logging import Logger
+import shutil
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import tld
@@ -59,7 +60,7 @@ class Crawler:
 
         # Prepare modules
         self.modules: List[Module] = []
-        self.modules += [AcceptCookies(self)] if Config.ACCEPT_COOKIES else []
+        self.modules += [AcceptCookies(self)] if (Config.COOKIES != 'Ignore') else []
         self.modules += [CollectURLs(self)] if Config.RECURSIVE else []
         for module in modules:
             self.modules.append(module(self))
@@ -120,7 +121,7 @@ class Crawler:
             self._invoke_page_handler(url)
 
             # Repetition loop
-            for repetition in range(1, Config.REPETITIONS):
+            for repetition in range(1, Config.REPETITIONS + 1):
                 self.repetition = repetition
 
                 # Navigate to page
@@ -143,10 +144,12 @@ class Crawler:
 
             # Save state if needed
             if (Config.RESTART and Config.RESTARTCONTEXT) or (Config.RESTART and ('Context' not in self.state)):
-                try:
-                    self.state['Context'] = self.context.storage_state()
-                except Exception as error:
-                    self.log.warning(f"Get main context fail: {error}")
+                _module: Optional[AcceptCookies] = next((module for module in self.modules if isinstance(module, AcceptCookies)), None)
+                if _module is None or not _module.extension:
+                    try:
+                        self.state['Context'] = self.context.storage_state()
+                    except Exception as error:
+                        self.log.warning(f"Get main context fail: {error}")
 
             if Config.RESTART:
                 with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache", mode='wb') as file:
@@ -184,6 +187,12 @@ class Crawler:
         if Config.RESTART and (Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
             self.log.debug("Deleting cache")
             os.remove(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
+        
+        # Delete old persistent storage
+        path = Config.LOG / f"{Config.BROWSER}{self.job_id}{self.crawler_id}"
+        if path.exists():
+            self.log.debug('Deleting old persistent storage')
+            shutil.rmtree(path)
 
     def _open_url(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> Optional[Response]:
         response: Optional[Response] = None
