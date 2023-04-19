@@ -61,14 +61,6 @@ class FindLoginForms(Module):
                          start: List[datetime], repetition: int) -> None:
         super().receive_response(responses, url, final_url, start, repetition)
 
-        # Check if response is valid
-        response: Optional[Response] = responses[-1] if len(responses) > 0 else None
-        if response is None or response.status >= 400:
-            # Add search engine if at
-            if self._found <= 0 and len(self.crawler.context_database) <= 0 and Config.RECURSIVE:
-                self.crawler.context_database.add_url(('https://www.google.com/search?q=' + urllib.parse.quote(f"\"login\" site:{self.crawler.site}"), Config.DEPTH - 1, self.crawler.rank, []))
-            return
-
         # Parse current page URL
         parsed_url: Optional[tld.utils.Result] = get_tld_object(self.crawler.page.url)
         if parsed_url is None:

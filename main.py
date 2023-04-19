@@ -10,14 +10,10 @@ import traceback
 from datetime import datetime
 from logging import FileHandler, Formatter, Logger
 from multiprocessing import Process
-from typing import List, Optional, Tuple, Type
-
-import tld
-from tld.exceptions import TldBadUrl, TldDomainNotFound
+from typing import List, Optional, Type
 
 from crawler import Crawler
 from database import URL, database
-from loader.csvloader import CSVLoader
 from modules.module import Module
 
 try:
@@ -29,18 +25,15 @@ except ModuleNotFoundError as e:
     sys.exit(1)
 
 
-def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Optional[pathlib.Path] = None, urls: Optional[List[Tuple[int, str]]] = None, log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1, listen: bool = False) -> int:
+def main(job: str, crawlers_count: int, module_names: List[str], log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1, listen: bool = False) -> int:
     # Create log path if needed
-    log_path = (log_path or Config.LOG).resolve()
+    log_path = log_path or Config.LOG
     if not log_path.exists():
         os.mkdir(log_path)
 
     # Verify arguments
     if not (log_path.exists() and log_path.is_dir()):
         raise RuntimeError('Path to directory for log output is incorrect')
-
-    if urls_path is not None and not (urls_path.exists() or urls_path.is_dir()):
-        raise RuntimeError('Path to file with urls is incorrect')
 
     if crawlers_count <= 0 or starting_crawler_id <= 0:
         raise RuntimeError('Invalid number of crawlers or starting crawler id.')
@@ -67,20 +60,8 @@ def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Opti
     with database.atomic():
         database.create_tables([URL])
 
-    # Iterate over URLs and add them to database
-    if urls_path is not None or urls:
-        with database.atomic():  # speedup by using atomic transaction
-            entry: Tuple[int, str]
-            for entry in (CSVLoader(urls_path) if urls_path is not None else urls):
-                url: str = ('https://' if not entry[1].startswith('http') else '') + entry[1]
-                try:
-                    site: str = tld.get_tld(url, as_object=True).fld
-                except (TldBadUrl, TldDomainNotFound):
-                    log.warning("Could not parse %s", url)
-                    continue
-                URL.create(job=job, crawler=None, site=site, url=url, landing_page=url, rank=int(entry[0]))
-
     # Create modules database
+    log.info('Load modules database')
     for module in modules:
         module.register_job(log)
 
@@ -91,7 +72,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], urls_path: Opti
         crawlers.append(process)
 
     for i, crawler in enumerate(crawlers):
-        log.info(f"Start crawler {i + starting_crawler_id} with JOBID {job} PID {crawler.pid}")
+        log.info("Start crawler %s with JOBID %s PID %s", (i + starting_crawler_id), job, crawler.pid)
         crawler.start()
 
     # Wait for crawlers to finish
@@ -115,18 +96,21 @@ def _get_modules(module_names: List[str]) -> List[Type[Module]]:
 
 
 def _get_url(job: str, crawler_id: int, log) -> Optional[URL]:
+    # Get progress URL
     url: Optional[URL] = URL.get_or_none(job=job, crawler=crawler_id, state='progress')
     if url is not None:
         log.debug("Loading progress URL")
         return url
     
+    # Otherwise get new free URL
     with database.atomic():
-        result = database.execute_sql(f"SELECT id FROM url WHERE state='free' AND job=%s FOR UPDATE SKIP LOCKED LIMIT 1", (job,)).fetchall()
+        result = database.execute_sql("SELECT id FROM url WHERE state='free' AND job=%s FOR UPDATE SKIP LOCKED LIMIT 1", (job,)).fetchall()
         if len(result) == 0:
+            log.debug("No free URL found")
             url = None
         else:
             log.debug("Loading free URL")
-            database.execute_sql(f"UPDATE url SET crawler=%s, state='progress' WHERE id=%s", (crawler_id, result[0]))
+            database.execute_sql("UPDATE url SET crawler=%s, state='progress' WHERE id=%s", (crawler_id, result[0]))
             url = URL.get(id=result[0])
     
     return url
@@ -134,8 +118,8 @@ def _get_url(job: str, crawler_id: int, log) -> Optional[URL]:
 
 def _start_crawler1(job: str, crawler_id: int, log_path: pathlib.Path, modules: List[Type[Module]], listen: bool) -> None:
     log = _get_logger(job, crawler_id, log_path)
-    url: Optional[URL] = _get_url(job, crawler_id, log)
 
+    url: Optional[URL] = _get_url(job, crawler_id, log)
     while url or listen:
         if not url and listen:
             time.sleep(30)
@@ -173,6 +157,7 @@ def _start_crawler1(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
 
         crawler.close()
 
+        url = URL.get(url.id)
         url.state = 'complete'
         url.save()
         url = _get_url(job, crawler_id, log)
@@ -251,8 +236,6 @@ if __name__ == '__main__':
         args.get('job'),
         args.get('crawlers'),
         args.get('modules') or [],
-        args.get('urlspath'),
-        args.get('urls'),
         args.get('log'),
         args.get('crawlerid'),
         args.get('listen')

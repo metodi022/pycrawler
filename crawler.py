@@ -1,4 +1,5 @@
 import os
+import pathlib
 import pickle
 from datetime import datetime
 from logging import Logger
@@ -24,11 +25,12 @@ class Crawler:
         self.job_id: str = job_id
         self.crawler_id: int = crawler_id
         self.state: Dict[str, Any] = {}
+        self.cache: pathlib.Path = Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache"
 
         # Load previous state
-        if Config.RESTART and (Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
+        if Config.RESTART and self.cache.exists():
             self.log.debug("Loading old cache")
-            with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache", mode="rb") as file:
+            with open(self.cache, mode="rb") as file:
                 self.state = pickle.load(file)
 
         # Prepare rest of variables
@@ -75,9 +77,9 @@ class Crawler:
     def start_crawl(self):
         # Stop crawler earlier if stop flag is set
         if self.stop:
-            if Config.RESTART and (Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
+            if Config.RESTART and self.cache.exists():
                 self.log.debug("Deleting cache")
-                os.remove(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
+                os.remove(self.cache)
             return
 
         if self.url is None:
@@ -152,7 +154,7 @@ class Crawler:
                         self.log.warning(f"Get main context fail: {error}")
 
             if Config.RESTART:
-                with open(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache", mode='wb') as file:
+                with open(self.cache, mode='wb') as file:
                     pickle.dump(self.state, file)
 
             # Close everything (to avoid memory issues)
@@ -184,9 +186,9 @@ class Crawler:
         self.playwright.stop()
 
         # Delete old cache
-        if Config.RESTART and (Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache").exists():
+        if Config.RESTART and self.cache.exists():
             self.log.debug("Deleting cache")
-            os.remove(Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache")
+            os.remove(self.cache)
         
         # Delete old persistent storage
         path = Config.LOG / f"{Config.BROWSER}{self.job_id}{self.crawler_id}"
@@ -202,6 +204,7 @@ class Crawler:
             response = self.page.goto(url[0], timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
             self.page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error as error:
+            error_message = ((error.name + ' ') if error.name else '') + error.message
             self.log.warning(error)
 
         if url[1] == 0 and self.url == url[0] and self.repetition == 1 and self.depth == 0:

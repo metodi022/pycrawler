@@ -35,11 +35,6 @@ class CollectURLs(Module):
         parsed_url_final: Optional[tld.utils.Result] = get_tld_object(final_url)
         self.crawler.context_database.add_seen(get_url_full(parsed_url_final) if parsed_url_final is not None else final_url)
 
-        # Check if response is valid
-        response: Optional[Response] = responses[-1] if len(responses) > 0 else None
-        if response is None or response.status >= 400:
-            return
-
         # Check if depth or max URLs exceeded
         if self.crawler.depth >= Config.DEPTH or self._max_urls < 1:
             return

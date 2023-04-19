@@ -51,11 +51,6 @@ class FindEmails(Module):
                          start: List[datetime], repetition: int) -> None:
         super().receive_response(responses, url, final_url, start, repetition)
 
-        # Check if response is valid
-        response: Optional[Response] = responses[-1] if len(responses) > 0 else None
-        if response is None or response.status >= 400:
-            return
-
         try:
             html: str = self.crawler.page.content()
         except Error:
