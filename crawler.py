@@ -1,18 +1,19 @@
 import os
 import pathlib
 import pickle
+import shutil
 from datetime import datetime
 from logging import Logger
-import shutil
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, cast
+from typing import Any, Callable, Dict, List, Optional, Type, cast
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Error, Page, Playwright, Response, sync_playwright
 
 from config import Config
-from database import Task, DequeDB
+from database import URL, URLDB, Task
 from modules.acceptcookies import AcceptCookies
 from modules.collecturls import CollectURLs
+from modules.feedbackurl import FeedbackURL
 from modules.module import Module
 from utils import get_screenshot, get_url_origin
 
@@ -50,15 +51,14 @@ class Crawler:
         self.browser: Browser = None
         self.context: BrowserContext = None
         self.page: Page = None
-        self.context_database: DequeDB = DequeDB()
+        self.urldb: URLDB = URLDB(self)
 
-        if 'DequeDB' in self.state:
-            self.context_database._data = self.state['DequeDB'][0]
-            self.context_database._seen = self.state['DequeDB'][1]
+        if 'URLDB' in self.state:
+            self.urldb._seen = self.state['URLDB']
         else:
-            self.state['DequeDB'] = [self.context_database._data, self.context_database._seen]
+            self.state['URLDB'] = self.urldb._seen
 
-        self.context_database.add_url((self.url, self.depth, self.rank, []))
+        self.urldb.add_url(self.url, None, None)
 
         # Prepare modules
         self.modules: List[Module] = []
@@ -66,6 +66,7 @@ class Crawler:
         self.modules += [CollectURLs(self)] if Config.RECURSIVE else []
         for module in modules:
             self.modules.append(module(self))
+        self.modules += [FeedbackURL(self)] if Config.RECURSIVE else []
         self.log.debug(f"Prepared modules: {self.modules}")
 
         # Prepare filters
@@ -107,13 +108,13 @@ class Crawler:
 
         self.page = self.context.new_page()
 
-        url: Optional[Tuple[str, int, int, List[Tuple[str, str]]]] = self.context_database.get_url()
-        self.log.info(f"Get URL {url[0] if url is not None else url} depth {url[1] if url is not None else self.depth}")
+        url: Optional[URL] = self.urldb.get_url()
+        self.log.info(f"Get URL {url.url if url is not None else url} depth {url.depth if url is not None else self.depth}")
 
         # Update variables
         if url is not None:
-            self.currenturl = url[0]
-            self.depth = url[1]
+            self.currenturl = url.url
+            self.depth = url.depth
             self.state['Crawler'] = (self.currenturl, self.depth)
 
         # Main loop
@@ -126,6 +127,10 @@ class Crawler:
             for repetition in range(1, Config.REPETITIONS + 1):
                 self.repetition = repetition
 
+                if repetition > 1:
+                    url = self.urldb.get_url()
+                    assert(url is not None)
+
                 # Navigate to page
                 response: Optional[Response] = self._open_url(url)
                 self.log.info(f"Response status {response if response is None else response.status} repetition {repetition}")
@@ -135,13 +140,13 @@ class Crawler:
                 self._invoke_response_handler([response], url, [datetime.now()], repetition)
 
             # Get next URL to crawl
-            url = self.context_database.get_url()
-            self.log.info(f"Get URL {url[0] if url is not None else url} depth {url[1] if url is not None else self.depth}")
+            url = self.urldb.get_url()
+            self.log.info(f"Get URL {url.url if url is not None else url} depth {url.depth if url is not None else self.depth}")
 
             # Update variables
             if url is not None:
-                self.currenturl = url[0]
-                self.depth = url[1]
+                self.currenturl = url.url
+                self.depth = url.depth
                 self.state['Crawler'] = (self.currenturl, self.depth)
 
             # Save state if needed
@@ -196,18 +201,18 @@ class Crawler:
             self.log.debug('Deleting old persistent storage')
             shutil.rmtree(path)
 
-    def _open_url(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> Optional[Response]:
+    def _open_url(self, url: URL) -> Optional[Response]:
         response: Optional[Response] = None
         error_message: Optional[str] = None
 
         try:
-            response = self.page.goto(url[0], timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+            response = self.page.goto(url.url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
             self.page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error as error:
             error_message = ((error.name + ' ') if error.name else '') + error.message
             self.log.warning(error)
 
-        if url[1] == 0 and self.url == url[0] and self.repetition == 1 and self.depth == 0:
+        if url.depth == 0 and self.url == url.url and self.repetition == 1 and self.depth == 0:
             self.task = cast(Task, Task.get(self.task.id))
             self.task.landing_page = self.page.url
             self.task.code = response.status if response is not None else Config.ERROR_CODES['response_error']
@@ -217,12 +222,10 @@ class Crawler:
 
         return response
 
-    def _invoke_page_handler(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+    def _invoke_page_handler(self, url: URL) -> None:
         for module in self.modules:
             module.add_handlers(url)
 
-    def _invoke_response_handler(self, responses: List[Optional[Response]],
-                                 url: Tuple[str, int, int, List[Tuple[str, str]]],
-                                 start: List[datetime], repetition: int) -> None:
+    def _invoke_response_handler(self, responses: List[Optional[Response]], url: URL, start: List[datetime], repetition: int) -> None:
         for module in self.modules:
             module.receive_response(responses, url, self.page.url, start, repetition)

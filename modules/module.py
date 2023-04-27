@@ -1,9 +1,11 @@
 from datetime import datetime
 from logging import Logger
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional
 
 import tld
 from playwright.sync_api import Response
+
+from database import URL
 
 
 class Module:
@@ -30,23 +32,21 @@ class Module:
             log (Logger): log
         """
 
-    def add_handlers(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+    def add_handlers(self, url: URL) -> None:
         """
         Add event handlers before navigating to a page.
 
         Args:
-            url (Tuple[str, int, int, List[Tuple[str, str]]]): URL, depth, rank, previous URL
+            url (URL): URL, depth, rank, previous URL
         """
 
-    def receive_response(self, responses: List[Optional[Response]],
-                         url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], repetition: int) -> None:
+    def receive_response(self, responses: List[Optional[Response]], url: URL, final_url: str, start: List[datetime], repetition: int) -> None:
         """
         Receive response from server.
 
         Args:
             responses (List[Optional[Response]]): list of responses from crawler and modules
-            url (Tuple[str, int, int, List[Tuple[str, str]]]): URL, depth, rank, previous URL
+            url (URL): URL, depth, rank, previous URL
             final_url (str): final url after redirections
             start (List[datetime]): start times for crawl and for each module response initiation
             repetition (int): current URL visited repetition

@@ -1,11 +1,12 @@
-from datetime import datetime
 import random
-from typing import Callable, List, Optional, Tuple
+from datetime import datetime
+from typing import Callable, List, Optional
 
 import tld
 from playwright.sync_api import Error, Locator, Response
 
 from config import Config
+from database import URL
 from modules.module import Module
 from utils import get_locator_attribute, get_locator_count, get_locator_nth, get_tld_object, get_url_from_href, get_url_full, get_url_full_with_query, get_url_full_with_query_fragment, get_url_origin
 
@@ -22,9 +23,7 @@ class CollectURLs(Module):
 
         self.crawler.state['CollectUrls'] = self._max_urls
 
-    def receive_response(self, responses: List[Optional[Response]],
-                         url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
-                         start: List[datetime], repetition: int) -> None:
+    def receive_response(self, responses: List[Optional[Response]], url: URL, final_url: str, start: List[datetime], repetition: int) -> None:
         super().receive_response(responses, url, final_url, start, repetition)
 
         # Speedup by ignoring repetitive URL collection from the same page
@@ -33,7 +32,7 @@ class CollectURLs(Module):
 
         # Make sure to add page as seen
         parsed_url_final: Optional[tld.utils.Result] = get_tld_object(final_url)
-        self.crawler.context_database.add_seen(get_url_full(parsed_url_final) if parsed_url_final is not None else final_url)
+        self.crawler.urldb.add_seen(get_url_full(parsed_url_final) if parsed_url_final is not None else final_url)
 
         # Check if depth or max URLs exceeded
         if self.crawler.depth >= Config.DEPTH or self._max_urls < 1:
@@ -76,9 +75,9 @@ class CollectURLs(Module):
 
             # Check seen
             parsed_link_full: str = get_url_full(parsed_link)
-            if self.crawler.context_database.get_seen(parsed_link_full):
+            if self.crawler.urldb.get_seen(parsed_link_full):
                 continue
-            self.crawler.context_database.add_seen(parsed_link_full)
+            self.crawler.urldb.add_seen(parsed_link_full)
 
             # Filter out unwanted entries
             filter_out: bool = False
@@ -102,7 +101,7 @@ class CollectURLs(Module):
 
         # For each found URL, add it to the database, while making sure not to exceed the max URL limit
         for parsed_link in urls:
-            self.crawler.context_database.add_url_force((get_url_full_with_query_fragment(parsed_link), self.crawler.depth + 1, self.crawler.rank, url[3] + [(self.crawler.currenturl, final_url)]))
+            self.crawler.urldb.add_url(get_url_full_with_query_fragment(parsed_link), self.crawler.currenturl, final_url, force = True)
 
             self._max_urls -= 1
             if self._max_urls < 1:
