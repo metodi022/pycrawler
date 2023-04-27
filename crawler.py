@@ -4,13 +4,13 @@ import pickle
 from datetime import datetime
 from logging import Logger
 import shutil
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, cast
 
 import tld
 from playwright.sync_api import Browser, BrowserContext, Error, Page, Playwright, Response, sync_playwright
 
 from config import Config
-from database import URL, DequeDB
+from database import Task, DequeDB
 from modules.acceptcookies import AcceptCookies
 from modules.collecturls import CollectURLs
 from modules.module import Module
@@ -18,11 +18,10 @@ from utils import get_screenshot, get_url_origin
 
 
 class Crawler:
-    def __init__(self, job_id: str, crawler_id: int, url: str, rank: int, log: Logger,
-                 modules: List[Type[Module]]) -> None:
+    def __init__(self, job: str, crawler_id: int, task: int, log: Logger, modules: List[Type[Module]]) -> None:
         # Prepare variables
         self.log: Logger = log
-        self.job_id: str = job_id
+        self.job_id: str = job
         self.crawler_id: int = crawler_id
         self.state: Dict[str, Any] = {}
         self.cache: pathlib.Path = Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache"
@@ -34,14 +33,15 @@ class Crawler:
                 self.state = pickle.load(file)
 
         # Prepare rest of variables
-        self.url: str = url
-        self.scheme: str = 'https' if url.startswith('https') else 'http'
-        self.site: str = tld.get_tld(self.url, as_object=True).fld
+        self.task: Task = cast(Task, Task.get(task))
+        self.url: str = cast(str, self.task.url)
+        self.scheme: str = 'https' if self.url.startswith('https') else 'http'
+        self.site: str = cast(str, tld.get_tld(self.url, as_object=True).fld)
         self.origin: str = get_url_origin(tld.get_tld(self.url, as_object=True))
-        self.currenturl: str = (self.state.get('Crawler')[0]) if 'Crawler' in self.state else url
+        self.currenturl: str = cast(str, self.state.get('Crawler')[0] if 'Crawler' in self.state else self.url)
 
-        self.rank: int = rank
-        self.depth: int = (self.state.get('Crawler')[1]) if 'Crawler' in self.state else 0
+        self.rank: int = cast(int, self.task.rank)
+        self.depth: int = cast(int, self.state.get('Crawler')[1] if 'Crawler' in self.state else 0)
         self.repetition: int = 1
 
         self.stop: bool = False
@@ -208,11 +208,11 @@ class Crawler:
             self.log.warning(error)
 
         if url[1] == 0 and self.url == url[0] and self.repetition == 1 and self.depth == 0:
-            tempurl: URL = URL.get(job=self.job_id, crawler=self.crawler_id, state='progress')
-            tempurl.landing_page = self.page.url
-            tempurl.code = response.status if response is not None else Config.ERROR_CODES['response_error']
-            tempurl.error = error_message
-            tempurl.save()
+            self.task = cast(Task, Task.get(self.task.id))
+            self.task.landing_page = self.page.url
+            self.task.code = response.status if response is not None else Config.ERROR_CODES['response_error']
+            self.task.error = error_message
+            self.task.save()
             get_screenshot(self.page, (Config.LOG / f"screenshots/{self.site}-{self.job_id}.png"), False)
 
         return response

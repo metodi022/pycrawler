@@ -13,7 +13,7 @@ from multiprocessing import Process
 from typing import List, Optional, Type
 
 from crawler import Crawler
-from database import URL, database
+from database import Task, database
 from modules.module import Module
 
 try:
@@ -58,7 +58,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: Optio
     # Creating database
     log.info('Load database')
     with database.atomic():
-        database.create_tables([URL])
+        database.create_tables([Task])
 
     # Create modules database
     log.info('Load modules database')
@@ -68,7 +68,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: Optio
     # Prepare crawlers
     crawlers: List[Process] = []
     for i in range(0, crawlers_count):
-        process = Process(target=_start_crawler1, args=(job, i + starting_crawler_id, log_path, modules, listen))
+        process = Process(target=_manage_crawler, args=(job, i + starting_crawler_id, log_path, modules, listen))
         crawlers.append(process)
 
     for i, crawler in enumerate(crawlers):
@@ -95,38 +95,38 @@ def _get_modules(module_names: List[str]) -> List[Type[Module]]:
     return result
 
 
-def _get_url(job: str, crawler_id: int, log) -> Optional[URL]:
-    # Get progress URL
-    url: Optional[URL] = URL.get_or_none(job=job, crawler=crawler_id, state='progress')
-    if url is not None:
-        log.debug("Loading progress URL")
-        return url
+def _get_task(job: str, crawler_id: int, log) -> Optional[Task]:
+    # Get progress task
+    task: Optional[Task] = Task.get_or_none(job=job, crawler=crawler_id, state='progress')
+    if task is not None:
+        log.debug("Loading progress task")
+        return task
     
-    # Otherwise get new free URL
+    # Otherwise get new free task
     with database.atomic():
-        result = database.execute_sql("SELECT id FROM url WHERE state='free' AND job=%s FOR UPDATE SKIP LOCKED LIMIT 1", (job,)).fetchall()
+        result = database.execute_sql("SELECT id FROM task WHERE state='free' AND job=%s FOR UPDATE SKIP LOCKED LIMIT 1", (job,)).fetchall()
         if len(result) == 0:
-            log.debug("No free URL found")
-            url = None
+            log.debug("No free task found")
+            task = None
         else:
-            log.debug("Loading free URL")
-            database.execute_sql("UPDATE url SET crawler=%s, state='progress' WHERE id=%s", (crawler_id, result[0]))
-            url = URL.get(id=result[0])
+            log.debug("Loading free task")
+            database.execute_sql("UPDATE task SET crawler=%s, state='progress' WHERE id=%s", (crawler_id, result[0]))
+            task = Task.get(id=result[0])
     
-    return url
+    return task
 
 
-def _start_crawler1(job: str, crawler_id: int, log_path: pathlib.Path, modules: List[Type[Module]], listen: bool) -> None:
+def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: List[Type[Module]], listen: bool) -> None:
     log = _get_logger(job, crawler_id, log_path)
 
-    url: Optional[URL] = _get_url(job, crawler_id, log)
-    while url or listen:
-        if not url and listen:
+    task: Optional[Task] = _get_task(job, crawler_id, log)
+    while task or listen:
+        if not task and listen:
             time.sleep(30)
-            url = _get_url(job, crawler_id, log)
+            task = _get_task(job, crawler_id, log)
             continue
-
-        crawler: Process = Process(target=_start_crawler2, args=(job, crawler_id, url.url, url.rank, log_path, modules))
+        
+        crawler: Process = Process(target=_start_crawler, args=(job, crawler_id, task.id, log_path, modules))
         crawler.start()
 
         while crawler.is_alive():
@@ -152,22 +152,21 @@ def _start_crawler1(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
 
             if Config.RESTART and (Config.LOG / f"job{job}crawler{crawler_id}.cache").exists():
                 crawler.close()
-                crawler = Process(target=_start_crawler2, args=(job, crawler_id, url.url, url.rank, log_path, modules))
+                crawler = Process(target=_start_crawler, args=(job, crawler_id, task.id, log_path, modules))
                 crawler.start()
 
         crawler.close()
 
-        url = URL.get(url.id)
-        url.state = 'complete'
-        url.save()
-        url = _get_url(job, crawler_id, log)
+        task = Task.get(task.id)
+        task.state = 'complete'
+        task.save()
+        task = _get_task(job, crawler_id, log)
 
 
-def _start_crawler2(job: str, crawler_id: int, url: str, rank: int, log_path: pathlib.Path,
-                    modules: List[Type[Module]]) -> None:
+def _start_crawler(job: str, crawler_id: int, task: int, log_path: pathlib.Path, modules: List[Type[Module]]) -> None:
     log = _get_logger(job, crawler_id, log_path)
     log.info('Start crawler')
-    crawler: Crawler = Crawler(job, crawler_id, url, rank, log, modules)
+    crawler: Crawler = Crawler(job, crawler_id, task, log, modules)
     crawler.start_crawl()
     log.info('Stop crawler')
 
@@ -215,10 +214,6 @@ if __name__ == '__main__':
     args_parser = argparse.ArgumentParser()
     args_parser.add_argument("-o", "--log", type=pathlib.Path,
                              help="path to directory where output log will be saved")
-    args_parser.add_argument("-f", "--urlspath", type=pathlib.Path,
-                             help="path to file with urls",)
-    args_parser.add_argument("-u", "--urls", type=ast.literal_eval, nargs='+',
-                             help="urls to crawl", )
     args_parser.add_argument("-m", "--modules", type=str, nargs='*',
                              help="which modules the crawler will run")
     args_parser.add_argument("-j", "--job", type=str, required=True,

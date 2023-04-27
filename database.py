@@ -28,7 +28,7 @@ class BaseModel(Model):
         database = database
 
 
-class URL(BaseModel):
+class Task(BaseModel):
     job = TextField()
     crawler = IntegerField(null=True)
     site = TextField()

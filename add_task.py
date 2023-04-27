@@ -7,14 +7,14 @@ from typing import List, Optional, Tuple, cast
 import tld
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
-from database import URL, database
+from database import Task, database
 from loader.csvloader import CSVLoader
 
 
 def main(job: str, urlspath: Optional[pathlib.Path], urls: Optional[List[Tuple[int, str]]]) -> int:
     # Prepare database
     with database.atomic():
-        database.create_tables([URL])
+        database.create_tables([Task])
 
     # Check for urls
     if urlspath is None and (not urls):
@@ -30,7 +30,7 @@ def main(job: str, urlspath: Optional[pathlib.Path], urls: Optional[List[Tuple[i
                 site: str = cast(tld.Result, tld.get_tld(url, as_object=True)).fld
             except (TldBadUrl, TldDomainNotFound):
                 continue
-            URL.create(job=job, crawler=None, site=site, url=url, landing_page=url, rank=int(entry[0]))
+            Task.create(job=job, crawler=None, site=site, url=url, landing_page=url, rank=int(entry[0]))
 
     return 0
 
