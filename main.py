@@ -1,5 +1,4 @@
 import argparse
-import ast
 import importlib
 import os
 import pathlib
@@ -13,7 +12,7 @@ from multiprocessing import Process
 from typing import List, Optional, Type
 
 from crawler import Crawler
-from database import Task, database
+from database import URL, Task, database
 from modules.module import Module
 
 try:
@@ -59,6 +58,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: Optio
     log.info('Load database')
     with database.atomic():
         database.create_tables([Task])
+        database.create_tables([URL])
 
     # Create modules database
     log.info('Load modules database')

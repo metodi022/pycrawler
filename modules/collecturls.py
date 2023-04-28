@@ -101,7 +101,7 @@ class CollectURLs(Module):
 
         # For each found URL, add it to the database, while making sure not to exceed the max URL limit
         for parsed_link in urls:
-            self.crawler.urldb.add_url(get_url_full_with_query_fragment(parsed_link), self.crawler.currenturl, final_url, force = True)
+            self.crawler.urldb.add_url(get_url_full_with_query_fragment(parsed_link), self.crawler.depth + 1, self.crawler.currenturl, final_url, force = True)
 
             self._max_urls -= 1
             if self._max_urls < 1:

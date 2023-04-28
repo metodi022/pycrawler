@@ -35,11 +35,11 @@ class Crawler:
 
         # Prepare rest of variables
         self.task: Task = cast(Task, Task.get(task))
-        self.url: str = cast(str, self.task.url)
-        self.scheme: str = 'https' if self.url.startswith('https') else 'http'
-        self.site: str = cast(str, tld.get_tld(self.url, as_object=True).fld)
-        self.origin: str = get_url_origin(tld.get_tld(self.url, as_object=True))
-        self.currenturl: str = cast(str, self.state.get('Crawler')[0] if 'Crawler' in self.state else self.url)
+        self.starturl: str = cast(str, self.task.url)
+        self.scheme: str = 'https' if self.starturl.startswith('https') else 'http'
+        self.site: str = cast(str, tld.get_tld(self.starturl, as_object=True).fld)
+        self.origin: str = get_url_origin(tld.get_tld(self.starturl, as_object=True))
+        self.currenturl: str = cast(str, self.state.get('Crawler')[0] if 'Crawler' in self.state else self.starturl)
 
         self.rank: int = cast(int, self.task.rank)
         self.depth: int = cast(int, self.state.get('Crawler')[1] if 'Crawler' in self.state else 0)
@@ -58,7 +58,10 @@ class Crawler:
         else:
             self.state['URLDB'] = self.urldb._seen
 
-        self.urldb.add_url(self.url, None, None)
+        if self.urldb.get_seen(self.currenturl):
+            URL.update(code=Config.ERROR_CODES['browser_error'], state='complete').where(URL.task==self.task, URL.job==self.job_id, URL.crawler==self.crawler_id, URL.site==self.site, URL.url==self.currenturl, URL.state != 'complete').execute()
+        else:
+            self.urldb.add_url(self.currenturl, self.depth, None, None)
 
         # Prepare modules
         self.modules: List[Module] = []
@@ -83,10 +86,6 @@ class Crawler:
                 os.remove(self.cache)
             return
 
-        if self.url is None:
-            self.log.info(f"Get URL None depth {self.depth}")
-            return
-
         # Initiate playwright, browser, context, and page
         self.playwright = sync_playwright().start()
 
@@ -108,7 +107,7 @@ class Crawler:
 
         self.page = self.context.new_page()
 
-        url: Optional[URL] = self.urldb.get_url()
+        url: Optional[URL] = self.urldb.get_url(1, initial=True)
         self.log.info(f"Get URL {url.url if url is not None else url} depth {url.depth if url is not None else self.depth}")
 
         # Update variables
@@ -128,7 +127,7 @@ class Crawler:
                 self.repetition = repetition
 
                 if repetition > 1:
-                    url = self.urldb.get_url()
+                    url = self.urldb.get_url(repetition)
                     assert(url is not None)
 
                 # Navigate to page
@@ -140,7 +139,7 @@ class Crawler:
                 self._invoke_response_handler([response], url, [datetime.now()], repetition)
 
             # Get next URL to crawl
-            url = self.urldb.get_url()
+            url = self.urldb.get_url(1)
             self.log.info(f"Get URL {url.url if url is not None else url} depth {url.depth if url is not None else self.depth}")
 
             # Update variables
@@ -212,7 +211,7 @@ class Crawler:
             error_message = ((error.name + ' ') if error.name else '') + error.message
             self.log.warning(error)
 
-        if url.depth == 0 and self.url == url.url and self.repetition == 1 and self.depth == 0:
+        if url.depth == 0 and self.starturl == url.url and self.repetition == 1 and self.depth == 0:
             self.task = cast(Task, Task.get(self.task.id))
             self.task.landing_page = self.page.url
             self.task.code = response.status if response is not None else Config.ERROR_CODES['response_error']

@@ -24,4 +24,7 @@ class FeedbackURL(Module):
         
         url.urlfinal = self.crawler.page.url
         url.code = code
+        url.state = 'complete'
+        url.start = start[-1]
+        url.end = datetime.now()
         url.save()

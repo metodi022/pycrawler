@@ -51,8 +51,8 @@ class URL(BaseModel):
     depth = IntegerField()
     code = IntegerField(default=None, null=True)
     repetition = IntegerField()
-    start = DateTimeField()
-    end = DateTimeField()
+    start = DateTimeField(default=None, null=True)
+    end = DateTimeField(default=None, null=True)
     state = TextField(default='free')
 
 
@@ -62,19 +62,25 @@ class URLDB:
         self.crawler: Crawler = crawler
         self._seen: MutableSet[str] = set()
 
-    def get_url(self) -> Optional[URL]:
-        url: Optional[URL] = URL.get_or_none(job=self.crawler.job_id,
+    def get_url(self, repetition: int, initial: bool = False) -> Optional[URL]:
+        url: Optional[URL] = URL.get_or_none(task=self.crawler.task,
+                                             job=self.crawler.job_id,
                                              crawler=self.crawler.crawler_id,
                                              site=self.crawler.site,
-                                             repetition=self.crawler.repetition,
-                                             state=('free' if self.crawler.repetition == 1 else 'waiting'))
+                                             url=self.crawler.currenturl,
+                                             repetition=repetition,
+                                             state=('free' if repetition == 1 else 'waiting'))
         
-        if self.crawler.repetition > 1:
-            assert(url is not None)
+        if initial and (url is None) and (repetition == 1):
+            url = URL.get_or_none(task=self.crawler.task,
+                                  job=self.crawler.job_id,
+                                  crawler=self.crawler.crawler_id,
+                                  site=self.crawler.site,
+                                  repetition=repetition,
+                                  state=('free' if repetition == 1 else 'waiting'))
 
         if url is None:
-            self._seen.clear()
-            return None
+            return
         
         url.state = 'progress'
         url.save()
@@ -90,7 +96,7 @@ class URLDB:
         else:
             self._seen.add(url + '/')
 
-    def add_url(self, url: str, fromurl: Optional[str], fromurlfinal: Optional[str], force: bool = False) -> None:
+    def add_url(self, url: str, depth: int, fromurl: Optional[str], fromurlfinal: Optional[str], force: bool = False) -> None:
         if url[0] in self._seen and not force:
             return
         
@@ -101,24 +107,23 @@ class URLDB:
                        job=self.crawler.job_id,
                        crawler=self.crawler.crawler_id,
                        site=self.crawler.site,
-                       url=self.crawler.url,
+                       url=self.crawler.currenturl,
                        fromurl=fromurl,
                        fromurlfinal=fromurlfinal,
-                       depth=(self.crawler.depth+1),
+                       depth=depth,
                        repetition=1)
             
-            for repetition in range(2, Config.REPETITIONS):
+            for repetition in range(2, Config.REPETITIONS + 1):
                 URL.create(task=self.crawler.task,
                            job=self.crawler.job_id,
                            crawler=self.crawler.crawler_id,
                            site=self.crawler.site,
-                           url=self.crawler.url,
+                           url=self.crawler.currenturl,
                            fromurl=fromurl,
                            fromurlfinal=fromurlfinal,
-                           depth=(self.crawler.depth+1),
+                           depth=depth,
                            repetition=repetition,
                            state='waiting')
 
     def __len__(self) -> int:
         return URL.select().where(URL.job==self.crawler.job_id, URL.crawler==self.crawler.crawler_id, URL.site==self.crawler.site, URL.state=='free').count()
-    
