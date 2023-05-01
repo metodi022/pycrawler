@@ -45,10 +45,10 @@ class FindLoginForms(Module):
         super().add_handlers(url)
 
         # Add common URLs with logins
-        self.crawler.context_database.add_url((self.crawler.origin + '/login/', Config.DEPTH, self.crawler.rank, []))
-        self.crawler.context_database.add_url((self.crawler.origin + '/signin/', Config.DEPTH, self.crawler.rank, []))
-        self.crawler.context_database.add_url((self.crawler.origin + '/account/', Config.DEPTH, self.crawler.rank, []))
-        self.crawler.context_database.add_url((self.crawler.origin + '/profile/', Config.DEPTH, self.crawler.rank, []))
+        self.crawler.urldb.add_url((self.crawler.origin + '/login/', Config.DEPTH, self.crawler.rank, []))
+        self.crawler.urldb.add_url((self.crawler.origin + '/signin/', Config.DEPTH, self.crawler.rank, []))
+        self.crawler.urldb.add_url((self.crawler.origin + '/account/', Config.DEPTH, self.crawler.rank, []))
+        self.crawler.urldb.add_url((self.crawler.origin + '/profile/', Config.DEPTH, self.crawler.rank, []))
 
         # TODO add site common urls?
         # self.crawler.context_database.add_url((self.crawler.site + '/login/', Config.DEPTH, self.crawler.rank, []))
@@ -89,11 +89,11 @@ class FindLoginForms(Module):
                              formurl=self.crawler.currenturl, formurlfinal=self.crawler.page.url)
 
         # If we already found entries or there are still URLs left -> stop here
-        if self._found > 0 or len(self.crawler.context_database) > 0:
+        if self._found > 0 or len(self.crawler.urldb) > 0:
             return
 
         # Finally, use search engine with login keyword
-        self.crawler.context_database.add_url(('https://www.google.com/search?q=' + urllib.parse.quote(f"\"login\" site:{self.crawler.site}"), Config.DEPTH - 1, self.crawler.rank, []))
+        self.crawler.urldb.add_url(('https://www.google.com/search?q=' + urllib.parse.quote(f"\"login\" site:{self.crawler.site}"), Config.DEPTH - 1, self.crawler.rank, []))
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         def filt(url: tld.utils.Result) -> bool:

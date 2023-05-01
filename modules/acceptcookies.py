@@ -1,14 +1,15 @@
-from logging import Logger
 import pathlib
 import re
-from datetime import datetime
 import shutil
+from datetime import datetime
+from logging import Logger
 from typing import List, MutableSet, Optional, Tuple, cast
 
 import tld
 from playwright.sync_api import Error, Frame, Locator, Page, Response
 
 from config import Config
+from database import URL
 from modules.module import Module
 from utils import CLICKABLES, SSO, get_locator_count, get_locator_nth, get_outer_html, get_tld_object, get_url_origin, invoke_click, refresh_page
 
@@ -27,11 +28,10 @@ class AcceptCookies(Module):
     def __init__(self, crawler) -> None:
         super().__init__(crawler)
         self._seen: MutableSet[str] = self.crawler.state.get('AcceptCookies', set())
+        self.crawler.state['AcceptCookies'] = self._seen
         self.extension: bool = False
 
-        if Config.RESTARTCONTEXT:
-            self.crawler.state['AcceptCookies'] = self._seen
-        else:
+        if not Config.RESTARTCONTEXT:
             return
 
         path: pathlib.Path = (pathlib.Path(__file__).parent.parent / 'extensions/I-Still-Dont-Care-About-Cookies/src')
@@ -47,30 +47,32 @@ class AcceptCookies(Module):
             shutil.copy((path / 'manifest_v2.json'), (path / 'manifest.json'))
 
 
-    def add_handlers(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+    def add_handlers(self, url: URL) -> None:
         super().add_handlers(url)
 
-        if self.extension:
-            self.crawler.page.close()
-            self.crawler.context.close()
-            
-            path: str = str((pathlib.Path(__file__).parent.parent / 'extensions/I-Still-Dont-Care-About-Cookies/src').resolve())
+        if not self.extension:
+            return
+        
+        self.crawler.page.close()
+        self.crawler.context.close()
+        
+        path: str = str((pathlib.Path(__file__).parent.parent / 'extensions/I-Still-Dont-Care-About-Cookies/src').resolve())
 
-            self.crawler.context = self.crawler.playwright.chromium.launch_persistent_context(
-                (Config.LOG / f"{Config.BROWSER}{self.crawler.job_id}{self.crawler.crawler_id}"),
-                user_agent=self.crawler.playwright.devices[Config.DEVICE]['user_agent'],
-                screen=self.crawler.playwright.devices[Config.DEVICE].get('screen', {"width": 1920, "height": 1080}),
-                viewport=self.crawler.playwright.devices[Config.DEVICE]['viewport'],
-                device_scale_factor=self.crawler.playwright.devices[Config.DEVICE]['device_scale_factor'],
-                is_mobile=self.crawler.playwright.devices[Config.DEVICE]['is_mobile'],
-                has_touch=self.crawler.playwright.devices[Config.DEVICE]['has_touch'],
-                locale=Config.LOCALE,
-                timezone_id=Config.TIMEZONE,
-                headless=False,
-                args=([f"--disable-extensions-except={path}", f"--load-extension={path}"] + (["--headless=new"] if Config.HEADLESS else [])),
-            )
+        self.crawler.context = self.crawler.playwright.chromium.launch_persistent_context(
+            (Config.LOG / f"{Config.BROWSER}{self.crawler.job_id}{self.crawler.crawler_id}"),
+            user_agent=self.crawler.playwright.devices[Config.DEVICE]['user_agent'],
+            screen=self.crawler.playwright.devices[Config.DEVICE].get('screen', {"width": 1920, "height": 1080}),
+            viewport=self.crawler.playwright.devices[Config.DEVICE]['viewport'],
+            device_scale_factor=self.crawler.playwright.devices[Config.DEVICE]['device_scale_factor'],
+            is_mobile=self.crawler.playwright.devices[Config.DEVICE]['is_mobile'],
+            has_touch=self.crawler.playwright.devices[Config.DEVICE]['has_touch'],
+            locale=Config.LOCALE,
+            timezone_id=Config.TIMEZONE,
+            headless=False,
+            args=([f"--disable-extensions-except={path}", f"--load-extension={path}"] + (["--headless=new"] if Config.HEADLESS else [])),
+        )
 
-            self.crawler.page = self.crawler.context.pages[0]
+        self.crawler.page = self.crawler.context.pages[0]
 
 
     def receive_response(self, responses: List[Optional[Response]],

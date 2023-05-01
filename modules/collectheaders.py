@@ -50,7 +50,7 @@ class CollectHeaders(Module):
                 headers = None
 
             Header.create(job=self.crawler.job_id, crawler=self.crawler.crawler_id,
-                          site=self.crawler.site, url=self.crawler.url, depth=self.crawler.depth,
+                          site=self.crawler.site, url=self.crawler.starturl, depth=self.crawler.depth,
                           code=response.status, method=response.request.method,
                           content=response.headers.get('content-type', None),
                           resource=response.request.resource_type, fromurl=self.crawler.currenturl,

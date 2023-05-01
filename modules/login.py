@@ -69,7 +69,7 @@ class Login(Module):
         for formurl in formsurls:
             self.crawler.log.debug(f"Get login URL {formurl.formurl}")
 
-            if not Login.login(self.crawler.browser, self.crawler.context, self.crawler.url, formurl.formurl, self.account):
+            if not Login.login(self.crawler.browser, self.crawler.context, self.crawler.starturl, formurl.formurl, self.account):
                 formurl.success = False
                 formurl.save()
                 continue
@@ -106,10 +106,10 @@ class Login(Module):
         # TODO screenshots + better feedback
 
         # Check if we are at the end of the crawl
-        if len(self.crawler.context_database) == 0 and self.crawler.repetition == Config.REPETITIONS:
+        if len(self.crawler.urldb) == 0 and self.crawler.repetition == Config.REPETITIONS:
             # At the end of the crawl check if we are still logged-in
             if self.loginsuccess and self.loginurl is not None and self.account is not None:
-                self.endsuccess = Login.verify_login(self.crawler.browser, self.crawler.context, self.crawler.url, self.loginurl, self.account)
+                self.endsuccess = Login.verify_login(self.crawler.browser, self.crawler.context, self.crawler.starturl, self.loginurl, self.account)
             
             loginform: LoginForm = LoginForm.get(site=self.crawler.site, formurl=self.loginurl)
             loginattempt: LoginAttempt = LoginAttempt.get(job=self.crawler.job_id, crawler=self.crawler.crawler_id, site=self.crawler.site, loginform=loginform)

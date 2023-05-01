@@ -43,8 +43,8 @@ class FindEmails(Module):
     def add_handlers(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
         super().add_handlers(url)
 
-        self.crawler.context_database.add_url((self.crawler.origin + '/.well-known/security.txt', Config.DEPTH, self.crawler.rank, []))
-        self.crawler.context_database.add_url((f"{self.crawler.scheme}://{self.crawler.site}" + '/.well-known/security.txt', Config.DEPTH, self.crawler.rank, []))
+        self.crawler.urldb.add_url((self.crawler.origin + '/.well-known/security.txt', Config.DEPTH, self.crawler.rank, []))
+        self.crawler.urldb.add_url((f"{self.crawler.scheme}://{self.crawler.site}" + '/.well-known/security.txt', Config.DEPTH, self.crawler.rank, []))
 
     def receive_response(self, responses: List[Optional[Response]],
                          url: Tuple[str, int, int, List[Tuple[str, str]]], final_url: str,
