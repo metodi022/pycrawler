@@ -62,22 +62,24 @@ class URLDB:
         self.crawler: Crawler = crawler
         self._seen: MutableSet[str] = set()
 
-    def get_url(self, repetition: int, initial: bool = False) -> Optional[URL]:
-        url: Optional[URL] = URL.get_or_none(task=self.crawler.task,
-                                             job=self.crawler.job_id,
-                                             crawler=self.crawler.crawler_id,
-                                             site=self.crawler.site,
-                                             url=self.crawler.currenturl,
-                                             repetition=repetition,
-                                             state=('free' if repetition == 1 else 'waiting'))
-        
-        if initial and (url is None) and (repetition == 1):
+    def get_url(self, repetition: int) -> Optional[URL]:
+        url: Optional[URL] = None
+
+        if repetition == 1:
             url = URL.get_or_none(task=self.crawler.task,
                                   job=self.crawler.job_id,
                                   crawler=self.crawler.crawler_id,
                                   site=self.crawler.site,
                                   repetition=repetition,
-                                  state=('free' if repetition == 1 else 'waiting'))
+                                  state='free')
+        else:
+            url = URL.get_or_none(task=self.crawler.task,
+                                  job=self.crawler.job_id,
+                                  crawler=self.crawler.crawler_id,
+                                  site=self.crawler.site,
+                                  url=self.crawler.currenturl,
+                                  repetition=repetition,
+                                  state='waiting')
 
         if url is None:
             return

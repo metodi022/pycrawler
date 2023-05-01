@@ -107,7 +107,7 @@ class Crawler:
 
         self.page = self.context.new_page()
 
-        url: Optional[URL] = self.urldb.get_url(1, initial=True)
+        url: Optional[URL] = self.urldb.get_url(1)
         self.log.info(f"Get URL {url.url if url is not None else url} depth {url.depth if url is not None else self.depth}")
 
         # Update variables
@@ -115,6 +115,10 @@ class Crawler:
             self.currenturl = url.url
             self.depth = url.depth
             self.state['Crawler'] = (self.currenturl, self.depth)
+        
+        if Config.RESTART:
+                with open(self.cache, mode='wb') as file:
+                    pickle.dump(self.state, file)
 
         # Main loop
         while url is not None and not self.stop:
