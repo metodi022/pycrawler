@@ -2,7 +2,7 @@ import argparse
 import ast
 import pathlib
 import sys
-from typing import List, Optional, Tuple, cast
+from typing import List, Optional, Tuple
 
 import tld
 from tld.exceptions import TldBadUrl, TldDomainNotFound
@@ -17,20 +17,22 @@ def main(job: str, urlspath: Optional[pathlib.Path], urls: Optional[List[Tuple[i
         database.create_tables([Task])
 
     # Check for urls
-    if urlspath is None and (not urls):
-        return 0
+    if (urlspath is None) and (not urls):
+        raise RuntimeError('URLs not specified.')
 
     # Iterate over URLs and add them to database
-    with database.atomic():  # speedup by using atomic transaction
-
+    with database.atomic():
         entry: Tuple[int, str]
-        for entry in (CSVLoader(urlspath) if (urlspath is not None) else cast(List[Tuple[int, str]], urls)):
+        urls_iterator: CSVLoader | List[Tuple[int, str]] = CSVLoader(urlspath) if (urlspath is not None) else urls
+
+        for entry in urls_iterator:
             url: str = ('https://' if not entry[1].startswith('http') else '') + entry[1]
             try:
-                site: str = cast(tld.Result, tld.get_tld(url, as_object=True)).fld
+                site: str = tld.get_tld(url, as_object=True).fld
             except (TldBadUrl, TldDomainNotFound):
+                # TODO log bad URL?
                 continue
-            Task.create(job=job, crawler=None, site=site, url=url, landing_page=url, rank=int(entry[0]))
+            Task.create(job=job, crawler=None, site=site, url=url, rank=int(entry[0]))
 
     return 0
 
@@ -43,4 +45,4 @@ if __name__ == '__main__':
 
     # Parse command line arguments
     args = vars(args_parser.parse_args())
-    sys.exit(main(cast(str, args.get('job')), args.get('urlspath'),args.get('urls')))
+    sys.exit(main(args.get('job'), args.get('urlspath'), args.get('urls')))

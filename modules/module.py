@@ -1,4 +1,3 @@
-from datetime import datetime
 from logging import Logger
 from typing import Callable, List, Optional
 
@@ -40,7 +39,7 @@ class Module:
             url (URL): URL, depth, rank, previous URL
         """
 
-    def receive_response(self, responses: List[Optional[Response]], url: URL, final_url: str, start: List[datetime], repetition: int) -> None:
+    def receive_response(self, responses: List[Optional[Response]], url: URL, final_url: str, repetition: int) -> None:
         """
         Receive response from server.
 
@@ -48,7 +47,6 @@ class Module:
             responses (List[Optional[Response]]): list of responses from crawler and modules
             url (URL): URL, depth, rank, previous URL
             final_url (str): final url after redirections
-            start (List[datetime]): start times for crawl and for each module response initiation
             repetition (int): current URL visited repetition
         """
 

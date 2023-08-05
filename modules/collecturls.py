@@ -1,5 +1,4 @@
 import random
-from datetime import datetime
 from typing import Callable, List, Optional
 
 import tld
@@ -8,7 +7,7 @@ from playwright.sync_api import Error, Locator, Response
 from config import Config
 from database import URL
 from modules.module import Module
-from utils import get_locator_attribute, get_locator_count, get_locator_nth, get_tld_object, get_url_from_href, get_url_full, get_url_full_with_query, get_url_full_with_query_fragment, get_url_origin
+from utils import get_locator_attribute, get_locator_count, get_locator_nth, get_tld_object, get_url_from_href, get_url_full, get_url_full_with_query_fragment, get_url_origin
 
 
 class CollectURLs(Module):
@@ -23,8 +22,8 @@ class CollectURLs(Module):
 
         self.crawler.state['CollectUrls'] = self._max_urls
 
-    def receive_response(self, responses: List[Optional[Response]], url: URL, final_url: str, start: List[datetime], repetition: int) -> None:
-        super().receive_response(responses, url, final_url, start, repetition)
+    def receive_response(self, responses: List[Optional[Response]], url: URL, final_url: str, repetition: int) -> None:
+        super().receive_response(responses, url, final_url, repetition)
 
         # Speedup by ignoring repetitive URL collection from the same page
         if self.crawler.repetition > 1:
@@ -70,8 +69,6 @@ class CollectURLs(Module):
                 continue
 
             # TODO: Check for same entity
-            # if Config.SAME_ENTITY and get_url_entity(parsed_url) != get_url_entity(parsed_link):
-            #    continue
 
             # Check seen
             parsed_link_full: str = get_url_full(parsed_link)
@@ -101,7 +98,7 @@ class CollectURLs(Module):
 
         # For each found URL, add it to the database, while making sure not to exceed the max URL limit
         for parsed_link in urls:
-            self.crawler.urldb.add_url(get_url_full_with_query_fragment(parsed_link), self.crawler.depth + 1, self.crawler.currenturl, final_url, force = True)
+            self.crawler.urldb.add_url(get_url_full_with_query_fragment(parsed_link), self.crawler.depth + 1, url, force = True)
 
             self._max_urls -= 1
             if self._max_urls < 1:

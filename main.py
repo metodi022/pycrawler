@@ -6,9 +6,9 @@ import re
 import sys
 import time
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging import FileHandler, Formatter, Logger
-from multiprocessing import Process
+from multiprocessing import Pipe, Process
 from typing import List, Optional, Type
 
 from crawler import Crawler
@@ -22,6 +22,27 @@ except ModuleNotFoundError as e:
     print(e)
     print("Prepare the config.py file. You can use the config-example.py as a start.")
     sys.exit(1)
+
+
+class CustomProcess(Process):
+    def __init__(self, *aargs, **kwargs):
+        Process.__init__(self, *aargs, **kwargs)
+        self._pconn, self._cconn = Pipe()
+        self._exception = None
+
+    def run(self):
+        try:
+            Process.run(self)
+            self._cconn.send(None)
+        except Exception as error:
+            trace = traceback.format_exc()
+            self._cconn.send((error, trace))
+
+    @property
+    def exception(self):
+        if self._pconn.poll():
+            self._exception = self._pconn.recv()
+        return self._exception
 
 
 def main(job: str, crawlers_count: int, module_names: List[str], log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1, listen: bool = False) -> int:
@@ -40,6 +61,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: Optio
     # Prepare logger
     if not (log_path / 'screenshots').exists():
         os.mkdir(log_path / 'screenshots')
+
     handler: FileHandler = FileHandler(log_path / f"job{job}.log")
     handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
     log: Logger = Logger(f"Job {job}")
@@ -72,8 +94,8 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: Optio
         crawlers.append(process)
 
     for i, crawler in enumerate(crawlers):
-        log.info("Start crawler %s with JOBID %s PID %s", (i + starting_crawler_id), job, crawler.pid)
         crawler.start()
+        log.info("Start crawler %s with JOBID %s PID %s", (i + starting_crawler_id), job, crawler.pid)
 
     # Wait for crawlers to finish
     log.info('Waiting for crawlers to complete')
@@ -99,20 +121,20 @@ def _get_task(job: str, crawler_id: int, log) -> Optional[Task]:
     # Get progress task
     task: Optional[Task] = Task.get_or_none(job=job, crawler=crawler_id, state='progress')
     if task is not None:
-        log.debug("Loading progress task")
+        log.info("Loading progress task")
         return task
-    
+
     # Otherwise get new free task
     with database.atomic():
         result = database.execute_sql("SELECT id FROM task WHERE state='free' AND job=%s FOR UPDATE SKIP LOCKED LIMIT 1", (job,)).fetchall()
+
         if len(result) == 0:
-            log.debug("No free task found")
             task = None
         else:
-            log.debug("Loading free task")
+            log.info("Loading free task")
             database.execute_sql("UPDATE task SET crawler=%s, state='progress' WHERE id=%s", (crawler_id, result[0]))
-            task = Task.get(id=result[0])
-    
+            task = Task.get_by_id(result[0])
+
     return task
 
 
@@ -120,28 +142,36 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
     log = _get_logger(job, crawler_id, log_path)
 
     task: Optional[Task] = _get_task(job, crawler_id, log)
+
     while task or listen:
-        if not task and listen:
-            time.sleep(30)
+        if not task:
+            time.sleep(60)
             task = _get_task(job, crawler_id, log)
             continue
-        
-        crawler: Process = Process(target=_start_crawler, args=(job, crawler_id, task.id, log_path, modules))
+
+        crawler: CustomProcess = CustomProcess(target=_start_crawler, args=(job, crawler_id, task.id, log_path, modules))
         crawler.start()
+        log.info("Start crawler %s PID %s", crawler_id, crawler.pid)
 
-        while crawler.is_alive():
+        while crawler.is_alive() or (Config.RESTART_TIMEOUT and (Config.LOG / f"job{job}crawler{crawler_id}.cache").exists()):
+            if not crawler.is_alive():
+                log.error("Crawler %s crashed with %s", task.crawler, crawler.exception)
+                crawler.close()
+                # TODO update task in db with error?
+                crawler = CustomProcess(target=_start_crawler, args=(job, crawler_id, task.id, log_path, modules))
+                crawler.start()
+                log.info("Start crawler %s PID %s", crawler_id, crawler.pid)
+
             crawler.join(timeout=Config.RESTART_TIMEOUT)
+            timelastentry = _get_last_log_entry(log_path / f"job{job}crawler{crawler_id}.log")
 
-            line = _get_line_last(log_path / f"job{job}crawler{crawler_id}.log").split()
-
-            if len(line) > 1:
-                date1: datetime = datetime.today()
-                date2: datetime = datetime.strptime(line[0] + ' ' + line[1], '%Y-%m-%d %H:%M:%S,%f')
-
-                if (date1 - date2).seconds < Config.RESTART_TIMEOUT:
+            if crawler.is_alive():
+                if (datetime.today() - timelastentry).seconds < Config.RESTART_TIMEOUT:
                     continue
+            else:
+                continue
 
-            log.error('Close stale crawler')
+            log.error("Close stale crawler %s", task.crawler)
 
             crawler.terminate()
             crawler.join(timeout=30)
@@ -150,17 +180,24 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
                 crawler.kill()
                 time.sleep(5)
 
-            if Config.RESTART and (Config.LOG / f"job{job}crawler{crawler_id}.cache").exists():
-                crawler.close()
-                crawler = Process(target=_start_crawler, args=(job, crawler_id, task.id, log_path, modules))
-                crawler.start()
-
         crawler.close()
 
-        task = Task.get(task.id)
+        task = Task.get_by_id(task.get_id())
         task.state = 'complete'
+
+        if crawler.exception:
+            # TODO update task in db with error?
+            task.error = 'Crash' if not task.error else 'Crash, ' + task.error
+            log.warning("Crawler %s crashed with %s", task.crawler, crawler.exception)
+
         task.save()
+
+        if Config.RESTART and (Config.LOG / f"job{job}crawler{crawler_id}.cache").exists():
+            os.remove(Config.LOG / f"job{job}crawler{crawler_id}.cache")
+
         task = _get_task(job, crawler_id, log)
+
+    log.handlers[-1].close()
 
 
 def _start_crawler(job: str, crawler_id: int, task: int, log_path: pathlib.Path, modules: List[Type[Module]]) -> None:
@@ -169,6 +206,7 @@ def _start_crawler(job: str, crawler_id: int, task: int, log_path: pathlib.Path,
     crawler: Crawler = Crawler(job, crawler_id, task, log, modules)
     crawler.start_crawl()
     log.info('Stop crawler')
+    log.handlers[-1].close()
 
 
 def _get_logger(job: str, crawler_id: int, log_path: pathlib.Path) -> Logger:
@@ -180,33 +218,40 @@ def _get_logger(job: str, crawler_id: int, log_path: pathlib.Path) -> Logger:
     return log
 
 
-def _get_line_last(path: str | pathlib.Path) -> str:
-    with open(path, mode='rb') as file:
-        line: bytes = b''
+def _get_last_log_entry(path: str | pathlib.Path) -> datetime:
+    error_time = datetime.today() - timedelta(seconds=Config.RESTART_TIMEOUT)
+    last_line: bytes = b''
 
-        try:
+    try:
+        with open(path, mode='rb') as file:
             file.seek(-2, 2)
-        except OSError:
-            return ''
 
-        while re.match('\\d{4}-\\d{2}-\\d{2}', line.decode("utf-8", errors="ignore")) is None:
-            try:
-                file.seek(-(len(line) + 2) if len(line) > 0 else 0, 1)
-            except OSError:
-                return ''
+            while re.match('\\d{4}-\\d{2}-\\d{2}', last_line.decode("utf-8", errors="ignore")) is None:
+                file.seek(-(len(last_line) + 2) if len(last_line) > 0 else 0, 1)
 
-            while file.read(1) != b'\n':
-                try:
-                    file.seek(-2, 1)
-                except OSError:
+                while file.read(1) != b'\n':
                     try:
-                        file.seek(-1, 1)
+                        file.seek(-2, 1)
                     except OSError:
-                        return ''
-                    break
+                        file.seek(-1, 1)
+                        break
 
-            line = file.readline() or b''
-    return line.decode("utf-8", errors="ignore")
+                last_line = file.readline() or b''
+    except Exception:
+        return error_time
+    
+    try:
+        last_line = last_line.decode("utf-8", errors="ignore").split()
+    except Exception:
+        return error_time
+    
+    if not last_line:
+        return error_time
+    
+    try:
+        return datetime.strptime(last_line[0] + ' ' + last_line[1], '%Y-%m-%d %H:%M:%S,%f')
+    except Exception:
+        return error_time
 
 
 if __name__ == '__main__':

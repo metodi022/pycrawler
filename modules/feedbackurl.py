@@ -1,4 +1,3 @@
-from datetime import datetime
 from logging import Logger
 from typing import List, Optional
 
@@ -16,15 +15,13 @@ class FeedbackURL(Module):
         with database:
             database.create_tables([URL])
 
-    def receive_response(self, responses: List[Optional[Response]], url: URL, final_url: str, start: List[datetime], repetition: int) -> None:
-        super().receive_response(responses, url, final_url, start, repetition)
+    def receive_response(self, responses: List[Optional[Response]], url: URL, final_url: str, repetition: int) -> None:
+        super().receive_response(responses, url, final_url, repetition)
 
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         code: int = response.status if response is not None else Config.ERROR_CODES['response_error']
         
-        url.urlfinal = self.crawler.page.url
+        url.urlfinal = final_url
         url.code = code
         url.state = 'complete'
-        url.start = start[-1]
-        url.end = datetime.now()
         url.save()

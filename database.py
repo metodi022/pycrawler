@@ -32,7 +32,6 @@ class Task(BaseModel):
     crawler = IntegerField(null=True)
     site = TextField()
     url = TextField()
-    landing_page = TextField()
     rank = IntegerField()
     state = TextField(default='free')
     code = IntegerField(null=True)
@@ -46,13 +45,10 @@ class URL(BaseModel):
     site = TextField()
     url = TextField()
     urlfinal = TextField(default=None, null=True)
-    fromurl = TextField(null=True)
-    fromurlfinal = TextField(null=True)
+    fromurl = ForeignKeyField('self', default=None, null=True, backref='children')
     depth = IntegerField()
     code = IntegerField(default=None, null=True)
     repetition = IntegerField()
-    start = DateTimeField(default=None, null=True)
-    end = DateTimeField(default=None, null=True)
     state = TextField(default='free')
 
 
@@ -66,23 +62,38 @@ class URLDB:
         url: Optional[URL] = None
 
         if repetition == 1:
-            url = URL.get_or_none(task=self.crawler.task,
-                                  job=self.crawler.job_id,
-                                  crawler=self.crawler.crawler_id,
-                                  site=self.crawler.site,
-                                  repetition=repetition,
-                                  state='free')
+            if Config.BREADTHFIRST:
+                url = URL.select().where(
+                    URL.task == self.crawler.task,
+                    URL.job == self.crawler.job_id,
+                    URL.crawler == self.crawler.crawler_id,
+                    URL.site == self.crawler.site,
+                    URL.depth == self.crawler.depth,
+                    URL.repetition == repetition,
+                    URL.state == 'free'
+                ).order_by(URL.created.asc()).first()
+
+
+            url = url or URL.select().where(
+                URL.task == self.crawler.task,
+                URL.job == self.crawler.job_id,
+                URL.crawler == self.crawler.crawler_id,
+                URL.site == self.crawler.site,
+                URL.repetition == repetition,
+                URL.state == 'free'
+            ).order_by(URL.created.asc()).first()
         else:
             url = URL.get_or_none(task=self.crawler.task,
                                   job=self.crawler.job_id,
                                   crawler=self.crawler.crawler_id,
                                   site=self.crawler.site,
                                   url=self.crawler.currenturl,
+                                  depth=self.crawler.depth,
                                   repetition=repetition,
                                   state='waiting')
 
         if url is None:
-            return
+            return None
         
         url.state = 'progress'
         url.save()
@@ -98,8 +109,8 @@ class URLDB:
         else:
             self._seen.add(url + '/')
 
-    def add_url(self, url: str, depth: int, fromurl: Optional[str], fromurlfinal: Optional[str], force: bool = False) -> None:
-        if url[0] in self._seen and not force:
+    def add_url(self, url: str, depth: int, fromurl: Optional[URL], force: bool = False) -> None:
+        if (url[0] in self._seen) and (not force):
             return
         
         self.add_seen(url)
@@ -111,7 +122,6 @@ class URLDB:
                        site=self.crawler.site,
                        url=url,
                        fromurl=fromurl,
-                       fromurlfinal=fromurlfinal,
                        depth=depth,
                        repetition=1)
             
@@ -122,10 +132,6 @@ class URLDB:
                            site=self.crawler.site,
                            url=url,
                            fromurl=fromurl,
-                           fromurlfinal=fromurlfinal,
                            depth=depth,
                            repetition=repetition,
                            state='waiting')
-
-    def __len__(self) -> int:
-        return URL.select().where(URL.job==self.crawler.job_id, URL.crawler==self.crawler.crawler_id, URL.site==self.crawler.site, URL.state=='free').count()
