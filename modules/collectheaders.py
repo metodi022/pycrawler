@@ -1,29 +1,31 @@
 from asyncio import CancelledError
 from logging import Logger
-from typing import List, Optional, Tuple
+from typing import Optional
 
-from peewee import CharField, IntegerField, TextField
+from peewee import CharField, ForeignKeyField, IntegerField, TextField
 from playwright.sync_api import Response
 
-from database import BaseModel, database
+from database import BaseModel, Task, URL, database
 from modules.module import Module
 
 
 class Header(BaseModel):
+    task = ForeignKeyField(Task)
     job = TextField()
     crawler = IntegerField()
     site = TextField()
-    url = TextField()
     depth = IntegerField()
-    code = IntegerField()
+    repetition = IntegerField()
+    frame = TextField()
     method = CharField()
+    code = IntegerField()
+    codetext = TextField()
     content = CharField(null=True)
     resource = CharField()
-    fromurl = TextField()
-    fromurlfinal = TextField()
+    fromurl = ForeignKeyField(URL)
     tourl = TextField()
+    tourlfinal = TextField()
     headers = TextField(null=True)
-    repetition = IntegerField()
 
 
 class CollectHeaders(Module):
@@ -37,25 +39,37 @@ class CollectHeaders(Module):
         with database:
             database.create_tables([Header])
 
-    def add_handlers(self, url: Tuple[str, int, int, List[Tuple[str, str]]]) -> None:
+    def add_handlers(self, url: URL) -> None:
         super().add_handlers(url)
 
-        # Create response listener that saves all headers
         def handler(response: Response):
-            headers: Optional[str]
+            headers: Optional[str] = None
             try:
                 headers = str(response.headers_array())
-            except (Exception, CancelledError) as error:
-                self.crawler.log.warning(f"Get headers fail: {error}")
-                headers = None
+            except (Exception, CancelledError):
+                # Ignored
+                pass
 
-            Header.create(job=self.crawler.job_id, crawler=self.crawler.crawler_id,
-                          site=self.crawler.site, url=self.crawler.starturl, depth=self.crawler.depth,
-                          code=response.status, method=response.request.method,
-                          content=response.headers.get('content-type', None),
-                          resource=response.request.resource_type, fromurl=self.crawler.currenturl,
-                          fromurlfinal=self.crawler.page.url, tourl=response.url, headers=headers,
-                          repetition=self.crawler.repetition)
+            try:
+                Header.create(task=self.crawler.task,
+                              job=self.crawler.job_id,
+                              crawler=self.crawler.crawler_id,
+                              site=self.crawler.site,
+                              depth=self.crawler.depth,
+                              repetition=self.crawler.repetition,
+                              frame=response.frame.name,
+                              method=response.request.method,
+                              code=response.status,
+                              codetext=response.status_text,
+                              content=response.headers.get('content-type', None),
+                              resource=response.request.resource_type,
+                              fromurl=url,
+                              tourl=response.request.url,
+                              tourlfinal=response.url,
+                              headers=headers)
+            except (Exception, CancelledError):
+                # Ignored
+                pass
 
-        # Register response handlers
+        # Register response handler
         self.crawler.page.on('response', handler)

@@ -105,6 +105,7 @@ class CollectURLs(Module):
                 break
 
         self.crawler.state['CollectUrls'] = self._max_urls
+        self.crawler.urldb.active = self.crawler.urldb.get_active()
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         self._url_filter_out = filters

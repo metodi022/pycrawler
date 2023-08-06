@@ -56,7 +56,15 @@ class URLDB:
     def __init__(self, crawler) -> None:
         from crawler import Crawler
         self.crawler: Crawler = crawler
+        self.active : int = 0
         self._seen: MutableSet[str] = set()
+
+    def get_active(self) -> int:
+        return URL.select().where(URL.task == self.crawler.task,
+                                  URL.job == self.crawler.job_id,
+                                  URL.crawler == self.crawler.crawler_id,
+                                  URL.site == self.crawler.site,
+                                  URL.state != 'complete').count()
 
     def get_url(self, repetition: int) -> Optional[URL]:
         url: Optional[URL] = None
