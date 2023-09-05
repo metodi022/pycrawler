@@ -56,7 +56,6 @@ class URLDB:
     def __init__(self, crawler) -> None:
         from crawler import Crawler
         self.crawler: Crawler = crawler
-        self.active : int = 0
         self._seen: MutableSet[str] = set()
 
     def get_active(self) -> int:
@@ -118,7 +117,7 @@ class URLDB:
             self._seen.add(url + '/')
 
     def add_url(self, url: str, depth: int, fromurl: Optional[URL], force: bool = False) -> None:
-        if (url[0] in self._seen) and (not force):
+        if (url in self._seen) and (not force):
             return
         
         self.add_seen(url)

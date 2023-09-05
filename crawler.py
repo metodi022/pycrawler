@@ -157,11 +157,11 @@ class Crawler:
                 self.state['Crawler'] = (self.currenturl, self.depth)
 
             # Save state if needed
-            if (Config.RESTART and Config.RESTARTCONTEXT) or (Config.RESTART and ('Context' not in self.state)):
+            if Config.RESTART and Config.RESTART_CONTEXT:
                 try:
                     self.state['Context'] = self.context.storage_state()
                 except Exception as error:
-                    self.log.error(f"Get main context fail: {error}")
+                    self.log.warning(f"Get main context fail: {error}")
 
             if Config.RESTART:
                 with open(self.cache, mode='wb') as file:

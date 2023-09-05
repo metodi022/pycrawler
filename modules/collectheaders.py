@@ -2,10 +2,10 @@ from asyncio import CancelledError
 from logging import Logger
 from typing import Optional
 
-from peewee import CharField, ForeignKeyField, IntegerField, TextField
+from peewee import BooleanField, CharField, ForeignKeyField, IntegerField, TextField
 from playwright.sync_api import Response
 
-from database import BaseModel, Task, URL, database
+from database import URL, BaseModel, Task, database
 from modules.module import Module
 
 
@@ -16,6 +16,7 @@ class Header(BaseModel):
     site = TextField()
     depth = IntegerField()
     repetition = IntegerField()
+    mainframe = BooleanField()
     frame = TextField()
     method = CharField()
     code = IntegerField()
@@ -57,7 +58,8 @@ class CollectHeaders(Module):
                               site=self.crawler.site,
                               depth=self.crawler.depth,
                               repetition=self.crawler.repetition,
-                              frame=response.frame.name,
+                              mainframe=(response.frame.parent_frame is None),
+                              frame=response.frame.url,
                               method=response.request.method,
                               code=response.status,
                               codetext=response.status_text,

@@ -19,6 +19,7 @@ class Config:
     TIMEZONE: str = 'Europe/Berlin'
     HEADLESS: bool = False  # Headless browser
     RESTART: bool = True  # If the browser crashes, try to restore the crawler
+    RESTART_CONTEXT: bool = False  # If the browser crashes, try to restore saved cookies and localStorage
 
     RECURSIVE: bool = True  # Discover additional URLs while crawling
     BREADTHFIRST: bool = True  # Visit URLs in a breadth-first manner, otherwise depth-first
@@ -33,7 +34,7 @@ class Config:
     WAIT_LOAD_UNTIL: Literal['commit', 'domcontentloaded', 'load', 'networkidle'] = 'load'
     LOAD_TIMEOUT: int = 30000  # URL page loading timeout in ms (0 = disable timeout)
     WAIT_AFTER_LOAD: int = 5000  # let page execute after loading in ms
-    RESTART_TIMEOUT: int = 600  # restart crawler if it hasn't done anything for ... seconds or if it crashes
+    RESTART_TIMEOUT: int = 600  # restart crawler if it hasn't done anything for ... seconds
 
     ACCEPT_COOKIES: bool = False  # Attempt to find cookie banners and accept them (unreliable)
 

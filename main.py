@@ -153,7 +153,7 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
         crawler.start()
         log.info("Start crawler %s PID %s", crawler_id, crawler.pid)
 
-        while crawler.is_alive() or (Config.RESTART_TIMEOUT and (Config.LOG / f"job{job}crawler{crawler_id}.cache").exists()):
+        while crawler.is_alive() or (Config.RESTART and (Config.LOG / f"job{job}crawler{crawler_id}.cache").exists()):
             if not crawler.is_alive():
                 log.error("Crawler %s crashed with %s", task.crawler, crawler.exception)
                 crawler.close()

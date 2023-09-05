@@ -109,7 +109,7 @@ class FindAuthForms(Module):
                                         formurl=url)
 
         # If we are at the end of the crawl -> stop here
-        if self.crawler.urldb.active != 1:
+        if (self.crawler.repetition != Config.REPETITIONS) or (self.crawler.urldb.get_active() != 1):
             return
 
         # If we haven't found authentication forms -> use search engine
@@ -222,12 +222,12 @@ class FindAuthForms(Module):
 
             if form is None:
                 continue
-            elif not FindAuthForms.verify_registration_form(form):
-                continue
-            elif not FindAuthForms.verify_login_form(form):
-                continue
 
-            return form
+            if FindAuthForms.verify_registration_form(form):
+                return form
+
+            if FindAuthForms.verify_login_form(form):
+                return form
 
         # If we did not find auth forms, try to find password field
         try:
@@ -248,8 +248,8 @@ class FindAuthForms(Module):
                 if passwords > 2:
                     break
 
-                # Check if element tree is a login form
-                if not FindAuthForms.verify_registration_form(form):
+                # Check if element tree is an authentication form
+                if FindAuthForms.verify_registration_form(form):
                     return form
                 elif FindAuthForms.verify_login_form(form):
                     return form
