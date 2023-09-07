@@ -58,7 +58,7 @@ class CollectHeaders(Module):
                               site=self.crawler.site,
                               depth=self.crawler.depth,
                               repetition=self.crawler.repetition,
-                              mainframe=(response.frame.parent_frame is None),
+                              mainframe=((response.frame.parent_frame is None) and (not response.frame.is_detached())),
                               frame=response.frame.url,
                               method=response.request.method,
                               code=response.status,
