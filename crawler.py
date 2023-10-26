@@ -24,10 +24,12 @@ class Crawler:
         self.state: Dict[str, Any] = {}
         self.cache: pathlib.Path = Config.LOG / f"job{self.job_id}crawler{self.crawler_id}.cache"
         self.task: Task = Task.get_by_id(taskid)
+        self.restart: bool = False
 
         # Load previous state
         if Config.RESTART and self.cache.exists():
             self.log.debug("Loading old cache")
+            self.restart = True
             with open(self.cache, mode="rb") as file:
                 self.state = pickle.load(file)
 
@@ -125,7 +127,7 @@ class Crawler:
                 pickle.dump(self.state, file)
 
         # Main loop
-        while url is not None and not self.stop:
+        while (url is not None) and (not self.stop):
             # Initiate modules
             self.log.debug('Invoke module page handler')
             self._invoke_page_handler(url)
@@ -225,5 +227,6 @@ class Crawler:
             module.add_handlers(url)
 
     def _invoke_response_handler(self, responses: List[Optional[Response]], url: URL, repetition: int) -> None:
+        final_url: str = self.page.url
         for module in self.modules:
-            module.receive_response(responses, url, self.page.url, repetition)
+            module.receive_response(responses, url, final_url, repetition)
