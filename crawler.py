@@ -17,14 +17,14 @@ class Crawler:
     def _update_cache(self) -> None:
         self.log.info("Updating cache")
 
-        self.task = Task.get_by_id(self.task.get_id())
+        self.task = cast(Task, Task.get_by_id(self.task.get_id()))
         self.task.crawlerState = pickle.dumps(self.state)
         self.task.save()
 
     def _delete_cache(self) -> None:
         self.log.info("Deleting cache")
 
-        self.task = Task.get_by_id(self.task.get_id())
+        self.task = cast(Task, Task.get_by_id(self.task.get_id()))
         self.state = {}
         self.task.crawlerState = None
         self.task.save()
@@ -82,7 +82,7 @@ class Crawler:
             self.log.warning(error)
 
         if self.initial and (self.repetition == 1):
-            self.task = Task.get_by_id(self.task.get_id())
+            self.task = cast(Task, Task.get_by_id(self.task.get_id()))
             self.task.code = response.status if response is not None else Config.ERROR_CODES['response_error']
             self.task.error = error_message
             self.task.save()
@@ -95,7 +95,7 @@ class Crawler:
         self.log: Logger = log
         self.job_id: str = job
         self.crawler_id: int = crawler_id
-        self.task: Task = Task.get_by_id(taskid)
+        self.task: Task = cast(Task, Task.get_by_id(taskid))
         self.state: Dict[str, Any] = cast(Dict[str, Any], self.task.crawlerState or {})
         self.restart: bool = False
 

@@ -9,7 +9,7 @@ import traceback
 from datetime import datetime, timedelta
 from logging import FileHandler, Formatter, Logger
 from multiprocessing import Pipe, Process
-from typing import List, Optional, Type
+from typing import List, Optional, Type, cast
 
 from crawler import Crawler
 from database import URL, Task, database
@@ -48,6 +48,7 @@ class CustomProcess(Process):
 def main(job: str, crawlers_count: int, module_names: List[str], log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1, listen: bool = False) -> int:
     # Create log path if needed
     log_path = (log_path or Config.LOG).resolve()
+    log_path = cast(pathlib.Path, log_path)
     if not log_path.exists():
         os.mkdir(log_path)
 
@@ -149,7 +150,7 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
             task = _get_task(job, crawler_id, log)
             continue
 
-        crawler: CustomProcess = CustomProcess(target=_start_crawler, args=(job, crawler_id, task.id, log_path, modules))
+        crawler: CustomProcess = CustomProcess(target=_start_crawler, args=(job, crawler_id, task.get_id(), log_path, modules))
         crawler.start()
         log.info("Start crawler %s PID %s", crawler_id, crawler.pid)
 
@@ -157,8 +158,7 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
             if not crawler.is_alive():
                 log.error("Crawler %s crashed with %s", task.crawler, crawler.exception)
                 crawler.close()
-                # TODO update task in db with error?
-                crawler = CustomProcess(target=_start_crawler, args=(job, crawler_id, task.id, log_path, modules))
+                crawler = CustomProcess(target=_start_crawler, args=(job, crawler_id, task.get_id(), log_path, modules))
                 crawler.start()
                 log.info("Start crawler %s PID %s", crawler_id, crawler.pid)
 
@@ -182,7 +182,7 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
 
         crawler.close()
 
-        task = Task.get_by_id(task.get_id())
+        task = cast(Task, Task.get_by_id(task.get_id()))
         task.state = 'complete'
 
         if crawler.exception:
@@ -273,10 +273,10 @@ if __name__ == '__main__':
     # Parse command line arguments
     args = vars(args_parser.parse_args())
     sys.exit(main(
-        args.get('job'),
-        args.get('crawlers'),
-        args.get('modules') or [],
+        cast(str, args.get('job')),
+        cast(int, args.get('crawlers')),
+        cast(List[str], args.get('modules', [])),
         args.get('log'),
-        args.get('crawlerid'),
-        args.get('listen')
+        cast(int, args.get('crawlerid')),
+        cast(bool, args.get('listen'))
     ))
