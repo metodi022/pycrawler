@@ -1,12 +1,11 @@
-import os
 import pickle
 from logging import Logger
 from typing import Any, Callable, Dict, List, Optional, Type, cast
 
 import tld
+from config import Config
 from playwright.sync_api import Browser, BrowserContext, Error, Page, Playwright, Response, sync_playwright
 
-from config import Config
 from database import URL, URLDB, Task
 from modules.collecturls import CollectURLs
 from modules.feedbackurl import FeedbackURL
@@ -76,7 +75,7 @@ class Crawler:
         error_message: Optional[str] = None
 
         try:
-            response = self.page.goto(url.url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+            response = self.page.goto(cast(str, url.url), timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
             self.page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error as error:
             error_message = ((error.name + ' ') if error.name else '') + error.message
@@ -117,6 +116,8 @@ class Crawler:
         if url_object is None:
             self.log.error(f"Can't parse URL {self.url}")
             self._delete_cache()
+
+        url_object = cast(tld.utils.Result, url_object)
 
         self.scheme: str = self.url[:self.url.find(':')]
         self.site: str = url_object.fld
@@ -207,8 +208,8 @@ class Crawler:
 
             # Update variables
             if url is not None:
-                self.currenturl = url.url
-                self.depth = url.depth
+                self.currenturl = cast(str, url.url)
+                self.depth = cast(int, url.depth)
                 self.state['Crawler'] = (self.currenturl, self.depth, self.initial)
 
             # Save state if needed
