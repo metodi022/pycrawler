@@ -1,6 +1,5 @@
 numpy
 playwright
 psycopg2
-scikit-learn
 tld
 peewee
