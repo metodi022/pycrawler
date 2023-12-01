@@ -107,13 +107,12 @@ class Crawler:
         self.restart: bool = False
 
         self.log.info("Crawler initializing")
-        self.log.debug(f"Loaded state: {self.state}")
 
         # Load previous state
         if Config.RESTART and self.state:
-            self.log.warning("Loading old cache")
             self.restart = True
             self.state = pickle.loads(self.state)
+            self.log.warning(f"Loading old state: {self.state}")
 
         # Prepare rest of variables
         self.url: str = cast(str, self.task.url)
