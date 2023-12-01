@@ -1,3 +1,4 @@
+from datetime import datetime
 import pickle
 from logging import Logger
 from typing import Any, Callable, Dict, List, Optional, Type, cast
@@ -6,7 +7,7 @@ import tld
 from config import Config
 from playwright.sync_api import Browser, BrowserContext, Error, Page, Playwright, Response, sync_playwright
 
-from database import URL, URLDB, Task
+from database import URL, URLDB, Task, database
 from modules.collecturls import CollectURLs
 from modules.feedbackurl import FeedbackURL
 from modules.module import Module
@@ -17,17 +18,20 @@ class Crawler:
     def _update_cache(self) -> None:
         self.log.info("Updating cache")
 
-        self.task = cast(Task, Task.get_by_id(self.task.get_id()))
+        self.task.updated = datetime.today()
         self.task.crawlerState = pickle.dumps(self.state)
-        self.task.save()
+
+        with database.atomic():
+            database.execute_sql("UPDATE task SET updated=%s, crawlerState=%s WHERE id=%s", (self.task.updated, self.task.crawlerState, self.task.get_id()))
 
     def _delete_cache(self) -> None:
         self.log.info("Deleting cache")
 
-        self.task = cast(Task, Task.get_by_id(self.task.get_id()))
+        self.task.updated = datetime.today()
         self.state = {}
-        self.task.crawlerState = None
-        self.task.save()
+
+        with database.atomic():
+            database.execute_sql("UPDATE task SET updated=%s, crawlerState=NULL WHERE id=%s", (self.task.updated, self.task.get_id()))
 
     def _init_browser(self) -> None:
         self.log.info("Initializing browser")
@@ -82,10 +86,13 @@ class Crawler:
             self.log.warning(error)
 
         if self.initial and (self.repetition == 1):
-            self.task = cast(Task, Task.get_by_id(self.task.get_id()))
+            self.task.updated = datetime.today()
             self.task.code = response.status if response is not None else Config.ERROR_CODES['response_error']
             self.task.error = error_message
-            self.task.save()
+
+            with database.atomic():
+                database.execute_sql("UPDATE task SET updated=%s, code=%s, error=%s WHERE id=%s", (self.task.updated, self.task.code, self.task.error, self.task.get_id()))
+
             get_screenshot(self.page, (Config.LOG / f"screenshots/{self.site}-{self.job_id}.png"))
 
         return response

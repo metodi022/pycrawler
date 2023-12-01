@@ -1,9 +1,8 @@
 from datetime import datetime
 from typing import MutableSet, Optional
 
-from peewee import DateTimeField, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, TextField
-
 from config import Config
+from peewee import BlobField, DateTimeField, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, TextField
 
 # Change the database to whatever you want
 database = PostgresqlDatabase(Config.DATABASE,
@@ -36,7 +35,7 @@ class Task(BaseModel):
     state = TextField(default="free")
     code = IntegerField(null=True)
     error = TextField(null=True)
-    crawlerState = TextField(null=True, default=None)
+    crawlerState = BlobField(null=True, default=None)
 
 
 class URL(BaseModel):
