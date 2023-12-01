@@ -1,8 +1,9 @@
 import random
+import re
 from typing import Callable, List, Optional
 
 import tld
-from playwright.sync_api import Error, Locator, Response
+from playwright.sync_api import Error, Locator, Response, Page
 
 from config import Config
 from database import URL
@@ -21,6 +22,42 @@ class CollectURLs(Module):
         self._url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
 
         self.crawler.state['CollectUrls'] = self._max_urls
+    
+    def add_handlers(self, url: URL) -> None:
+        super().add_handlers(url)
+
+        # Disable further calls to this handler
+        self.add_handlers = super().add_handlers
+
+        # Should activate only once; restarted crawler should not re-run it
+        if self.crawler.restart:
+            return
+
+        # Get robots.txt
+        robots: str = f"{self.crawler.site}/robots.txt"
+        page: Page = self.crawler.context.new_page()
+        response_robots: Optional[Response] = page.goto(robots)
+
+        # Parse valid sitemap from robots.txt
+        if (response_robots is None) or (response_robots.status >= 400):
+            return
+
+        sitemap: str = f"{self.crawler.site}/sitemap.xml"
+        sitemap_match: Optional[re.Match[str]] = re.search(r"(?<=^Sitemap: )[^\n;,\s]+", response_robots.text())
+        sitemap_parsed: tld.Result = get_url_from_href(sitemap_match.group() if sitemap_match else sitemap, get_tld_object(robots)) or get_tld_object(sitemap)
+
+        # Check for same origin
+        if Config.SAME_ORIGIN and self.crawler.origin == get_url_origin(sitemap_parsed):
+            sitemap = get_url_full(sitemap_parsed)
+        # Check for same ETLD+1
+        elif Config.SAME_ETLDP1 and self.crawler.site == sitemap_parsed.fld:
+            sitemap = get_url_full(sitemap_parsed)
+        # TODO: Check for same entity
+
+        self.setup(sitemap)
+
+    def setup(self, sitemap: str) -> None:
+        pass
 
     def receive_response(self, responses: List[Optional[Response]], url: URL, final_url: str, repetition: int) -> None:
         super().receive_response(responses, url, final_url, repetition)
@@ -30,7 +67,7 @@ class CollectURLs(Module):
             return
 
         # Make sure to add page as seen
-        parsed_url_final: Optional[tld.utils.Result] = get_tld_object(final_url)
+        parsed_url_final: Optional[tld.utils.Result] = get_tld_object(self.crawler.page.url)
         self.crawler.urldb.add_seen(get_url_full(parsed_url_final) if parsed_url_final is not None else final_url)
 
         # Check if depth or max URLs exceeded
@@ -39,6 +76,8 @@ class CollectURLs(Module):
 
         if parsed_url_final is None:
             return
+        
+        # TODO do other checks
 
         # Get all <a> tags with a href
         try:
