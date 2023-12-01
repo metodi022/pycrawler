@@ -33,10 +33,10 @@ class Task(BaseModel):
     site = TextField()
     url = TextField()
     rank = IntegerField()
-    state = TextField(default='free')
+    state = TextField(default="free")
     code = IntegerField(null=True)
     error = TextField(null=True)
-    crawlerState = TextField(null=True)
+    crawlerState = TextField(null=True, default=None)
 
 
 class URL(BaseModel):
@@ -46,11 +46,11 @@ class URL(BaseModel):
     site = TextField()
     url = TextField()
     urlfinal = TextField(default=None, null=True)
-    fromurl = ForeignKeyField('self', default=None, null=True, backref='children')
+    fromurl = ForeignKeyField("self", default=None, null=True, backref="children")
     depth = IntegerField()
     code = IntegerField(default=None, null=True)
     repetition = IntegerField()
-    state = TextField(default='free')
+    state = TextField(default="free")
 
 
 class URLDB:
@@ -112,4 +112,4 @@ class URLDB:
             URL.create(**url_data, repetition=1)
 
             for repetition in range(2, Config.REPETITIONS + 1):
-                URL.create(**url_data, repetition=repetition, state='waiting')
+                URL.create(**url_data, repetition=repetition, state="waiting")
