@@ -23,7 +23,7 @@ class CollectURLs(Module):
 
         self.crawler.state['CollectUrls'] = self._max_urls
     
-    def add_handlers(self, url: URL) -> None:
+    """def add_handlers(self, url: URL) -> None:
         super().add_handlers(url)
 
         # Disable further calls to this handler
@@ -57,7 +57,7 @@ class CollectURLs(Module):
         self.setup(sitemap)
 
     def setup(self, sitemap: str) -> None:
-        pass
+        pass"""
 
     def receive_response(self, responses: List[Optional[Response]], url: URL, final_url: str, repetition: int) -> None:
         super().receive_response(responses, url, final_url, repetition)
@@ -76,16 +76,17 @@ class CollectURLs(Module):
 
         if parsed_url_final is None:
             return
-        
-        # TODO do other checks
 
+        # TODO add other checks
+
+        # TODO improve link gather
         # Get all <a> tags with a href
         try:
             links: Locator = self.crawler.page.locator('a[href]')
         except Error:
             return
 
-        # Iterate over each href
+        # Iterate over each link
         urls: List[tld.utils.Result] = []
         for i in range(get_locator_count(links)):
             # Get href attribute
