@@ -4,7 +4,7 @@ from typing import MutableSet, Optional
 from config import Config
 from peewee import BlobField, DateTimeField, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, TextField
 
-# Change the database to whatever you want
+
 database = PostgresqlDatabase(Config.DATABASE,
                               user=Config.USER,
                               password=Config.PASSWORD,
@@ -25,7 +25,6 @@ class BaseModel(Model):
     class Meta:
         database = database
 
-
 class Task(BaseModel):
     job = TextField()
     crawler = IntegerField(null=True)
@@ -36,7 +35,6 @@ class Task(BaseModel):
     code = IntegerField(null=True)
     error = TextField(null=True)
     crawlerState = BlobField(null=True, default=None)
-
 
 class URL(BaseModel):
     task = ForeignKeyField(Task)
@@ -56,7 +54,7 @@ class URLDB:
     def __init__(self, crawler) -> None:
         from crawler import Crawler
         self.crawler: Crawler = crawler
-        self._seen: MutableSet[str] = set()
+        self._seen: MutableSet[str] = set(URL.select(URL.url).where(URL.task==crawler.task, URL.repetition==1))
 
     def get_url(self, repetition: int) -> Optional[URL]:
         url: Optional[URL] = None
@@ -84,7 +82,8 @@ class URLDB:
         return url
 
     def get_seen(self, url: str) -> bool:
-        return url in self._seen
+        url = url.rstrip('/')
+        return (url in self._seen) or ((url + '/') in self._seen)
 
     def add_seen(self, url: str):
         url = url.rstrip('/')
@@ -92,10 +91,12 @@ class URLDB:
         self._seen.add(url + '/')
 
     def add_url(self, url: str, depth: int, fromurl: Optional[URL], force: bool = False) -> None:
-        if (url in self._seen) and (not force):
+        if self.get_seen(url) and (not force):
             return
 
         self.add_seen(url)
+
+        url = (url.rstrip('/') + '/') if url[-1] == '/' else url
 
         url_data = {
             "task": self.crawler.task,

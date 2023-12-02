@@ -18,19 +18,17 @@ class Crawler:
     def _update_cache(self) -> None:
         self.log.info("Updating cache")
 
-        self.task.updated = datetime.today()
-        self.task.crawlerState = pickle.dumps(self.state)
-
         with database.atomic():
+            self.task.updated = datetime.today()
+            self.task.crawlerState = pickle.dumps(self.state)
             database.execute_sql("UPDATE task SET updated=%s, crawlerState=%s WHERE id=%s", (self.task.updated, self.task.crawlerState, self.task.get_id()))
 
     def _delete_cache(self) -> None:
         self.log.info("Deleting cache")
 
-        self.task.updated = datetime.today()
-        self.state = {}
-
         with database.atomic():
+            self.task.updated = datetime.today()
+            self.state = {}
             database.execute_sql("UPDATE task SET updated=%s, crawlerState=NULL WHERE id=%s", (self.task.updated, self.task.get_id()))
 
     def _init_browser(self) -> None:
@@ -86,11 +84,10 @@ class Crawler:
             self.log.warning(error)
 
         if self.initial and (self.repetition == 1):
-            self.task.updated = datetime.today()
-            self.task.code = response.status if response is not None else Config.ERROR_CODES['response_error']
-            self.task.error = error_message
-
             with database.atomic():
+                self.task.updated = datetime.today()
+                self.task.code = response.status if response is not None else Config.ERROR_CODES['response_error']
+                self.task.error = error_message
                 database.execute_sql("UPDATE task SET updated=%s, code=%s, error=%s WHERE id=%s", (self.task.updated, self.task.code, self.task.error, self.task.get_id()))
 
             get_screenshot(self.page, (Config.LOG / f"screenshots/{self.site}-{self.job_id}.png"))
@@ -142,14 +139,9 @@ class Crawler:
         self.page: Page = None
         self.urldb: URLDB = URLDB(self)
 
-        if 'URLDB' in self.state:
-            self.urldb._seen = self.state['URLDB']
-        else:
-            self.state['URLDB'] = self.urldb._seen
-
         if self.urldb.get_seen(self.currenturl):
             self.log.warning(f"Invalidating latest URL: {self.currenturl}")
-            URL.update(code=Config.ERROR_CODES['browser_error'], state='complete').where(URL.task==self.task, URL.job==self.job_id, URL.crawler==self.crawler_id, URL.site==self.site, URL.url==self.currenturl, URL.depth==self.depth).execute()
+            URL.update(code=Config.ERROR_CODES['browser_error'], state='complete').where(URL.task==self.task, URL.url==self.currenturl, URL.depth==self.depth).execute()
         else:
             self.urldb.add_url(self.currenturl, self.depth, None)
 

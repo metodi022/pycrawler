@@ -1,6 +1,5 @@
 import argparse
 import importlib
-import os
 import pathlib
 import sys
 import time
@@ -36,28 +35,38 @@ class CustomProcess(Process):
         except Exception as error:
             trace = traceback.format_exc()
             self._cconn.send((error, trace))
+        finally:
+            self._cconn.close()
 
     @property
     def exception(self):
-        if self._pconn.poll():
-            self._exception = self._pconn.recv()
+        if (not self._exception) and self._pconn.poll():
+            self._exception = self._pconn.recv() or 'None'
+            self._pconn.close()
         return self._exception
 
 
-def _get_logger(job: str, crawler_id: int, log_path: pathlib.Path) -> Logger:
-    handler: FileHandler = FileHandler(log_path / f"job{job}crawler{crawler_id}.log")
+def _validate_arguments(crawlers_count: int, starting_crawler_id: int, log_path: pathlib.Path):
+    if crawlers_count <= 0 or starting_crawler_id <= 0:
+        raise ValueError('Invalid number of crawlers or starting crawler id.')
+    
+    if log_path.exists() and not log_path.is_dir():
+        raise ValueError('Path to directory for log output is incorrect')
+
+def _get_logger(log_path: pathlib.Path, name: str) -> Logger:
+    handler: FileHandler = FileHandler(log_path)
     handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
-    log = Logger(f"Job {job} Crawler {crawler_id}")
+    log = Logger(name)
     log.setLevel(Config.LOG_LEVEL)
     log.addHandler(handler)
     return log
 
 def _get_modules(module_names: List[str]) -> List[Type[Module]]:
-    result: List[Type[Module]] = []
+    modules: List[Type[Module]] = []
     for module_name in module_names:
-        module = importlib.import_module('modules.' + module_name.lower())
-        result.append(getattr(module, module_name))
-    return result
+        module = importlib.import_module(f"modules.{module_name.lower()}")
+        modules.append(getattr(module, module_name))
+    return modules
 
 def _get_task(job: str, crawler_id: int, log) -> Optional[Task]:
     # Get progress task
@@ -68,20 +77,19 @@ def _get_task(job: str, crawler_id: int, log) -> Optional[Task]:
 
     # Otherwise get new free task
     with database.atomic():
-        result = database.execute_sql("SELECT id FROM task WHERE state='free' AND job=%s FOR UPDATE SKIP LOCKED LIMIT 1", (job,)).fetchall()
+        result = database.execute_sql("SELECT id FROM task WHERE state='free' AND job=%s FOR UPDATE SKIP LOCKED LIMIT 1", (job,)).fetchone()
 
-        if len(result) == 0:
+        if not result:
             task = None
         else:
             log.info("Loading free task")
-            with database.atomic():
-                database.execute_sql("UPDATE task SET updated=%s, crawler=%s, state='progress' WHERE id=%s", (datetime.today(), crawler_id, result[0]))
+            database.execute_sql("UPDATE task SET updated=%s, crawler=%s, state='progress' WHERE id=%s", (datetime.today(), crawler_id, result[0]))
             task = Task.get_by_id(result[0])
 
     return task
 
 def _start_crawler(job: str, crawler_id: int, task: int, log_path: pathlib.Path, modules: List[Type[Module]]) -> None:
-    log = _get_logger(job, crawler_id, log_path)
+    log = _get_logger(log_path / f"job{job}crawler{crawler_id}.log", job + str(crawler_id))
     log.info('Start crawler')
     crawler: Crawler = Crawler(job, crawler_id, task, log, modules)
     crawler.start_crawl()
@@ -89,35 +97,12 @@ def _start_crawler(job: str, crawler_id: int, task: int, log_path: pathlib.Path,
     log.handlers[-1].close()
 
 
-def main(job: str, crawlers_count: int, module_names: List[str], log_path: Optional[pathlib.Path] = None, starting_crawler_id: int = 1, listen: bool = False) -> int:
-    # Create log path if needed
-    log_path = (log_path or Config.LOG).resolve()
-    log_path = cast(pathlib.Path, log_path)
-    if not log_path.exists():
-        os.mkdir(log_path)
-
-    # TODO better verify of arguments
-
-    # Verify arguments
-    if not (log_path.exists() and log_path.is_dir()):
-        raise RuntimeError('Path to directory for log output is incorrect')
-
-    if crawlers_count <= 0 or starting_crawler_id <= 0:
-        raise RuntimeError('Invalid number of crawlers or starting crawler id.')
-
+def main(job: str, crawlers_count: int, module_names: List[str], log_path: pathlib.Path, starting_crawler_id: int = 1, listen: bool = False) -> int:
     # Prepare logger
-    if not (log_path / 'screenshots').exists():
-        os.mkdir(log_path / 'screenshots')
+    log_path.mkdir(parents=True, exist_ok=True)
+    (log_path / 'screenshots').mkdir(parents=True, exist_ok=True)
 
-    handler: FileHandler = FileHandler(log_path / f"job{job}.log")
-    handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
-    log: Logger = Logger(f"Job {job}")
-    log.setLevel(Config.LOG_LEVEL)
-    log.addHandler(handler)
-
-    # Fix for multiple modules not correctly parsed
-    if module_names and (' ' in module_names[0]):
-        module_names = module_names[0].split()
+    log: Logger = _get_logger(log_path / f"job{job}.log", job)
 
     # Importing modules
     log.info("Import modules %s", str(module_names))
@@ -135,11 +120,14 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: Optio
         module.register_job(log)
 
     # Prepare crawlers
+    log.info('Preparing crawlers')
     crawlers: List[Process] = []
     for i in range(0, crawlers_count):
         process = Process(target=_manage_crawler, args=(job, i + starting_crawler_id, log_path, modules, listen))
         crawlers.append(process)
 
+    # Start crawlers
+    log.info('Startin crawlers')
     for i, crawler in enumerate(crawlers):
         crawler.start()
         log.info("Start crawler %s with JOBID %s PID %s", (i + starting_crawler_id), job, crawler.pid)
@@ -156,7 +144,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: Optio
     return 0
 
 def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: List[Type[Module]], listen: bool) -> None:
-    log = _get_logger(job, crawler_id, log_path)
+    log = _get_logger(log_path / f"job{job}crawler{crawler_id}.log", job + str(crawler_id))
 
     task: Optional[Task] = _get_task(job, crawler_id, log)
 
@@ -170,7 +158,10 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
         crawler.start()
         log.info("Start crawler %s PID %s", crawler_id, crawler.pid)
 
-        while crawler.is_alive() or (Config.RESTART and (Config.LOG / f"job{job}crawler{crawler_id}.cache").exists()):
+        with database:
+            is_cached: bool = database.execute_sql("SELECT crawlerState IS NULL FROM task WHERE id=%s", (task.get_id(),)).fetchone()
+
+        while crawler.is_alive() or (Config.RESTART and is_cached):
             if not crawler.is_alive():
                 log.error("Crawler %s crashed with %s", task.crawler, crawler.exception)
                 crawler.close()
@@ -179,7 +170,10 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
                 log.info("Start crawler %s PID %s", crawler_id, crawler.pid)
 
             crawler.join(timeout=Config.RESTART_TIMEOUT)
-            timelastentry = database.execute_sql("SELECT updated FROM task WHERE id=%s", (task.get_id(),)).fetchone()
+
+            with database:
+                timelastentry = database.execute_sql("SELECT updated FROM task WHERE id=%s", (task.get_id(),)).fetchone()
+                is_cached = database.execute_sql("SELECT crawlerState IS NULL FROM task WHERE id=%s", (task.get_id(),)).fetchone()
 
             if not crawler.is_alive():
                 continue
@@ -200,14 +194,11 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
 
         with database.atomic():
             task.updated = datetime.today()
-            database.execute_sql("UPDATE task SET updated=%s, state='complete' WHERE id=%s", (task.updated, task.get_id()))
+            database.execute_sql("UPDATE task SET updated=%s, state='complete', crawlerState=NULL WHERE id=%s", (task.updated, task.get_id()))
 
         if crawler.exception:
             # TODO save error in db?
             log.error("Crawler %s crashed with %s", task.crawler, crawler.exception)
-
-        if Config.RESTART and (Config.LOG / f"job{job}crawler{crawler_id}.cache").exists():
-            os.remove(Config.LOG / f"job{job}crawler{crawler_id}.cache")
 
         task = _get_task(job, crawler_id, log)
 
@@ -232,11 +223,23 @@ if __name__ == '__main__':
 
     # Parse command line arguments
     args = vars(args_parser.parse_args())
+
+    try:
+        _validate_arguments(args['crawlers'], args['crawlerid'], args.get('log', Config.LOG))
+    except ValueError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+    # Fix for multiple modules not correctly parsed
+    modules = cast(List[str], args.get('modules', []))
+    if modules and (' ' in modules[0]):
+        modules = modules[0].split()
+
     sys.exit(main(
-        cast(str, args.get('job')),
-        cast(int, args.get('crawlers')),
-        cast(List[str], args.get('modules', [])),
-        args.get('log'),
-        cast(int, args.get('crawlerid')),
-        cast(bool, args.get('listen'))
+        cast(str, args['job']),
+        cast(int, args['crawlers']),
+        modules,
+        args.get('log', Config.LOG),
+        cast(int, args['crawlerid']),
+        cast(bool, args['listen'])
     ))
