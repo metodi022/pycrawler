@@ -83,6 +83,7 @@ class Crawler:
             error_message = ((error.name + ' ') if error.name else '') + error.message
             self.log.warning(error)
 
+        # On first visit, also update the task
         if self.initial and (self.repetition == 1):
             with database.atomic():
                 self.task.updated = datetime.today()
@@ -92,66 +93,70 @@ class Crawler:
 
             get_screenshot(self.page, (Config.LOG / f"screenshots/{self.site}-{self.job_id}.png"))
 
+        self.log.info(f"Response status {response if response is None else response.status} repetition {self.repetition}")
         return response
 
     def __init__(self, job: str, crawler_id: int, taskid: int, log: Logger, modules: List[Type[Module]]) -> None:
+        log.info("Crawler initializing")
+
         # Prepare variables
+        self.stop: bool = False
         self.log: Logger = log
         self.job_id: str = job
         self.crawler_id: int = crawler_id
         self.task: Task = cast(Task, Task.get_by_id(taskid))
         self.state: Dict[str, Any] = cast(Dict[str, Any], self.task.crawlerState or {})
-        self.restart: bool = False
-
-        self.log.info("Crawler initializing")
+        self.repetition: int = 1
 
         # Load previous state
+        self.restart: bool = False
         if Config.RESTART and self.state:
             self.restart = True
             self.state = pickle.loads(self.state)
             self.log.warning(f"Loading old state: {self.state}")
 
-        # Prepare rest of variables
+        # Load state-dependent variables
+        self.depth: int = self.state.get('Crawler', (None,0))[1]
+        self.initial: bool = self.state.get('Crawler', (None,None,True))[2]
+
+        # Validate URL
         self.url: str = cast(str, self.task.url)
-
         url_object: Optional[tld.utils.Result] = get_tld_object(self.url)
-
         if url_object is None:
             self.log.error(f"Can't parse URL {self.url}")
             self._delete_cache()
-
         url_object = cast(tld.utils.Result, url_object)
 
+        # Unpack URL
         self.scheme: str = self.url[:self.url.find(':')]
         self.site: str = url_object.fld
         self.origin: str = get_url_origin(url_object)
         self.currenturl: str = self.state.get('Crawler', (self.url,))[0]
 
-        self.depth: int = self.state.get('Crawler', (None,0))[1]
-        self.initial: bool = self.state.get('Crawler', (None,None,True))[2]
-        self.repetition: int = 1
-
-        self.stop: bool = False
-
+        # Prepare browser variables
         self.playwright: Playwright = None
         self.browser: Browser = None
         self.context: BrowserContext = None
         self.page: Page = None
         self.urldb: URLDB = URLDB(self)
 
-        if self.urldb.get_seen(self.currenturl):
+        # Add URL to database
+        if self.restart or self.urldb.get_seen(self.currenturl):
+            # Crawler previously crashed on current URL
+            # Therefore, invalidate the current URL
             self.log.warning(f"Invalidating latest URL: {self.currenturl}")
             URL.update(code=Config.ERROR_CODES['browser_error'], state='complete').where(URL.task==self.task, URL.url==self.currenturl, URL.depth==self.depth).execute()
         else:
             self.urldb.add_url(self.currenturl, self.depth, None)
 
+        # Initialize modules
         self.modules: List[Module] = [CollectURLs(self)] if Config.RECURSIVE else []
         for module in modules:
             self.modules.append(module(self))
         self.modules += [FeedbackURL(self)]
-
         self.log.debug(f"Prepared modules: {self.modules}")
 
+        # Initialize URL filters
         url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
         for module in self.modules:
             module.add_url_filter_out(url_filter_out)
@@ -165,12 +170,13 @@ class Crawler:
         self.playwright = sync_playwright().start()
         self._init_browser()
 
-        self.log.debug(f"Start {Config.BROWSER} {self.browser.version}")
+        self.log.info(f"Start {Config.BROWSER} {self.browser.version}")
 
+        # Get URL
         url: Optional[URL] = self.urldb.get_url(1)
         self.log.info(f"Get URL {url.url if url is not None else url} depth {url.depth if url is not None else self.depth}")
 
-        # Update variables
+        # Update state
         if url is not None:
             self.currenturl = cast(str, url.url)
             self.depth = cast(int, url.depth)
@@ -181,7 +187,7 @@ class Crawler:
 
         # Main loop
         while (url is not None) and (not self.stop):
-            # Initiate modules
+            # Invoke module page handlers
             self._invoke_page_handlers(url)
 
             # Repetition loop
@@ -190,11 +196,9 @@ class Crawler:
 
                 if repetition > 1:
                     url = self.urldb.get_url(repetition)
-                    assert(url is not None)
 
                 # Navigate to page
                 response: Optional[Response] = self._open_url(url)
-                self.log.info(f"Response status {response if response is None else response.status} repetition {repetition}")
 
                 # Run modules response handler
                 self._invoke_response_handlers([response], url, repetition)
@@ -204,7 +208,7 @@ class Crawler:
             self.initial = False
             self.log.info(f"Get URL {url.url if url is not None else url} depth {url.depth if url is not None else self.depth}")
 
-            # Update variables
+            # Update state
             if url is not None:
                 self.currenturl = cast(str, url.url)
                 self.depth = cast(int, url.depth)
@@ -217,7 +221,7 @@ class Crawler:
                         self.state['Context'] = self.context.storage_state()
                     except Exception as error:
                         self.log.warning(f"Get main context fail: {error}")
-                
+
                 self._update_cache()
 
             # Close everything (to avoid memory issues)
