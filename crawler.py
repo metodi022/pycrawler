@@ -1,5 +1,5 @@
-from datetime import datetime
 import pickle
+from datetime import datetime
 from logging import Logger
 from typing import Any, Callable, Dict, List, Optional, Type, cast
 
@@ -7,11 +7,11 @@ import tld
 from config import Config
 from playwright.sync_api import Browser, BrowserContext, Error, Page, Playwright, Response, sync_playwright
 
+import utils
 from database import URL, URLDB, Task, database
 from modules.collecturls import CollectURLs
 from modules.feedbackurl import FeedbackURL
 from modules.module import Module
-from utils import get_screenshot, get_tld_object, get_url_origin
 
 
 class Crawler:
@@ -20,8 +20,8 @@ class Crawler:
 
         with database.atomic():
             self.task.updated = datetime.today()
-            self.task.crawlerState = pickle.dumps(self.state)
-            database.execute_sql("UPDATE task SET updated=%s, crawlerState=%s WHERE id=%s", (self.task.updated, self.task.crawlerState, self.task.get_id()))
+            self.task.crawlerstate = pickle.dumps(self.state)
+            database.execute_sql("UPDATE task SET updated=%s, crawlerstate=%s WHERE id=%s", (self.task.updated, self.task.crawlerstate, self.task.get_id()))
 
     def _delete_cache(self) -> None:
         self.log.info("Deleting cache")
@@ -29,7 +29,7 @@ class Crawler:
         with database.atomic():
             self.task.updated = datetime.today()
             self.state = {}
-            database.execute_sql("UPDATE task SET updated=%s, crawlerState=NULL WHERE id=%s", (self.task.updated, self.task.get_id()))
+            database.execute_sql("UPDATE task SET updated=%s, crawlerstate=NULL WHERE id=%s", (self.task.updated, self.task.get_id()))
 
     def _init_browser(self) -> None:
         self.log.info("Initializing browser")
@@ -91,7 +91,7 @@ class Crawler:
                 self.task.error = error_message
                 database.execute_sql("UPDATE task SET updated=%s, code=%s, error=%s WHERE id=%s", (self.task.updated, self.task.code, self.task.error, self.task.get_id()))
 
-            get_screenshot(self.page, (Config.LOG / f"screenshots/{self.site}-{self.job_id}.png"))
+            utils.get_screenshot(self.page, (Config.LOG / f"screenshots/{self.site}-{self.job_id}.png"))
 
         self.log.info(f"Response status {response if response is None else response.status} repetition {self.repetition}")
         return response
@@ -105,7 +105,7 @@ class Crawler:
         self.job_id: str = job
         self.crawler_id: int = crawler_id
         self.task: Task = cast(Task, Task.get_by_id(taskid))
-        self.state: Dict[str, Any] = cast(Dict[str, Any], self.task.crawlerState or {})
+        self.state: Dict[str, Any] = cast(Dict[str, Any], self.task.crawlerstate or {})
         self.repetition: int = 1
 
         # Load previous state
@@ -121,7 +121,7 @@ class Crawler:
 
         # Validate URL
         self.url: str = cast(str, self.task.url)
-        url_object: Optional[tld.utils.Result] = get_tld_object(self.url)
+        url_object: Optional[tld.utils.Result] = utils.get_tld_object(self.url)
         if url_object is None:
             self.log.error(f"Can't parse URL {self.url}")
             self._delete_cache()
@@ -130,7 +130,7 @@ class Crawler:
         # Unpack URL
         self.scheme: str = self.url[:self.url.find(':')]
         self.site: str = url_object.fld
-        self.origin: str = get_url_origin(url_object)
+        self.origin: str = utils.get_url_origin(url_object)
         self.currenturl: str = self.state.get('Crawler', (self.url,))[0]
 
         # Prepare browser variables

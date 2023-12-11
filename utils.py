@@ -1,22 +1,20 @@
 import pathlib
 import re
-from typing import Optional
+from typing import List, Optional
 
 import tld
-from playwright.sync_api import Error, Frame, Locator, Page, Response
-from tld.exceptions import TldBadUrl, TldDomainNotFound
-
 from config import Config
-
+from playwright.sync_api import BrowserContext, Error, Frame, Locator, Page, Response
+from tld.exceptions import TldBadUrl, TldDomainNotFound
 
 CLICKABLES: str = r'button,*[role="button"],*[onclick],input[type="button"],input[type="submit"],' \
                   r'a[href="#"]'
 
 
-SSO: str = r'Facebook|Twitter|Google|Yahoo|Windows.?Live|Linked.?In|Git.?Hub|Pay.?Pal|Amazon|' \
-           r'v.?Kontakte|Yandex|37.?signals|Salesforce|Fitbit|Baidu|Ren.?Ren|Weibo|AOL|Shopify|' \
-           r'Word.?Press|Dwolla|miiCard|Yammer|Sound.?Cloud|Instagram|The.?City|Apple|Slack|' \
-           r'Evernote'
+SSO: str = r'facebook|twitter|google|yahoo|windows.?live|linked.?in|git.?hub|pay.?pal|amazon|' \
+           r'v.?kontakte|yandex|37.?signals|salesforce|fitbit|baidu|ren.?ren|weibo|aol|shopify|' \
+           r'word.?press|dwolla|miicard|yammer|sound.?cloud|instagram|the.?city|apple|slack|' \
+           r'evernote'
 
 
 def get_tld_object(url: str) -> Optional[tld.utils.Result]:
@@ -25,37 +23,28 @@ def get_tld_object(url: str) -> Optional[tld.utils.Result]:
     except (TldBadUrl, TldDomainNotFound):
         return None
 
-
 def get_url_origin(url: tld.utils.Result) -> str:
     return url.parsed_url.scheme + '://' + url.parsed_url.netloc
-
 
 def get_url_scheme_site(url: tld.utils.Result) -> str:
     return url.parsed_url.scheme + '://' + url.fld
 
-
-def get_url_full(url: tld.utils.Result) -> str:
+def get_url_str(url: tld.utils.Result) -> str:
     return url.parsed_url.scheme + '://' + url.parsed_url.netloc + url.parsed_url.path
 
+def get_url_str_with_query(url: tld.utils.Result) -> str:
+    return get_url_str(url) + ('?' if url.parsed_url.query else '') + url.parsed_url.query
 
-def get_url_full_with_query(url: tld.utils.Result) -> str:
-    return get_url_full(url) + ('?' if url.parsed_url.query else '') + url.parsed_url.query
+def get_url_str_with_query_fragment(url: tld.utils.Result) -> str:
+    return get_url_str_with_query(url) + ('#' if url.parsed_url.fragment else '') + url.parsed_url.fragment
 
-
-def get_url_full_with_query_fragment(url: tld.utils.Result) -> str:
-    return get_url_full_with_query(url) + ('#' if url.parsed_url.fragment else '') + url.parsed_url.fragment
-
-
-def get_url_from_href(href: str, origin: Optional[tld.utils.Result]) -> Optional[tld.utils.Result]:
-    if re.match('^http', href) is not None:
+def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils.Result]:
+    if re.match('^' + origin.parsed_url.scheme, href) is not None:
         return get_tld_object(href)
-    
-    if origin is None:
-        return None
-    
+
     if re.match('^//', href) is not None:
         return get_tld_object(origin.parsed_url.scheme + ":" + href)
-    
+
     if href[0] == '/':
         path: str = origin.parsed_url.path[:-1] if (origin.parsed_url.path and origin.parsed_url.path[-1] == '/') else origin.parsed_url.path
     else:
@@ -75,20 +64,13 @@ def get_screenshot(page: Page, path: pathlib.Path, force: bool = False, full_pag
         return False
 
 
-def get_locator_count(locator: Optional[Locator]) -> int:
-    if locator is None:
-        return 0
-
+def get_locator_count(locator: Locator) -> int:
     try:
         return locator.count()
     except Error:
         return 0
 
-
-def get_locator_nth(locator: Optional[Locator], nth: int) -> Optional[Locator]:
-    if locator is None:
-        return None
-
+def get_locator_nth(locator: Locator, nth: int) -> Optional[Locator]:
     count: int = get_locator_count(locator)
 
     if (count < 1) or (nth >= count):
@@ -99,9 +81,8 @@ def get_locator_nth(locator: Optional[Locator], nth: int) -> Optional[Locator]:
     except Error:
         return None
 
-
-def get_locator_attribute(locator: Optional[Locator], attribute: str) -> Optional[str]:
-    if (locator is None) or (get_locator_count(locator) != 1):
+def get_locator_attribute(locator: Locator, attribute: str) -> Optional[str]:
+    if get_locator_count(locator) != 1:
         return None
 
     try:
@@ -109,9 +90,8 @@ def get_locator_attribute(locator: Optional[Locator], attribute: str) -> Optiona
     except Error:
         return None
 
-
-def get_locator_inner_html(locator: Optional[Locator]) -> Optional[str]:
-    if (locator is None) or (get_locator_count(locator) != 1):
+def get_locator_inner_html(locator: Locator) -> Optional[str]:
+    if get_locator_count(locator) != 1:
         return None
 
     try:
@@ -119,9 +99,8 @@ def get_locator_inner_html(locator: Optional[Locator]) -> Optional[str]:
     except Error:
         return None
 
-
-def get_locator_outer_html(locator: Optional[Locator]) -> Optional[str]:
-    if (locator is None) or (get_locator_count(locator) != 1):
+def get_locator_outer_html(locator: Locator) -> Optional[str]:
+    if get_locator_count(locator) != 1:
         return None
 
     try:
@@ -130,8 +109,8 @@ def get_locator_outer_html(locator: Optional[Locator]) -> Optional[str]:
         return None
 
 
-def invoke_click(page: Page | Frame, clickable: Optional[Locator], timeout=30000, trial=False) -> bool:
-    if (clickable is None) or (get_locator_count(clickable) != 1):
+def invoke_click(page: Page | Frame, clickable: Locator, timeout=30000, trial=False) -> bool:
+    if get_locator_count(clickable) != 1:
         return False
 
     try:
@@ -145,13 +124,13 @@ def invoke_click(page: Page | Frame, clickable: Optional[Locator], timeout=30000
         return False
 
 
-def get_visible_extra(locator: Optional[Locator], timeout=30000) -> bool:
-    if (locator is None) or (get_locator_count(locator) != 1):
+def get_visible_advanced(locator: Locator) -> bool:
+    if get_locator_count(locator) != 1:
         return False
 
     try:
-        locator.hover(timeout=timeout, trial=True)
-        locator.click(timeout=timeout, trial=True)
+        locator.hover(trial=True)
+        locator.click(trial=True)
     except Error:
         return False
 
@@ -179,7 +158,7 @@ def goto(page: Page | Frame, url: str) -> Optional[Response]:
         response = page.goto(url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
     except Error:
         return None
-    
+
     try:
         page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
     except Error:
@@ -187,3 +166,27 @@ def goto(page: Page | Frame, url: str) -> Optional[Response]:
         pass
 
     return response
+
+
+def search_google(context: BrowserContext, query: str, page_number: int = 0, entries: int = 10) -> List[str]:
+    result: List[str] = []
+    page: Page = context.new_page()
+
+    for i in range(1, (entries % 10) + 2):
+        url: str = f'https://www.google.com/search?q={query}&start={page_number * 10 * i}'
+
+        try:
+            response: Optional[Response] = page.goto(url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+            page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+        except Error:
+            break
+
+        if (response is None) or (response.status >= 400):
+            break
+
+        body: str = response.text()
+
+        #result.append(body)
+
+    page.close()
+    return result

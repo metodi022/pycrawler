@@ -41,7 +41,7 @@ class CustomProcess(Process):
     @property
     def exception(self):
         if (not self._exception) and self._pconn.poll():
-            self._exception = self._pconn.recv() or 'None'
+            self._exception = self._pconn.recv()
             self._pconn.close()
         return self._exception
 
@@ -80,6 +80,7 @@ def _get_task(job: str, crawler_id: int, log) -> Optional[Task]:
         result = database.execute_sql("SELECT id FROM task WHERE state='free' AND job=%s FOR UPDATE SKIP LOCKED LIMIT 1", (job,)).fetchone()
 
         if not result:
+            log.info("Found no task")
             task = None
         else:
             log.info("Loading free task")
@@ -157,9 +158,10 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
         crawler: CustomProcess = CustomProcess(target=_start_crawler, args=(job, crawler_id, task.get_id(), log_path, modules))
         crawler.start()
         log.info("Start crawler %s PID %s", crawler_id, crawler.pid)
+        crawler.join(timeout=Config.RESTART_TIMEOUT)
 
         with database:
-            is_cached: bool = database.execute_sql("SELECT crawlerState IS NULL FROM task WHERE id=%s", (task.get_id(),)).fetchone()
+            is_cached: bool = not database.execute_sql("SELECT crawlerstate IS NULL FROM task WHERE id=%s", (task.get_id(),)).fetchone()[0]
 
         while crawler.is_alive() or (Config.RESTART and is_cached):
             if not crawler.is_alive():
@@ -173,7 +175,7 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
 
             with database:
                 timelastentry = database.execute_sql("SELECT updated FROM task WHERE id=%s", (task.get_id(),)).fetchone()
-                is_cached = database.execute_sql("SELECT crawlerState IS NULL FROM task WHERE id=%s", (task.get_id(),)).fetchone()
+                is_cached = not database.execute_sql("SELECT crawlerstate IS NULL FROM task WHERE id=%s", (task.get_id(),)).fetchone()[0]
 
             if not crawler.is_alive():
                 continue
@@ -194,7 +196,7 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
 
         with database.atomic():
             task.updated = datetime.today()
-            database.execute_sql("UPDATE task SET updated=%s, state='complete', crawlerState=NULL WHERE id=%s", (task.updated, task.get_id()))
+            database.execute_sql("UPDATE task SET updated=%s, state='complete', crawlerstate=NULL WHERE id=%s", (task.updated, task.get_id()))
 
         if crawler.exception:
             # TODO save error in db?
@@ -225,13 +227,13 @@ if __name__ == '__main__':
     args = vars(args_parser.parse_args())
 
     try:
-        _validate_arguments(args['crawlers'], args['crawlerid'], args.get('log', Config.LOG))
+        _validate_arguments(args['crawlers'], args['crawlerid'], args['log'] or Config.LOG)
     except ValueError as e:
         print(f"Error: {e}")
         sys.exit(1)
 
     # Fix for multiple modules not correctly parsed
-    modules = cast(List[str], args.get('modules', []))
+    modules = args['modules'] or []
     if modules and (' ' in modules[0]):
         modules = modules[0].split()
 
@@ -239,7 +241,7 @@ if __name__ == '__main__':
         cast(str, args['job']),
         cast(int, args['crawlers']),
         modules,
-        args.get('log', Config.LOG),
+        args['log'] or Config.LOG,
         cast(int, args['crawlerid']),
         cast(bool, args['listen'])
     ))

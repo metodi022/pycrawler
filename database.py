@@ -34,7 +34,7 @@ class Task(BaseModel):
     state = TextField(default="free")
     code = IntegerField(null=True)
     error = TextField(null=True)
-    crawlerState = BlobField(null=True, default=None)
+    crawlerstate = BlobField(null=True, default=None)
 
 class URL(BaseModel):
     task = ForeignKeyField(Task)

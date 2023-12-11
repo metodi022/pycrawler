@@ -1,4 +1,3 @@
-numpy
 playwright
 psycopg2
 tld
