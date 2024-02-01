@@ -7,7 +7,7 @@ from playwright.sync_api import Error, Locator, Response, Page
 
 from config import Config
 from database import URL
-from modules.module import Module
+from modules.Module import Module
 from utils import get_locator_attribute, get_locator_count, get_locator_nth, get_tld_object, get_url_from_href, get_url_str, get_url_str_with_query_fragment, get_url_origin
 
 
@@ -79,7 +79,7 @@ class CollectURLs(Module):
                 continue
 
             # Check for same ETLD+1
-            if Config.SAME_ETLDP1 and self.crawler.site != parsed_link.fld:
+            if Config.SAME_ETLDP1 and self.crawler.site.site != parsed_link.fld:
                 continue
 
             # TODO: Check for same entity

@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple, cast
 import tld
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
-from database import Task, database
+from database import Site, Task, database
 from loader.csvloader import CSVLoader
 
 
@@ -22,13 +22,14 @@ def main(job: str, urlspath: Optional[pathlib.Path], urls: Optional[List[Tuple[i
 
     # Iterate over URLs and add them to database
     with database.atomic():
-        urls_iterator: CSVLoader | List[Tuple[int, str]] = CSVLoader(urlspath) if (urlspath is not None) else urls
+        urls_iterator: CSVLoader | List[Tuple[str, str, str]] = CSVLoader(urlspath) if (urlspath is not None) else urls
 
         for entry in urls_iterator:
-            url: str = ('https://' if not entry[1].startswith('http') else '') + entry[1]
+            url: str = ('https://' if not entry[2].startswith('http') else '') + entry[2]
             try:
-                site: str = tld.get_tld(url, as_object=True).fld
-                Task.create(job=job, crawler=None, site=site, url=url, rank=int(entry[0]))
+                _site: str = tld.get_tld(url, as_object=True).fld
+                site: Site = Site.get_or_create(site=_site)
+                Task.create(job=job, crawler=None, site=site, url=url)
             except (TldBadUrl, TldDomainNotFound):
                 # TODO log bad URL?
                 pass

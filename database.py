@@ -1,9 +1,11 @@
+import re
 from datetime import datetime
-from typing import MutableSet, Optional
+from typing import Optional
 
-from config import Config
 from peewee import BlobField, DateTimeField, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, TextField
 
+import utils
+from config import Config
 
 database = PostgresqlDatabase(Config.DATABASE,
                               user=Config.USER,
@@ -16,7 +18,6 @@ database = PostgresqlDatabase(Config.DATABASE,
 class BaseModel(Model):
     created = DateTimeField(default=datetime.now)
     updated = DateTimeField(default=datetime.now)
-    note = TextField(default=None, null=True)
 
     def save(self, *args, **kwargs):
         self.updated = datetime.now()
@@ -25,22 +26,26 @@ class BaseModel(Model):
     class Meta:
         database = database
 
+class Site(BaseModel):
+    site = TextField(primary_key=True, unique=True, index=True)
+    rank = IntegerField(default=None, null=True)
+    bucket = IntegerField(default=None, null=True)
+    category = TextField(default=None, null=True)
+
 class Task(BaseModel):
     job = TextField()
     crawler = IntegerField(null=True)
-    site = TextField()
+    site = ForeignKeyField(Site)
     url = TextField()
-    rank = IntegerField()
+    urlfinal = TextField(default=None, null=True)
     state = TextField(default="free")
-    code = IntegerField(null=True)
-    error = TextField(null=True)
-    crawlerstate = BlobField(null=True, default=None)
+    code = IntegerField(default=None, null=True)
+    error = TextField(default=None, null=True)
+    crawlerstate = BlobField(default=None, null=True)
 
 class URL(BaseModel):
     task = ForeignKeyField(Task)
-    job = TextField()
-    crawler = IntegerField()
-    site = TextField()
+    site = ForeignKeyField(Site)
     url = TextField()
     urlfinal = TextField(default=None, null=True)
     fromurl = ForeignKeyField("self", default=None, null=True, backref="children")
@@ -54,26 +59,32 @@ class URLDB:
     def __init__(self, crawler) -> None:
         from crawler import Crawler
         self.crawler: Crawler = crawler
-        self._seen: MutableSet[str] = set(URL.select(URL.url).where(URL.task==crawler.task, URL.repetition==1))
+        self._seen: set[str] = self.crawler.state.get('URLDB', set(URL.select(URL.url).where(URL.task==crawler.task, URL.repetition==1)))
+        self.crawler.state['URLDB'] = self._seen
 
     def get_url(self, repetition: int) -> Optional[URL]:
         url: Optional[URL] = None
 
         query = [
             URL.task == self.crawler.task,
-            URL.job == self.crawler.job_id,
-            URL.crawler == self.crawler.crawler_id,
-            URL.site == self.crawler.site,
             URL.repetition == repetition
         ]
 
         if (repetition == 1):
+            query.append(URL.state == "free")
+
             if Config.BREADTHFIRST:
                 query.append(URL.depth == self.crawler.depth)
 
-            url = URL.select().where(*query, URL.state == "free").order_by(URL.created.asc()).first()
+            url = URL.select().where(*query).order_by(URL.created.asc()).first()
+
+            query = query[:-1]
+            url = URL.select().where(*query).order_by(URL.depth.asc()).first() if not url else url
         else:
-            url = URL.get_or_none(*query, url=self.crawler.currenturl, depth=self.crawler.depth, state="waiting")
+            query.append(URL.state == "waiting")
+            query.append(URL.url == self.crawler.currenturl)
+            query.append(URL.depth == self.crawler.depth)
+            url = URL.get_or_none(*query)
 
         if url:
             url.state = "progress"
@@ -91,18 +102,22 @@ class URLDB:
         self._seen.add(url + '/')
 
     def add_url(self, url: str, depth: int, fromurl: Optional[URL], force: bool = False) -> None:
-        if self.get_seen(url) and (not force):
+        if (not force) and self.get_seen(url):
             return
 
         self.add_seen(url)
 
         url = (url.rstrip('/') + '/') if url[-1] == '/' else url
 
+        site = utils.get_tld_object(url)
+        if site is None:
+            return
+
+        site = Site.get_or_create(site=site.fld)[0]
+
         url_data = {
             "task": self.crawler.task,
-            "job": self.crawler.job_id,
-            "crawler": self.crawler.crawler_id,
-            "site": self.crawler.site,
+            "site": site,
             "url": url,
             "fromurl": fromurl,
             "depth": depth
@@ -113,3 +128,6 @@ class URLDB:
 
             for repetition in range(2, Config.REPETITIONS + 1):
                 URL.create(**url_data, repetition=repetition, state="waiting")
+
+    def get_state(self, state: str) -> list[int]:
+        return list(URL.select(URL.id).where(URL.task==self.crawler.task, URL.state==state))

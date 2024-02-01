@@ -10,8 +10,8 @@ from multiprocessing import Pipe, Process
 from typing import List, Optional, Type, cast
 
 from crawler import Crawler
-from database import URL, Task, database
-from modules.module import Module
+from database import URL, Site, Task, database
+from modules.Module import Module
 
 try:
     Config = importlib.import_module('config').Config
@@ -64,7 +64,7 @@ def _get_logger(log_path: pathlib.Path, name: str) -> Logger:
 def _get_modules(module_names: List[str]) -> List[Type[Module]]:
     modules: List[Type[Module]] = []
     for module_name in module_names:
-        module = importlib.import_module(f"modules.{module_name.lower()}")
+        module = importlib.import_module(f"modules.{module_name}")
         modules.append(getattr(module, module_name))
     return modules
 
@@ -112,6 +112,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: pathl
     # Creating database
     log.info('Load database')
     with database.atomic():
+        database.create_tables([Site])
         database.create_tables([Task])
         database.create_tables([URL])
 
@@ -128,7 +129,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: pathl
         crawlers.append(process)
 
     # Start crawlers
-    log.info('Startin crawlers')
+    log.info('Starting crawlers')
     for i, crawler in enumerate(crawlers):
         crawler.start()
         log.info("Start crawler %s with JOBID %s PID %s", (i + starting_crawler_id), job, crawler.pid)
@@ -158,7 +159,7 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
         crawler: CustomProcess = CustomProcess(target=_start_crawler, args=(job, crawler_id, task.get_id(), log_path, modules))
         crawler.start()
         log.info("Start crawler %s PID %s", crawler_id, crawler.pid)
-        crawler.join(timeout=Config.RESTART_TIMEOUT)
+        crawler.join()
 
         with database:
             is_cached: bool = not database.execute_sql("SELECT crawlerstate IS NULL FROM task WHERE id=%s", (task.get_id(),)).fetchone()[0]

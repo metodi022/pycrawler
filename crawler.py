@@ -4,14 +4,14 @@ from logging import Logger
 from typing import Any, Callable, Dict, List, Optional, Type, cast
 
 import tld
-from config import Config
 from playwright.sync_api import Browser, BrowserContext, Error, Page, Playwright, Response, sync_playwright
 
 import utils
-from database import URL, URLDB, Task, database
-from modules.collecturls import CollectURLs
-from modules.feedbackurl import FeedbackURL
-from modules.module import Module
+from config import Config
+from database import URL, URLDB, Site, Task, database
+from modules.Collecturls import CollectURLs
+from modules.Feedbackurl import FeedbackURL
+from modules.Module import Module
 
 
 class Crawler:
@@ -91,7 +91,7 @@ class Crawler:
                 self.task.error = error_message
                 database.execute_sql("UPDATE task SET updated=%s, code=%s, error=%s WHERE id=%s", (self.task.updated, self.task.code, self.task.error, self.task.get_id()))
 
-            utils.get_screenshot(self.page, (Config.LOG / f"screenshots/{self.site}-{self.job_id}.png"))
+            utils.get_screenshot(self.page, (Config.LOG / f"screenshots/{self.site.site}-{self.job_id}.png"))
 
         self.log.info(f"Response status {response if response is None else response.status} repetition {self.repetition}")
         return response
@@ -129,7 +129,7 @@ class Crawler:
 
         # Unpack URL
         self.scheme: str = self.url[:self.url.find(':')]
-        self.site: str = url_object.fld
+        self.site: Site = Site.get(site=url_object.fld)
         self.origin: str = utils.get_url_origin(url_object)
         self.currenturl: str = self.state.get('Crawler', (self.url,))[0]
 

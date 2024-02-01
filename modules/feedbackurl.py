@@ -5,7 +5,7 @@ from playwright.sync_api import Response
 
 from config import Config
 from database import URL, database
-from modules.module import Module
+from modules.Module import Module
 
 
 class FeedbackURL(Module):

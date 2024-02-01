@@ -168,25 +168,32 @@ def goto(page: Page | Frame, url: str) -> Optional[Response]:
     return response
 
 
-def search_google(context: BrowserContext, query: str, page_number: int = 0, entries: int = 10) -> List[str]:
+def search_google(context: BrowserContext, query: str, page_number: int = 0, start_page: int = 0) -> List[str]:
     result: List[str] = []
     page: Page = context.new_page()
 
-    for i in range(1, (entries % 10) + 2):
-        url: str = f'https://www.google.com/search?q={query}&start={page_number * 10 * i}'
+    url: str = f'https://www.google.com/search?q={query}&start={(page_number + start_page) * 10}'
+    response: Optional[Response] = None
 
-        try:
-            response: Optional[Response] = page.goto(url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
-            page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-        except Error:
-            break
+    try:
+        response = page.goto(url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+        page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+    except Error:
+        # Ignored
+        pass
 
-        if (response is None) or (response.status >= 400):
-            break
-
+    try:
         body: str = response.text()
+        result = re.findall(r'<a jsname=".+?" href=".+?" data-ved=".+?" ping=".+?">', body)
+        result = re.findall(r'(?<=href=").+?(?=")', ''.join(result))
+    except Error:
+        # Ignored
+        pass
 
-        #result.append(body)
+    try:
+        page.close()
+    except Error:
+        # Ignored
+        pass
 
-    page.close()
     return result
