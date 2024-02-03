@@ -15,13 +15,13 @@ class FeedbackURL(Module):
         with database:
             database.create_tables([URL])
 
-    def receive_response(self, responses: List[Optional[Response]], url: URL, final_url: str, repetition: int) -> None:
-        super().receive_response(responses, url, final_url, repetition)
+    def receive_response(self, responses: List[Optional[Response]], final_url: str, repetition: int) -> None:
+        super().receive_response(responses, final_url, repetition)
 
         response: Optional[Response] = responses[-1] if len(responses) > 0 else None
         code: int = response.status if response is not None else Config.ERROR_CODES['response_error']
-        
-        url.urlfinal = final_url
-        url.code = code
-        url.state = 'complete'
-        url.save()
+
+        self.crawler.url.urlfinal = final_url
+        self.crawler.url.code = code
+        self.crawler.url.state = 'complete'
+        self.crawler.url.save()

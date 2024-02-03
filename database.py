@@ -26,6 +26,7 @@ class BaseModel(Model):
     class Meta:
         database = database
 
+
 class Site(BaseModel):
     site = TextField(primary_key=True, unique=True, index=True)
     rank = IntegerField(default=None, null=True)
@@ -36,8 +37,7 @@ class Task(BaseModel):
     job = TextField()
     crawler = IntegerField(null=True)
     site = ForeignKeyField(Site)
-    url = TextField()
-    urlfinal = TextField(default=None, null=True)
+    landing = ForeignKeyField("URL", default=None, null=True)
     state = TextField(default="free")
     code = IntegerField(default=None, null=True)
     error = TextField(default=None, null=True)
@@ -48,6 +48,8 @@ class URL(BaseModel):
     site = ForeignKeyField(Site)
     url = TextField()
     urlfinal = TextField(default=None, null=True)
+    scheme = TextField()
+    origin = TextField()
     fromurl = ForeignKeyField("self", default=None, null=True, backref="children")
     depth = IntegerField()
     code = IntegerField(default=None, null=True)
@@ -82,7 +84,7 @@ class URLDB:
             url = URL.select().where(*query).order_by(URL.depth.asc()).first() if not url else url
         else:
             query.append(URL.state == "waiting")
-            query.append(URL.url == self.crawler.currenturl)
+            query.append(URL.url == self.crawler.url.url)
             query.append(URL.depth == self.crawler.depth)
             url = URL.get_or_none(*query)
 

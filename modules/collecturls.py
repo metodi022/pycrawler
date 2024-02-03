@@ -3,12 +3,12 @@ import re
 from typing import Callable, List, Optional
 
 import tld
-from playwright.sync_api import Error, Locator, Response, Page
+from playwright.sync_api import Error, Locator, Page, Response
 
+import utils
 from config import Config
 from database import URL
 from modules.Module import Module
-from utils import get_locator_attribute, get_locator_count, get_locator_nth, get_tld_object, get_url_from_href, get_url_str, get_url_str_with_query_fragment, get_url_origin
 
 
 class CollectURLs(Module):
@@ -18,36 +18,30 @@ class CollectURLs(Module):
 
     def __init__(self, crawler) -> None:
         super().__init__(crawler)
-        self._max_urls: int = self.crawler.state.get('CollectUrls', Config.MAX_URLS)
-        self._url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
 
+        self._max_urls: int = self.crawler.state.get('CollectUrls', Config.MAX_URLS)
         self.crawler.state['CollectUrls'] = self._max_urls
 
-    def add_handlers(self, url: URL) -> None:
-        super().add_handlers(url)
+        self._url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
 
-        # Disable further calls to this handler
-        self.add_handlers = super().add_handlers
-
-        # Should activate only once; restarted crawler should not re-run it
-        if self.crawler.restart:
-            return
-
-    def receive_response(self, responses: List[Optional[Response]], url: URL, final_url: str, repetition: int) -> None:
-        super().receive_response(responses, url, final_url, repetition)
+    def receive_response(self, responses: List[Optional[Response]], final_url: str, repetition: int) -> None:
+        super().receive_response(responses, final_url, repetition)
 
         # Speedup by ignoring repetitive URL collection from the same page
         if self.crawler.repetition > 1:
             return
 
         # Make sure to add page as seen
-        parsed_url_final: Optional[tld.utils.Result] = get_tld_object(self.crawler.page.url)
-        self.crawler.urldb.add_seen(get_url_str(parsed_url_final) if parsed_url_final is not None else final_url)
+        parsed_url_final: Optional[tld.utils.Result] = utils.get_tld_object(self.crawler.page.url)
+        self.crawler.urldb.add_seen(final_url)
 
-        # Check if depth or max URLs exceeded
-        if (self.crawler.depth >= Config.DEPTH) or (self._max_urls < 1):
+        # Checks
+        if self.crawler.depth >= Config.DEPTH:
             return
 
+        if self._max_urls < 1:
+            return
+        
         if parsed_url_final is None:
             return
 
@@ -62,30 +56,30 @@ class CollectURLs(Module):
         urls: List[tld.utils.Result] = []
 
         # Iterate over each link
-        for i in range(get_locator_count(links)):
+        for i in range(utils.get_locator_count(links)):
             # Get href attribute
-            link: Optional[str] = get_locator_attribute(get_locator_nth(links, i), 'href')
+            link: Optional[str] = utils.get_locator_attribute(utils.get_locator_nth(links, i), 'href')
 
-            if link is None or not link.strip():
+            if (link is None) or (not link.strip()):
                 continue
 
             # Parse attribute
-            parsed_link: Optional[tld.utils.Result] = get_url_from_href(link.strip(), parsed_url_final)
+            parsed_link: Optional[tld.utils.Result] = utils.get_url_from_href(link.strip(), parsed_url_final)
             if not parsed_link:
                 continue
 
             # Check for same origin
-            if Config.SAME_ORIGIN and self.crawler.origin != get_url_origin(parsed_link):
+            if Config.SAME_ORIGIN and (self.crawler.origin != utils.get_url_origin(parsed_link)):
                 continue
 
             # Check for same ETLD+1
-            if Config.SAME_ETLDP1 and self.crawler.site.site != parsed_link.fld:
+            if Config.SAME_ETLDP1 and (self.crawler.site.site != parsed_link.fld):
                 continue
 
             # TODO: Check for same entity
 
             # Check seen
-            parsed_link_full: str = get_url_str(parsed_link)
+            parsed_link_full: str = utils.get_url_str(parsed_link)
             if self.crawler.urldb.get_seen(parsed_link_full):
                 continue
             self.crawler.urldb.add_seen(parsed_link_full)
@@ -112,7 +106,7 @@ class CollectURLs(Module):
 
         # For each found URL, add it to the database, while making sure not to exceed the max URL limit
         for parsed_link in urls:
-            self.crawler.urldb.add_url(get_url_str_with_query_fragment(parsed_link), self.crawler.depth + 1, url, force = True)
+            self.crawler.urldb.add_url(utils.get_url_str_with_query_fragment(parsed_link), self.crawler.depth + 1, self.crawler.url, force = True)
 
             self._max_urls -= 1
             if self._max_urls < 1:

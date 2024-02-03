@@ -49,7 +49,7 @@ class CustomProcess(Process):
 def _validate_arguments(crawlers_count: int, starting_crawler_id: int, log_path: pathlib.Path):
     if crawlers_count <= 0 or starting_crawler_id <= 0:
         raise ValueError('Invalid number of crawlers or starting crawler id.')
-    
+
     if log_path.exists() and not log_path.is_dir():
         raise ValueError('Path to directory for log output is incorrect')
 

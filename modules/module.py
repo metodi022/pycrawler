@@ -16,10 +16,10 @@ class Module:
     def register_job(log: Logger) -> None:
         pass
 
-    def add_handlers(self, url: URL) -> None:
+    def add_handlers(self) -> None:
         pass
 
-    def receive_response(self, responses: List[Optional[Response]], url: URL, final_url: str, repetition: int) -> None:
+    def receive_response(self, responses: List[Optional[Response]], final_url: str, repetition: int) -> None:
         pass
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
