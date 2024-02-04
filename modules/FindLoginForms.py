@@ -78,7 +78,11 @@ class FindLoginForms(Module):
             return
 
         # Finally, use search engine with login keyword
-        self.crawler.urldb.add_url('https://www.google.com/search?q=' + urllib.parse.quote(f"\"login\" site:{self.crawler.site.site}"), Config.DEPTH - 1, None)
+        self.crawler.urldb.add_url(
+            f'https://www.google.com/search?q="login"++site%3A{urllib.parse.quote(self.crawler.site.site)}',
+            Config.DEPTH - 1,
+            None
+        )
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         def filt(url: tld.utils.Result) -> bool:

@@ -29,8 +29,8 @@ class BaseModel(Model):
 
 class Site(BaseModel):
     site = TextField(primary_key=True, unique=True, index=True)
-    rank = IntegerField(default=None, null=True)
     bucket = IntegerField(default=None, null=True)
+    rank = IntegerField(default=None, null=True)
     category = TextField(default=None, null=True)
 
 class Task(BaseModel):
