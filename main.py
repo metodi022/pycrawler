@@ -27,7 +27,9 @@ except ModuleNotFoundError as e:
 class CustomProcess(Process):
     def __init__(self, *aargs, **kwargs):
         Process.__init__(self, *aargs, **kwargs)
+
         self._pconn, self._cconn = Pipe()
+
         self._exception = None
 
     def run(self):
@@ -45,6 +47,7 @@ class CustomProcess(Process):
         if (not self._exception) and self._pconn.poll():
             self._exception = self._pconn.recv()
             self._pconn.close()
+
         return self._exception
 
 
@@ -108,7 +111,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: pathl
     log: Logger = _get_logger(log_path / f"job{job}.log", job)
 
     # Importing modules
-    log.info("Import additional modules %s", str(module_names))
+    log.debug("Import additional modules %s", str(module_names))
     modules: List[Type[Module]] = _get_modules(module_names)
 
     # Creating database
@@ -117,7 +120,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: pathl
         database.create_tables([Site])
         database.create_tables([Task])
         database.create_tables([URL])
-        
+
         try:
             Task._schema.create_foreign_key(Task.landing)
         except ProgrammingError:
@@ -163,13 +166,12 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
             task = _get_task(job, crawler_id, log)
             continue
 
+        with database:
+            is_cached: bool = not database.execute_sql("SELECT crawlerstate IS NULL FROM task WHERE id=%s", (task.get_id(),)).fetchone()[0]
+
         crawler: CustomProcess = CustomProcess(target=_start_crawler, args=(job, crawler_id, task.get_id(), log_path, modules))
         crawler.start()
         log.info("Start crawler %s PID %s", crawler_id, crawler.pid)
-        crawler.join()
-
-        with database:
-            is_cached: bool = not database.execute_sql("SELECT crawlerstate IS NULL FROM task WHERE id=%s", (task.get_id(),)).fetchone()[0]
 
         while crawler.is_alive() or is_cached:
             if not crawler.is_alive():
@@ -182,7 +184,7 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
             crawler.join(timeout=Config.RESTART_TIMEOUT)
 
             with database:
-                timelastentry = database.execute_sql("SELECT updated FROM task WHERE id=%s", (task.get_id(),)).fetchone()
+                timelastentry = database.execute_sql("SELECT updated FROM task WHERE id=%s", (task.get_id(),)).fetchone()[0]
                 is_cached = not database.execute_sql("SELECT crawlerstate IS NULL FROM task WHERE id=%s", (task.get_id(),)).fetchone()[0]
 
             if not crawler.is_alive():

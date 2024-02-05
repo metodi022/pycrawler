@@ -117,7 +117,8 @@ class Crawler:
         if self.state:
             self.restart = True
             self.state = pickle.loads(self.state)
-            self.log.warning(f"Loading old state: {self.state}")
+            self.log.warning("Loading old state")
+            self.log.debug(self.state)
 
         # Load state-dependent variables
         self.url: URL = URL.get_by_id(self.state.get('Crawler', cast(URL, self.task.landing)))
