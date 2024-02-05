@@ -29,6 +29,9 @@ class AcceptCookies(Module):
 
         self._seen: MutableSet[str] = self.crawler.state.get('AcceptCookies', set())
         self.crawler.state['AcceptCookies'] = self._seen
+        
+        if not Config.SAVE_CONTEXT:
+            self.crawler.log.error("AcceptCookies: Config.SAVE_CONTEXT is False")
 
     def receive_response(self, responses: List[Optional[Response]], final_url: str, repetition: int) -> None:
         super().receive_response(responses, final_url, repetition)
@@ -44,18 +47,32 @@ class AcceptCookies(Module):
             return
         self._seen.add(utils.get_url_origin(url_origin))
 
-        # Accept cookies for origin
+        # Accept cookies in first-depth frames
         for frame in self.crawler.page.frames[1:]:
-            self.accept(frame, self.crawler.url)
-        self.accept(self.crawler.page, self.crawler.url, inframe=False, responses=responses)
+            response = self.accept(frame, self.crawler.url, inframe=True)
 
-        self.crawler.state['Context'] = self.crawler.context.storage_state()
+            if response:
+                self.crawler.log.info(f"Found a cookiebanner in frame {response.url}")
+
+        # Accept cookies in main page
+        response = self.accept(self.crawler.page, self.crawler.url)
+
+        if response:
+            self.crawler.log.info(f"Found a cookiebanner in main {final_url}")
+            responses.append(response)
+
+        # Save context (accepted cookies need context)
+        try:
+            self.crawler.state['Context'] = self.crawler.context.storage_state()
+        except Exception as error:
+            self.crawler.log.warning(f"Get main context fail: {error}")
 
         # Update the screenshot of the landing page
-        if self.crawler.initial and (self.crawler.repetition == 1):
+        if self.crawler.initial and (self.crawler.repetition == 1) and response:
             utils.get_screenshot(self.crawler.page, (Config.LOG / f"screenshots/{self.crawler.site.site}-{self.crawler.job_id}.png"), force=True)
 
-    def accept(self, page: Page | Frame, url: URL, inframe: bool = True, responses: Optional[List[Optional[Response]]] = None) -> Optional[Response]:
+    @staticmethod
+    def accept(page: Page | Frame, url: URL, inframe: bool = False) -> Optional[Response]:
         """Automatically searches buttons with accept keywords and presses them.
 
         Args:
@@ -91,8 +108,6 @@ class AcceptCookies(Module):
             if re.search(AcceptCookies.CHECK_IGNORE, button_html, flags=re.I) is not None:
                 continue
 
-            self.crawler.log.info(f"Found a cookiebanner in {'frame' if inframe else 'main'} {page.url}")
-
             utils.invoke_click(page, button, timeout=2000)
 
         # Update responses if needed
@@ -101,8 +116,5 @@ class AcceptCookies(Module):
         if not inframe:
             response = page.goto(url.url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
             page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-
-            if responses is not None:
-                responses.append(response)
 
         return response

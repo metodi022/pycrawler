@@ -19,8 +19,7 @@ class Config:
     TIMEZONE: str = 'Europe/Berlin'
     HEADLESS: bool = False  # Headless browser
 
-    RESTART: bool = True  # If the browser crashes, try to restore the crawler
-    RESTART_CONTEXT: bool = False  # If the browser crashes, try to restore saved cookies and localStorage
+    SAVE_CONTEXT: bool = False  # Store saved cookies and localStorage while crawling
 
     RECURSIVE: bool = True  # Discover additional URLs while crawling
     BREADTHFIRST: bool = True  # Visit URLs in a breadth-first manner, otherwise depth-first

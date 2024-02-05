@@ -59,7 +59,8 @@ class URLDB:
     def __init__(self, crawler) -> None:
         from crawler import Crawler
         self.crawler: Crawler = crawler
-        self._seen: set[str] = self.crawler.state.get('URLDB', set(URL.select(URL.url).where(URL.task==crawler.task, URL.repetition==1)))  # TODO check
+
+        self._seen: set[str] = self.crawler.state.get('URLDB', set())
         self.crawler.state['URLDB'] = self._seen
 
     def get_url(self, repetition: int) -> Optional[URL]:
@@ -70,7 +71,7 @@ class URLDB:
             URL.repetition == repetition
         ]
 
-        if (repetition == 1):
+        if repetition == 1:
             query.append(URL.state == "free")
 
             if Config.BREADTHFIRST:

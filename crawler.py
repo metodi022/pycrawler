@@ -51,7 +51,7 @@ class Crawler:
 
         self.page = self.context.new_page()
 
-    def _close_borwser(self) -> None:
+    def _close_browser(self) -> None:
         self.log.info("Closing browser")
 
         self.page.close()
@@ -70,7 +70,7 @@ class Crawler:
         final_url: str = self.page.url
         for module in self.modules:
             module.receive_response(responses, final_url, repetition)
-    
+
     def _open_url(self) -> Optional[Response]:
         self.log.info(f"Navigating to URL: {self.url.url}")
 
@@ -114,7 +114,7 @@ class Crawler:
         self.state: Dict[str, Any] = cast(Dict[str, Any], self.task.crawlerstate or {})
         self.restart: bool = cast(bool, False)
 
-        if Config.RESTART and self.state:
+        if self.state:
             self.restart = True
             self.state = pickle.loads(self.state)
             self.log.warning(f"Loading old state: {self.state}")
@@ -172,8 +172,7 @@ class Crawler:
             self.depth = cast(int, self.url.depth)
             self.state['Crawler'] = self.url.get_id()
 
-        if Config.RESTART:
-            self._update_cache()
+        self._update_cache()
 
         # Main loop
         while (self.url is not None) and (not self.stop):
@@ -205,25 +204,23 @@ class Crawler:
                 self.state['Crawler'] = self.url.get_id()
 
             # Save state if needed
-            if Config.RESTART:
-                if Config.RESTART_CONTEXT:
-                    try:
-                        self.state['Context'] = self.context.storage_state()
-                    except Exception as error:
-                        self.log.warning(f"Get main context fail: {error}")
+            if Config.SAVE_CONTEXT:
+                try:
+                    self.state['Context'] = self.context.storage_state()
+                except Exception as error:
+                    self.log.warning(f"Get main context fail: {error}")
 
-                self._update_cache()
+            self._update_cache()
 
             # Close everything (to avoid memory issues)
-            self._close_borwser()
+            self._close_browser()
 
             # Re-open stuff
             self._init_browser()
 
         # Close everything
-        self._close_borwser()
+        self._close_browser()
         self.playwright.stop()
 
         # Delete old cache
-        if Config.RESTART and self.state:
-            self._delete_cache()
+        self._delete_cache()

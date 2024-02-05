@@ -1,9 +1,8 @@
 import re
 import urllib.parse
 from logging import Logger
-from typing import Callable, List, Optional
+from typing import List, Optional
 
-import tld.utils
 from peewee import BooleanField, ForeignKeyField, IntegerField
 from playwright.sync_api import Error, Locator, Page, Response
 
@@ -25,6 +24,11 @@ class FindLoginForms(Module):
     """
         Module to automatically find login forms.
     """
+    KEYWORDS_1 = r'/(log.?in|sign.?in|logge|anmeldung|anmelde|melde[^\n]+an|auth' \
+                 r'user.?name|e.?mail|nutzer|passwor|account|konto|mitglied)/i'
+    KEYWORDS_2 = r'/(continue|next|weiter|proceed|fortfahren|submit|access|enter|eintragen|zugang)/i'
+
+    IGNORE = r'search|news.?letter|subscribe'
 
     def __init__(self, crawler) -> None:
         super().__init__(crawler)
@@ -112,42 +116,41 @@ class FindLoginForms(Module):
 
         # If there is more than one password field -> it's not a login form
         # If there are no text fields or more than two text fields -> it's not a login form
-        if password_fields > 1 or text_fields == 0 or text_fields > 2:
+        if (password_fields > 1) or (text_fields == 0) or (text_fields > 2):
             return False
 
         # Find if there are login buttons
         try:
-            check_str: str = r'/(log.?in|sign.?in|continue|next|weiter|melde|logge|proceed|' \
-                              r'fortfahren|anmeldung|einmeldung|submit)/i'
-            button1: Locator = form.locator(f"{utils.CLICKABLES} >> text={check_str} >> visible=true")
+            button1: Locator = form.locator(f"{utils.CLICKABLES} >> text={FindLoginForms.KEYWORDS_1} >> visible=true")
+            button1 = button1 if utils.get_locator_count(button1) > 0 else form.locator(f"{utils.CLICKABLES} >> text={FindLoginForms.KEYWORDS_2} >> visible=true")
         except Error:
             return False
 
         # Forms that are not registration or login forms
-        misc_form: bool = re.search(r'search|news.?letter|subscribe', utils.get_locator_outer_html(form) or '', flags=re.I) is not None
+        misc_form = re.search(FindLoginForms.IGNORE, utils.get_locator_outer_html(form) or '', flags=re.I)
 
         # Return true if there is at least one login button in the form and avoid false positives
-        return (utils.get_locator_count(button1) > 0) and (not misc_form)
+        return (utils.get_locator_count(button1) > 0) and (misc_form is None)
 
     @staticmethod
     def _find_login_form(page: Page) -> Optional[Locator]:
         # Find all forms on a page
         try:
             forms: Locator = page.locator('form:visible,fieldset:visible')
+
+            # Check if each form is a login form
+            for i in range(utils.get_locator_count(forms)):
+                form: Optional[Locator] = utils.get_locator_nth(forms, i)
+
+                if (form is not None) and (FindLoginForms.verify_login_form(form)):
+                    return form
         except Error:
             # Ignored
             return None
 
-        # Check if each form is a login form
-        for i in range(utils.get_locator_count(forms)):
-            form: Optional[Locator] = utils.get_locator_nth(forms, i)
-            if form is None or not FindLoginForms.verify_login_form(form):
-                continue
-            return form
-
         # If we did not find login forms, try to find password field
         try:
-            form = page.locator('input[type="password"]:visible').locator('..')
+            form = page.locator('input[type="password"]').locator('..')
         except Error:
             return None
 
@@ -176,7 +179,7 @@ class FindLoginForms(Module):
                     return None
         except Error:
             # Ignored
-            pass
+            return None
 
         return None
 
@@ -193,9 +196,7 @@ class FindLoginForms(Module):
 
         # Get all buttons with login keywords
         try:
-            check_str: str = r'/log.?in|sign.?in|melde|logge|user.?name|e.?mail|nutzer|next|' \
-                             r'continue|proceed|fortfahren|weiter|anmeldung|einmeldung/i'
-            buttons: Locator = page.locator(f"{utils.CLICKABLES} >> text={check_str} >> visible=true")
+            buttons: Locator = page.locator(f"{utils.CLICKABLES} >> text={FindLoginForms.KEYWORDS_1} >> visible=true")
         except Error:
             return None
 

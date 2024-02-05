@@ -9,10 +9,11 @@ from logging import FileHandler, Formatter, Logger
 from multiprocessing import Pipe, Process
 from typing import List, Optional, Type, cast
 
+from peewee import ProgrammingError
+
 from crawler import Crawler
 from database import URL, Site, Task, database
 from modules.Module import Module
-from peewee import ProgrammingError
 
 try:
     Config = importlib.import_module('config').Config
@@ -170,7 +171,7 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
         with database:
             is_cached: bool = not database.execute_sql("SELECT crawlerstate IS NULL FROM task WHERE id=%s", (task.get_id(),)).fetchone()[0]
 
-        while crawler.is_alive() or (Config.RESTART and is_cached):
+        while crawler.is_alive() or is_cached:
             if not crawler.is_alive():
                 log.error("Crawler %s crashed with %s", task.crawler, crawler.exception)
                 crawler.close()
