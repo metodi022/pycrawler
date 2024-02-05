@@ -115,6 +115,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: pathl
         database.create_tables([Site])
         database.create_tables([Task])
         database.create_tables([URL])
+        Task._schema.create_foreign_key(Task.landing)
 
     # Create modules database
     log.info('Load modules database')

@@ -17,6 +17,8 @@ def main(job: str, urls: List[str]) -> int:
     with database.atomic():
         database.create_tables([Site])
         database.create_tables([Task])
+        database.create_tables([URL])
+        Task._schema.create_foreign_key(Task.landing)
 
     # Iterate over URLs and add them to database
     with database.atomic():

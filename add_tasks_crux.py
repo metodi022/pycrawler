@@ -21,8 +21,10 @@ def main(job: str, file: Optional[pathlib.Path]) -> int:
 
     # Iterate over URLs and add them to database
     with database.atomic(), open(file, encoding="utf-8") as _file:
+        next(_file)
+
         for entry in _file:
-            rank, url = entry.split(',')
+            url, bucket = entry.split(',')
             url = ('https://' if not url.startswith('http') else '') + url
 
             try:
@@ -30,7 +32,7 @@ def main(job: str, file: Optional[pathlib.Path]) -> int:
 
                 _site: str = url_parsed.fld
                 site: Site = Site.get_or_create(site=_site)[0]
-                site.rank = int(rank)
+                site.bucket = int(bucket)
                 site.save()
 
                 task: Task = Task.create(job=job, site=site)
@@ -52,7 +54,7 @@ if __name__ == '__main__':
     # Preparing command line argument parser
     args_parser = argparse.ArgumentParser()
     args_parser.add_argument("-j", "--job", type=str, required=True, help="unique job id for crawl")
-    args_parser.add_argument("-f", "--file", type=str, required=True, help="path to tranco CSV file")
+    args_parser.add_argument("-f", "--file", type=str, required=True, help="path to crux CSV file")
 
     # Parse command line arguments
     args = vars(args_parser.parse_args())

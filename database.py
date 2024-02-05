@@ -1,8 +1,7 @@
-import re
 from datetime import datetime
 from typing import Optional
 
-from peewee import BlobField, DateTimeField, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, TextField
+from peewee import BlobField, DateTimeField, DeferredForeignKey, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, TextField
 
 import utils
 from config import Config
@@ -37,20 +36,20 @@ class Task(BaseModel):
     job = TextField()
     crawler = IntegerField(null=True)
     site = ForeignKeyField(Site)
-    landing = ForeignKeyField("URL", default=None, null=True)
+    landing = DeferredForeignKey("URL", default=None, null=True, backref='tasks')
     state = TextField(default="free")
     code = IntegerField(default=None, null=True)
     error = TextField(default=None, null=True)
     crawlerstate = BlobField(default=None, null=True)
 
 class URL(BaseModel):
-    task = ForeignKeyField(Task)
+    task = ForeignKeyField(Task, backref='urls')
     site = ForeignKeyField(Site)
     url = TextField()
     urlfinal = TextField(default=None, null=True)
     scheme = TextField()
     origin = TextField()
-    fromurl = ForeignKeyField("self", default=None, null=True, backref="children")
+    fromurl = ForeignKeyField("self", default=None, null=True, backref="from_url")
     depth = IntegerField()
     code = IntegerField(default=None, null=True)
     repetition = IntegerField()

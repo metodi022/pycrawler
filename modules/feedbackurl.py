@@ -9,12 +9,6 @@ from modules.Module import Module
 
 
 class FeedbackURL(Module):
-    @staticmethod
-    def register_job(log: Logger) -> None:
-        log.info('Create feedback stats table')
-        with database:
-            database.create_tables([URL])
-
     def receive_response(self, responses: List[Optional[Response]], final_url: str, repetition: int) -> None:
         super().receive_response(responses, final_url, repetition)
 
