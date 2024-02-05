@@ -48,7 +48,6 @@ class URL(BaseModel):
     url = TextField()
     urlfinal = TextField(default=None, null=True)
     scheme = TextField()
-    origin = TextField()
     fromurl = ForeignKeyField("self", default=None, null=True, backref="from_url")
     depth = IntegerField()
     code = IntegerField(default=None, null=True)
@@ -60,7 +59,7 @@ class URLDB:
     def __init__(self, crawler) -> None:
         from crawler import Crawler
         self.crawler: Crawler = crawler
-        self._seen: set[str] = self.crawler.state.get('URLDB', set(URL.select(URL.url).where(URL.task==crawler.task, URL.repetition==1)))
+        self._seen: set[str] = self.crawler.state.get('URLDB', set(URL.select(URL.url).where(URL.task==crawler.task, URL.repetition==1)))  # TODO check
         self.crawler.state['URLDB'] = self._seen
 
     def get_url(self, repetition: int) -> Optional[URL]:
@@ -120,6 +119,7 @@ class URLDB:
             "task": self.crawler.task,
             "site": site,
             "url": url,
+            "scheme": url[:url.find(':')],
             "fromurl": fromurl,
             "depth": depth
         }

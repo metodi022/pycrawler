@@ -12,6 +12,7 @@ from typing import List, Optional, Type, cast
 from crawler import Crawler
 from database import URL, Site, Task, database
 from modules.Module import Module
+from peewee import ProgrammingError
 
 try:
     Config = importlib.import_module('config').Config
@@ -106,7 +107,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: pathl
     log: Logger = _get_logger(log_path / f"job{job}.log", job)
 
     # Importing modules
-    log.info("Import modules %s", str(module_names))
+    log.info("Import additional modules %s", str(module_names))
     modules: List[Type[Module]] = _get_modules(module_names)
 
     # Creating database
@@ -115,7 +116,11 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: pathl
         database.create_tables([Site])
         database.create_tables([Task])
         database.create_tables([URL])
-        Task._schema.create_foreign_key(Task.landing)
+        
+        try:
+            Task._schema.create_foreign_key(Task.landing)
+        except ProgrammingError:
+            pass
 
     # Create modules database
     log.info('Load modules database')

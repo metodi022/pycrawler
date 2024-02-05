@@ -1,10 +1,10 @@
 import argparse
 import ast
-import pathlib
 import sys
-from typing import List, Optional, cast
+from typing import List, cast
 
 import tld
+from peewee import ProgrammingError
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
 import utils
@@ -18,7 +18,11 @@ def main(job: str, urls: List[str]) -> int:
         database.create_tables([Site])
         database.create_tables([Task])
         database.create_tables([URL])
-        Task._schema.create_foreign_key(Task.landing)
+
+        try:
+            Task._schema.create_foreign_key(Task.landing)
+        except ProgrammingError:
+            pass
 
     # Iterate over URLs and add them to database
     with database.atomic():

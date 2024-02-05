@@ -1,17 +1,15 @@
 import random
-import re
 from typing import Callable, List, Optional
 
 import tld
-from playwright.sync_api import Error, Locator, Page, Response
+from playwright.sync_api import Error, Locator, Response
 
 import utils
 from config import Config
-from database import URL
 from modules.Module import Module
 
 
-class CollectURLs(Module):
+class CollectUrls(Module):
     """
     Module to automatically collect links to crawl further.
     """
@@ -41,7 +39,7 @@ class CollectURLs(Module):
 
         if self._max_urls < 1:
             return
-        
+
         if parsed_url_final is None:
             return
 

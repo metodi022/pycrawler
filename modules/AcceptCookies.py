@@ -46,11 +46,16 @@ class AcceptCookies(Module):
 
         # Accept cookies for origin
         for frame in self.crawler.page.frames[1:]:
-            AcceptCookies.accept(frame, self.crawler.url)
-        AcceptCookies.accept(self.crawler.page, self.crawler.url, inframe=False, responses=responses)
+            self.accept(frame, self.crawler.url)
+        self.accept(self.crawler.page, self.crawler.url, inframe=False, responses=responses)
 
-    @staticmethod
-    def accept(page: Page | Frame, url: URL, inframe: bool = True, responses: Optional[List[Optional[Response]]] = None) -> Optional[Response]:
+        self.crawler.state['Context'] = self.crawler.context.storage_state()
+
+        # Update the screenshot of the landing page
+        if self.crawler.initial and (self.crawler.repetition == 1):
+            utils.get_screenshot(self.crawler.page, (Config.LOG / f"screenshots/{self.crawler.site.site}-{self.crawler.job_id}.png"), force=True)
+
+    def accept(self, page: Page | Frame, url: URL, inframe: bool = True, responses: Optional[List[Optional[Response]]] = None) -> Optional[Response]:
         """Automatically searches buttons with accept keywords and presses them.
 
         Args:
@@ -85,6 +90,8 @@ class AcceptCookies(Module):
 
             if re.search(AcceptCookies.CHECK_IGNORE, button_html, flags=re.I) is not None:
                 continue
+
+            self.crawler.log.info(f"Found a cookiebanner in {'frame' if inframe else 'main'} {page.url}")
 
             utils.invoke_click(page, button, timeout=2000)
 

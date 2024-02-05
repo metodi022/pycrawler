@@ -9,8 +9,9 @@ from playwright.sync_api import Browser, BrowserContext, Error, Page, Playwright
 import utils
 from config import Config
 from database import URL, URLDB, Site, Task, database
-from modules.Collecturls import CollectURLs
-from modules.Feedbackurl import FeedbackURL
+from modules.AcceptCookies import AcceptCookies
+from modules.CollectUrls import CollectUrls
+from modules.FeedbackUrl import FeedbackUrl
 from modules.Module import Module
 
 
@@ -49,7 +50,7 @@ class Crawler:
         )
 
         self.page = self.context.new_page()
-    
+
     def _close_borwser(self) -> None:
         self.log.info("Closing browser")
 
@@ -119,7 +120,7 @@ class Crawler:
             self.log.warning(f"Loading old state: {self.state}")
 
         # Load state-dependent variables
-        self.url: URL = self.state.get('Crawler', cast(URL, self.task.landing))
+        self.url: URL = URL.get_by_id(self.state.get('Crawler', cast(URL, self.task.landing)))
         self.initial: bool = (self.url.get_id() == self.task.landing.get_id()) and (not self.restart)
         self.depth: int = self.url.depth
 
@@ -138,10 +139,11 @@ class Crawler:
             URL.update(code=Config.ERROR_CODES['browser_error'], state='complete').where(URL.task==self.task, URL.url==self.url.url, URL.depth==self.depth).execute()
 
         # Initialize modules
-        self.modules: List[Module] = [CollectURLs(self)] if Config.RECURSIVE else []
+        self.modules: List[Module] = [AcceptCookies(self)] if Config.ACCEPT_COOKIES else []
+        self.modules += [CollectUrls(self)] if Config.RECURSIVE else []
         for module in modules:
             self.modules.append(module(self))
-        self.modules += [FeedbackURL(self)]
+        self.modules += [FeedbackUrl(self)]
         self.log.debug(f"Prepared modules: {self.modules}")
 
         # Initialize URL filters
@@ -162,7 +164,7 @@ class Crawler:
 
         # Get URL
         self.url: URL = self.urldb.get_url(1) if self.restart else self.url
-        self.log.info(f"Get URL {self.url if self.url is not None else self.url} depth {self.url.depth if self.url is not None else self.depth}")
+        self.log.info(f"Get URL {self.url.url if self.url is not None else self.url} depth {self.url.depth if self.url is not None else self.depth}")
 
         # Update state
         if self.url is not None:

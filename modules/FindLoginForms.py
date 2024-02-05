@@ -42,12 +42,12 @@ class FindLoginForms(Module):
         super().add_handlers()
 
         # Add common URLs with logins
-        self.crawler.urldb.add_url(self.crawler.landing.origin + '/login/', Config.DEPTH, None)
-        self.crawler.urldb.add_url(self.crawler.landing.origin + '/signin/', Config.DEPTH, None)
-        self.crawler.urldb.add_url(self.crawler.landing.origin + '/account/', Config.DEPTH, None)
-        self.crawler.urldb.add_url(self.crawler.landing.origin + '/profile/', Config.DEPTH, None)
-        self.crawler.urldb.add_url(self.crawler.landing.origin + '/auth/', Config.DEPTH, None)
-        self.crawler.urldb.add_url(self.crawler.landing.origin + '/authenticate/', Config.DEPTH, None)
+        self.crawler.urldb.add_url(self.crawler.landing.url + '/login/', Config.DEPTH, None)
+        self.crawler.urldb.add_url(self.crawler.landing.url + '/signin/', Config.DEPTH, None)
+        self.crawler.urldb.add_url(self.crawler.landing.url + '/account/', Config.DEPTH, None)
+        self.crawler.urldb.add_url(self.crawler.landing.url + '/profile/', Config.DEPTH, None)
+        self.crawler.urldb.add_url(self.crawler.landing.url + '/auth/', Config.DEPTH, None)
+        self.crawler.urldb.add_url(self.crawler.landing.url + '/authenticate/', Config.DEPTH, None)
 
         if Config.SAME_ETLDP1:
             self.crawler.urldb.add_url(self.crawler.landing.scheme + '://' + self.crawler.site.site + '/login/', Config.DEPTH, None)
@@ -83,19 +83,6 @@ class FindLoginForms(Module):
             Config.DEPTH - 1,
             None
         )
-
-    def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
-        def filt(url: tld.utils.Result) -> bool:
-            url_full: str = utils.get_url_str(url)
-
-            # Ignore URLs which possibly do not lead to HTML pages, because login forms should only be found on HTML pages
-            return re.search(
-                r'(\.js|\.mp3|\.wav|\.aif|\.aiff|\.wma|\.csv|\.pdf|\.jpg|\.png|\.gif|\.tif|\.svg'
-                r'|\.bmp|\.psd|\.tiff|\.ai|\.lsm|\.3gp|\.avi|\.flv|\.gvi|\.m2v|\.m4v|\.mkv|\.mov'
-                r'|\.mp4|\.mpg|\.ogv|\.wmv|\.xml|\.otf|\.ttf|\.css|\.rss|\.ico|\.cfg|\.ogg|\.mpa'
-                r'|\.jpeg|\.webm|\.mpeg|\.webp)$', url_full, flags=re.I) is not None
-
-        filters.append(filt)
 
     @staticmethod
     def verify_login_form(form: Locator) -> bool:

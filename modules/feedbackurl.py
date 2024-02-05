@@ -8,7 +8,7 @@ from database import URL, database
 from modules.Module import Module
 
 
-class FeedbackURL(Module):
+class FeedbackUrl(Module):
     def receive_response(self, responses: List[Optional[Response]], final_url: str, repetition: int) -> None:
         super().receive_response(responses, final_url, repetition)
 
