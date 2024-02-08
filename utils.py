@@ -3,11 +3,12 @@ import re
 from typing import List, Optional
 
 import tld
-from config import Config
 from playwright.sync_api import BrowserContext, Error, Frame, Locator, Page, Response
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
-CLICKABLES: str = r'button,*[role="button"],*[onclick],input[type="button"],input[type="submit"],' \
+from config import Config
+
+CLICKABLES: str = r'button,*[role="button"],*[onclick],*[type="button"],*[type="submit"],*[type="reset"],' \
                   r'a[href="#"]'
 
 

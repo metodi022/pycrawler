@@ -112,17 +112,14 @@ class Crawler:
 
         # Load previous state
         self.state: Dict[str, Any] = cast(Dict[str, Any], self.task.crawlerstate or {})
-        self.restart: bool = cast(bool, False)
 
         if self.state:
-            self.restart = True
             self.state = pickle.loads(self.state)
             self.log.warning("Loading old state")
             self.log.debug(self.state)
 
         # Load state-dependent variables
         self.url: URL = URL.get_by_id(self.state.get('Crawler', cast(URL, self.task.landing)))
-        self.initial: bool = (self.url.get_id() == self.task.landing.get_id()) and (not self.restart)
         self.depth: int = self.url.depth
 
         # Prepare browser variables
@@ -132,8 +129,10 @@ class Crawler:
         self.page: Page = None
         self.urldb: URLDB = URLDB(self)
 
+        self.initial: bool = bool(self.urldb._seen)
+
         # Add URL to database
-        if self.restart or self.urldb.get_seen(self.url.url):
+        if self.initial:
             # Crawler previously crashed on current URL
             # Therefore, invalidate the current URL
             self.log.warning(f"Invalidating latest URL: {self.url.url}")
@@ -164,7 +163,7 @@ class Crawler:
         self.log.info(f"Start {Config.BROWSER} {self.browser.version}")
 
         # Get URL
-        self.url: URL = self.urldb.get_url(1) if self.restart else self.url
+        self.url: URL = self.urldb.get_url(1) if self.initial else self.url
         self.log.info(f"Get URL {self.url.url if self.url is not None else self.url} depth {self.url.depth if self.url is not None else self.depth}")
 
         # Update state
@@ -195,7 +194,7 @@ class Crawler:
 
             # Get next URL to crawl
             self.url = self.urldb.get_url(1)
-            self.initial = cast(bool, False)
+            self.initial = False
             self.log.info(f"Get URL {self.url.url if self.url is not None else self.url} depth {self.url.depth if self.url is not None else self.depth}")
 
             # Update state

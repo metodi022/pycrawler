@@ -24,7 +24,7 @@ class FindLoginForms(Module):
     """
         Module to automatically find login forms.
     """
-    KEYWORDS_1 = r'/(log.?in|sign.?in|logge|anmeldung|anmelde|melde[^\n]+an|auth' \
+    KEYWORDS_1 = r'/(log.?in|sign.?in|logge|anmeldung|anmelde|auth|' \
                  r'user.?name|e.?mail|nutzer|passwor|account|konto|mitglied)/i'
     KEYWORDS_2 = r'/(continue|next|weiter|proceed|fortfahren|submit|access|enter|eintragen|zugang)/i'
 
@@ -36,14 +36,15 @@ class FindLoginForms(Module):
         self._found: int = self.crawler.state.get('FindLoginForms', 0)
         self.crawler.state['FindLoginForms'] = self._found
 
-    @staticmethod
-    def register_job(log: Logger) -> None:
-        log.info('Create login form table')
-        with database:
-            database.create_tables([LoginForm])
+        if not self.crawler.initial:
+            return
 
-    def add_handlers(self) -> None:
-        super().add_handlers()
+        # Search engine with login keyword
+        self.crawler.urldb.add_url(
+            f'https://www.google.com/search?q="login"+site%3A{urllib.parse.quote(self.crawler.site.site)}',
+            Config.DEPTH - 1,
+            None
+        )
 
         # Add common URLs with logins
         self.crawler.urldb.add_url(self.crawler.landing.url + '/login/', Config.DEPTH, None)
@@ -61,32 +62,28 @@ class FindLoginForms(Module):
             self.crawler.urldb.add_url(self.crawler.landing.scheme + '://' + self.crawler.site.site + '/auth/', Config.DEPTH, None)
             self.crawler.urldb.add_url(self.crawler.landing.scheme + '://' + self.crawler.site.site + '/authenticate/', Config.DEPTH, None)
 
+    @staticmethod
+    def register_job(log: Logger) -> None:
+        log.info('Create login form table')
+
+        with database:
+            database.create_tables([LoginForm])
+
     def receive_response(self, responses: List[Optional[Response]], final_url: str, repetition: int) -> None:
         super().receive_response(responses, final_url, repetition)
 
         # Find login forms
         form: Optional[Locator] = FindLoginForms.find_login_form(self.crawler.page, interact=(self._found < 3))
+
         if form is not None:
             self.crawler.log.info("Found a login form")
+
             self._found += 1
             self.crawler.state['FindLoginForms'] = self._found
+
             LoginForm.create(task=self.crawler.task, site=self.crawler.task.site, url=self.crawler.url, depth=self.crawler.depth)
+
             utils.get_screenshot(self.crawler.page, (Config.LOG / f"screenshots/{self.crawler.site.site}-{self.crawler.job_id}-Login{self._found}.png"))
-
-        # If we already found login forms, don't use search engine
-        if self._found > 0:
-            return
-
-        # If we are not at the end of the crawl, stop
-        if (self.crawler.repetition != Config.REPETITIONS) or (len(self.crawler.urldb.get_state('free')) > 0):
-            return
-
-        # Finally, use search engine with login keyword
-        self.crawler.urldb.add_url(
-            f'https://www.google.com/search?q="login"++site%3A{urllib.parse.quote(self.crawler.site.site)}',
-            Config.DEPTH - 1,
-            None
-        )
 
     @staticmethod
     def verify_login_form(form: Locator) -> bool:
@@ -197,6 +194,7 @@ class FindLoginForms(Module):
         # Get all buttons with login keywords
         try:
             buttons: Locator = page.locator(f"{utils.CLICKABLES} >> text={FindLoginForms.KEYWORDS_1} >> visible=true")
+            buttons = buttons if utils.get_locator_count(buttons) > 0 else page.locator(f"{utils.CLICKABLES} >> text={FindLoginForms.KEYWORDS_2} >> visible=true")
         except Error:
             return None
 
