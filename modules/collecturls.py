@@ -97,8 +97,14 @@ class CollectUrls(Module):
 
         # Shuffle the URLs
         if Config.FOCUS_FILTER:
-            urls = urls[:int(len(urls) * 0.15)] + urls[int(len(urls) * 0.85):] + urls[int(len(urls) * 0.15):int(len(urls) * 0.85)]
+            # Prioritize URLs at the begining and end of the HTML document
+            urls_1 = urls[:int(len(urls) * 0.15)] + urls[int(len(urls) * 0.85):]
+            urls_2 = urls[int(len(urls) * 0.15):int(len(urls) * 0.85)]
+            random.shuffle(urls_1)
+            random.shuffle(urls_2)
+            urls = urls_1 + urls_2
         else:
+            # Random shuffle
             random.shuffle(urls)
 
         # For each found URL, add it to the database, while making sure not to exceed the max URL limit
