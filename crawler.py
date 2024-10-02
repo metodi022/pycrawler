@@ -11,8 +11,8 @@ from config import Config
 from database import URL, URLDB, Site, Task, database
 from modules.AcceptCookies import AcceptCookies
 from modules.CollectUrls import CollectUrls
-from modules.FeedbackUrl import FeedbackUrl
 from modules.Module import Module
+from modules.SaveUrl import SaveUrl
 
 
 class Crawler:
@@ -42,17 +42,34 @@ class Crawler:
         else:
             self.browser = self.playwright.chromium.launch(headless=Config.HEADLESS)
 
-        self.context = self.browser.new_context(
-            storage_state=self.state.get('Context', None),
-            **self.playwright.devices[Config.DEVICE],
-            locale=Config.LOCALE,
-            timezone_id=Config.TIMEZONE
-        )
+        if Config.HAR:
+            self.context = self.browser.new_context(
+                storage_state=self.state.get('Context', None),
+                **self.playwright.devices[Config.DEVICE],
+                locale=Config.LOCALE,
+                timezone_id=Config.TIMEZONE,
+                record_har_content='embed',
+                record_har_mode='full',
+                record_har_path=str(Config.HAR) + f'/{self.job_id}-{self.crawler_id}.har'
+            )
+        else:
+            self.context = self.browser.new_context(
+                storage_state=self.state.get('Context', None),
+                **self.playwright.devices[Config.DEVICE],
+                locale=Config.LOCALE,
+                timezone_id=Config.TIMEZONE
+            )
 
         self.page = self.context.new_page()
 
     def _close_browser(self) -> None:
         self.log.info("Closing browser")
+
+        if len(self.urldb.get_state('free')) == 0:
+            utils.get_screenshot(
+                self.page,
+                (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.job_id}-2-{self.site.site.replace(':','').replace('/','')}.png")
+            )
 
         self.page.close()
         self.context.close()
@@ -82,17 +99,24 @@ class Crawler:
             self.page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error as error:
             error_message = ((error.name + ' ') if error.name else '') + error.message
-            self.log.warning(error)
+            self.log.error("Error navigating to %s", self.url.url, exc_info=True)
 
         # On first visit, also update the task
-        if self.initial and (self.repetition == 1):
+        if self.state['Initial'] and (self.repetition == 1):
             with database.atomic():
                 self.task.updated = datetime.today()
                 self.task.code = response.status if response is not None else Config.ERROR_CODES['response_error']
                 self.task.error = error_message
-                database.execute_sql("UPDATE task SET updated=%s, code=%s, error=%s WHERE id=%s", (self.task.updated, self.task.code, self.task.error, self.task.get_id()))
 
-            utils.get_screenshot(self.page, (Config.LOG / f"screenshots/{self.site.site}-{self.job_id}.png"))
+                database.execute_sql(
+                    "UPDATE task SET updated=%s, code=%s, error=%s WHERE id=%s",
+                    (self.task.updated, self.task.code, self.task.error, self.task.get_id())
+                )
+
+            utils.get_screenshot(
+                self.page,
+                (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.job_id}-1-{self.site.site.replace(':','').replace('/','')}.png")
+            )
 
         self.log.info(f"Response status {response if response is None else response.status} repetition {self.repetition}")
         return response
@@ -118,6 +142,8 @@ class Crawler:
             self.log.warning("Loading old state")
             self.log.debug(self.state)
 
+        self.state['Initial'] = self.state.get('Initial', True)
+
         # Load state-dependent variables
         self.url: URL = URL.get_by_id(self.state.get('Crawler', cast(URL, self.task.landing)))
         self.depth: int = self.url.depth
@@ -129,13 +155,11 @@ class Crawler:
         self.page: Page = None
         self.urldb: URLDB = URLDB(self)
 
-        self.initial: bool = bool(self.urldb._seen)
-
         # Add URL to database
-        if self.initial:
+        if not self.state['Initial']:
             # Crawler previously crashed on current URL
             # Therefore, invalidate the current URL
-            self.log.warning(f"Invalidating latest URL: {self.url.url}")
+            self.log.warning("Invalidating latest URL %s", self.url.url)
             URL.update(code=Config.ERROR_CODES['browser_error'], state='complete').where(URL.task==self.task, URL.url==self.url.url, URL.depth==self.depth).execute()
 
         # Initialize modules
@@ -143,7 +167,7 @@ class Crawler:
         self.modules += [CollectUrls(self)] if Config.RECURSIVE else []
         for module in modules:
             self.modules.append(module(self))
-        self.modules += [FeedbackUrl(self)]
+        self.modules += [SaveUrl(self)]
         self.log.debug(f"Prepared modules: {self.modules}")
 
         # Initialize URL filters
@@ -157,13 +181,19 @@ class Crawler:
             return
 
         # Initiate playwright, browser, context, and page
-        self.playwright = sync_playwright().start()
-        self._init_browser()
+        try:
+            self.playwright = sync_playwright().start()
+            self._init_browser()
+        except Exception as error:
+            self.log.error(error)
+            self.stop = True
+            self._delete_cache()
+            return
 
         self.log.info(f"Start {Config.BROWSER} {self.browser.version}")
 
         # Get URL
-        self.url: URL = self.urldb.get_url(1) if self.initial else self.url
+        self.url: URL = self.urldb.get_url(1) if (not self.state['Initial']) else self.url
         self.log.info(f"Get URL {self.url.url if self.url is not None else self.url} depth {self.url.depth if self.url is not None else self.depth}")
 
         # Update state
@@ -172,6 +202,7 @@ class Crawler:
             self.depth = cast(int, self.url.depth)
             self.state['Crawler'] = self.url.get_id()
 
+        self.state['Initial'] = False
         self._update_cache()
 
         # Main loop
@@ -194,7 +225,6 @@ class Crawler:
 
             # Get next URL to crawl
             self.url = self.urldb.get_url(1)
-            self.initial = False
             self.log.info(f"Get URL {self.url.url if self.url is not None else self.url} depth {self.url.depth if self.url is not None else self.depth}")
 
             # Update state
@@ -207,16 +237,20 @@ class Crawler:
             if Config.SAVE_CONTEXT:
                 try:
                     self.state['Context'] = self.context.storage_state()
-                except Exception as error:
-                    self.log.warning(f"Get main context fail: {error}")
+                except Exception:
+                    self.log.error("Get main context fail", exc_info=True)
 
-            self._update_cache()
+                self._update_cache()
 
             # Close everything (to avoid memory issues)
             self._close_browser()
 
             # Re-open stuff
-            self._init_browser()
+            try:
+                self._init_browser()
+            except Exception as error:
+                self.log.error(error)
+                self.stop = True
 
         # Close everything
         self._close_browser()

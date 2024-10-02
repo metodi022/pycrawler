@@ -28,31 +28,29 @@ class BaseModel(Model):
 
 class Site(BaseModel):
     site = TextField(primary_key=True, unique=True, index=True)
-    bucket = IntegerField(default=None, null=True)
-    rank = IntegerField(default=None, null=True)
-    category = TextField(default=None, null=True)
+    rank = IntegerField(default=None, null=True, index=True)
+    categories = TextField(default=None, null=True)
 
 class Task(BaseModel):
-    job = TextField()
-    crawler = IntegerField(null=True)
-    site = ForeignKeyField(Site)
-    landing = DeferredForeignKey("URL", default=None, null=True, backref='tasks')
-    state = TextField(default="free")
-    code = IntegerField(default=None, null=True)
+    job = TextField(index=True)
+    crawler = IntegerField(default=None, null=True, index=True)
+    site = ForeignKeyField(Site, index=True)
+    landing = DeferredForeignKey("URL", default=None, null=True, backref='tasks', index=True)
+    state = TextField(default="free", index=True)
+    code = IntegerField(default=None, null=True, index=True)
     error = TextField(default=None, null=True)
     crawlerstate = BlobField(default=None, null=True)
 
 class URL(BaseModel):
-    task = ForeignKeyField(Task, backref='urls')
-    site = ForeignKeyField(Site)
-    url = TextField()
+    task = ForeignKeyField(Task, backref='urls', index=True)
+    site = ForeignKeyField(Site, index=True)
+    url = TextField(index=True)
     urlfinal = TextField(default=None, null=True)
-    scheme = TextField()
-    fromurl = ForeignKeyField("self", default=None, null=True, backref="from_url")
-    depth = IntegerField()
-    code = IntegerField(default=None, null=True)
-    repetition = IntegerField()
-    state = TextField(default="free")
+    fromurl = ForeignKeyField("self", default=None, null=True, backref="from_url", index=True)
+    depth = IntegerField(index=True)
+    code = IntegerField(default=None, null=True, index=True)
+    repetition = IntegerField(index=True)
+    state = TextField(default="free", index=True)
 
 
 class URLDB:
@@ -77,10 +75,10 @@ class URLDB:
             if Config.BREADTHFIRST:
                 query.append(URL.depth == self.crawler.depth)
 
-            url = URL.select().where(*query).order_by(URL.created.asc()).first()
+            url = URL.get_or_none(*query)
 
-            query = query[:-1]
-            url = URL.select().where(*query).order_by(URL.depth.asc()).first() if not url else url
+            if (not url) and Config.BREADTHFIRST:
+                url = URL.get_or_none(*(query[:-1]))
         else:
             query.append(URL.state == "waiting")
             query.append(URL.url == self.crawler.url.url)
@@ -97,30 +95,32 @@ class URLDB:
         url = url.rstrip('/')
         return (url in self._seen) or ((url + '/') in self._seen)
 
-    def add_seen(self, url: str):
-        url = url.rstrip('/')
-        self._seen.add(url)
-        self._seen.add(url + '/')
+    def add_seen(self, url: str, query_fragment: bool):
+        if query_fragment:
+            self._seen.add(url)
+        else:
+            url = url.rstrip('/')
+            self._seen.add(url)
+            self._seen.add(url + '/')
 
-    def add_url(self, url: str, depth: int, fromurl: Optional[URL], force: bool = False) -> None:
+    def add_url(self, url: str, depth: int, query_fragment: bool, fromurl: Optional[URL], force: bool = False) -> None:
         if (not force) and self.get_seen(url):
             return
 
-        self.add_seen(url)
+        self.add_seen(url, query_fragment)
 
-        url = (url.rstrip('/') + '/') if url[-1] == '/' else url
-
-        site = utils.get_tld_object(url)
-        if site is None:
+        url_parsed = utils.get_tld_object(url)
+        if url_parsed is None:
             return
 
-        site = Site.get_or_create(site=site.fld)[0]
+        site = Site.get_or_create(
+            site=utils.get_url_scheme_site(url_parsed)
+        )[0]
 
         url_data = {
             "task": self.crawler.task,
             "site": site,
             "url": url,
-            "scheme": url[:url.find(':')],
             "fromurl": fromurl,
             "depth": depth
         }

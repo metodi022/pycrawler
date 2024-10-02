@@ -1,14 +1,12 @@
-from logging import Logger
 from typing import List, Optional
 
 from playwright.sync_api import Response
 
 from config import Config
-from database import URL, database
 from modules.Module import Module
 
 
-class FeedbackUrl(Module):
+class SaveUrl(Module):
     def receive_response(self, responses: List[Optional[Response]], final_url: str, repetition: int) -> None:
         super().receive_response(responses, final_url, repetition)
 

@@ -1,35 +1,29 @@
 import argparse
 import importlib
+import logging
 import pathlib
 import sys
 import time
 import traceback
 from datetime import datetime
-from logging import FileHandler, Formatter, Logger
 from multiprocessing import Pipe, Process
 from typing import List, Optional, Type, cast
 
+#import ecs_logging  # TODO elastic search logs
 from peewee import ProgrammingError
 
 from crawler import Crawler
 from database import URL, Site, Task, database
 from modules.Module import Module
 
-try:
-    Config = importlib.import_module('config').Config
-except ModuleNotFoundError as e:
-    traceback.print_exc()
-    print(e)
-    print("Prepare the config.py file. You can use the config-example.py as a start.")
-    sys.exit(1)
+Config = importlib.import_module('config').Config
 
 
 class CustomProcess(Process):
-    def __init__(self, *aargs, **kwargs):
-        Process.__init__(self, *aargs, **kwargs)
+    def __init__(self, *args, **kwargs):
+        Process.__init__(self, *args, **kwargs)
 
         self._pconn, self._cconn = Pipe()
-
         self._exception = None
 
     def run(self):
@@ -37,14 +31,14 @@ class CustomProcess(Process):
             Process.run(self)
             self._cconn.send(None)
         except Exception as error:
-            trace = traceback.format_exc()
-            self._cconn.send((error, trace))
+            tb = traceback.format_exc()
+            self._cconn.send((type(error), error, tb))
         finally:
             self._cconn.close()
 
     @property
     def exception(self):
-        if (not self._exception) and self._pconn.poll():
+        if (self._exception is None) and self._pconn.poll():
             self._exception = self._pconn.recv()
             self._pconn.close()
 
@@ -58,12 +52,14 @@ def _validate_arguments(crawlers_count: int, starting_crawler_id: int, log_path:
     if log_path.exists() and not log_path.is_dir():
         raise ValueError('Path to directory for log output is incorrect')
 
-def _get_logger(log_path: pathlib.Path, name: str) -> Logger:
-    handler: FileHandler = FileHandler(log_path)
-    handler.setFormatter(Formatter('%(asctime)s %(levelname)s %(message)s'))
-    log = Logger(name)
+def _get_logger(log_path: pathlib.Path, name: str) -> logging.Logger:
+    handler: logging.FileHandler = logging.FileHandler(log_path)
+    handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+
+    log = logging.Logger(name)
     log.setLevel(Config.LOG_LEVEL)
     log.addHandler(handler)
+
     return log
 
 def _get_modules(module_names: List[str]) -> List[Type[Module]]:
@@ -95,7 +91,7 @@ def _get_task(job: str, crawler_id: int, log) -> Optional[Task]:
     return task
 
 def _start_crawler(job: str, crawler_id: int, task: int, log_path: pathlib.Path, modules: List[Type[Module]]) -> None:
-    log = _get_logger(log_path / f"job{job}crawler{crawler_id}.log", job + str(crawler_id))
+    log = _get_logger(log_path / f"job{job}crawler{crawler_id}.log", job + str(crawler_id) + __name__)
     log.info('Start crawler')
     crawler: Crawler = Crawler(job, crawler_id, task, log, modules)
     crawler.start_crawl()
@@ -108,7 +104,10 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: pathl
     log_path.mkdir(parents=True, exist_ok=True)
     (log_path / 'screenshots').mkdir(parents=True, exist_ok=True)
 
-    log: Logger = _get_logger(log_path / f"job{job}.log", job)
+    if Config.HAR:
+        Config.HAR.mkdir(parents=True, exist_ok=True)
+
+    log: logging.Logger = _get_logger(log_path / f"job{job}.log", job + __name__)
 
     # Importing modules
     log.debug("Import additional modules %s", str(module_names))
@@ -156,15 +155,18 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: pathl
     return 0
 
 def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: List[Type[Module]], listen: bool) -> None:
-    log = _get_logger(log_path / f"job{job}crawler{crawler_id}.log", job + str(crawler_id))
+    log = _get_logger(log_path / f"job{job}crawler{crawler_id}.log", job + str(crawler_id) + __name__)
 
     task: Optional[Task] = _get_task(job, crawler_id, log)
 
+    # Main loop
     while task or listen:
         if not task:
             time.sleep(60)
             task = _get_task(job, crawler_id, log)
             continue
+
+        start_time: datetime = datetime.now()
 
         with database:
             is_cached: bool = not database.execute_sql("SELECT crawlerstate IS NULL FROM task WHERE id=%s", (task.get_id(),)).fetchone()[0]
@@ -175,7 +177,7 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
 
         while crawler.is_alive() or is_cached:
             if not crawler.is_alive():
-                log.error("Crawler %s crashed with %s", task.crawler, crawler.exception)
+                log.error("Crawler %s crashed %s", task.crawler, crawler.exception)
                 crawler.close()
                 crawler = CustomProcess(target=_start_crawler, args=(job, crawler_id, task.get_id(), log_path, modules))
                 crawler.start()
@@ -209,8 +211,9 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
             database.execute_sql("UPDATE task SET updated=%s, state='complete', crawlerstate=NULL WHERE id=%s", (task.updated, task.get_id()))
 
         if crawler.exception:
-            # TODO save error in db?
-            log.error("Crawler %s crashed with %s", task.crawler, crawler.exception)
+            log.error("Crawler %s crashed %s", task.crawler, crawler.exception)
+
+        log.info("Crawler %s finished after %s", task.crawler, (datetime.now() - start_time), extra=())  # TODO
 
         task = _get_task(job, crawler_id, log)
 
@@ -220,8 +223,6 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
 if __name__ == '__main__':
     # Preparing command line argument parser
     args_parser = argparse.ArgumentParser()
-    args_parser.add_argument("-o", "--log", type=pathlib.Path,
-                             help="path to directory where output log will be saved")
     args_parser.add_argument("-m", "--modules", type=str, nargs='*',
                              help="which modules the crawler will run")
     args_parser.add_argument("-j", "--job", type=str, required=True,
@@ -251,7 +252,7 @@ if __name__ == '__main__':
         cast(str, args['job']),
         cast(int, args['crawlers']),
         modules,
-        args['log'] or Config.LOG,
+        Config.LOG,
         cast(int, args['crawlerid']),
         cast(bool, args['listen'])
     ))

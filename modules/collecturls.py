@@ -29,10 +29,6 @@ class CollectUrls(Module):
         if self.crawler.repetition > 1:
             return
 
-        # Make sure to add page as seen
-        parsed_url_final: Optional[tld.utils.Result] = utils.get_tld_object(self.crawler.page.url)
-        self.crawler.urldb.add_seen(final_url)
-
         # Checks
         if self.crawler.depth >= Config.DEPTH:
             return
@@ -40,12 +36,18 @@ class CollectUrls(Module):
         if self._max_urls < 1:
             return
 
+        # Make sure to add page as seen
+        parsed_url_final: Optional[tld.utils.Result] = utils.get_tld_object(final_url)
         if parsed_url_final is None:
             return
+        self.crawler.urldb.add_seen(
+            utils.get_url_str_with_query_fragment(parsed_url_final),
+            bool(parsed_url_final.parsed_url.query) or bool(parsed_url_final.parsed_url.fragment)
+        )
 
         # TODO add other checks
 
-        # TODO improve link gather
+        # TODO improve link collection?
         try:
             links: Locator = self.crawler.page.locator('a[href]')
         except Error:
@@ -67,29 +69,26 @@ class CollectUrls(Module):
                 continue
 
             # Check for same origin
-            if Config.SAME_ORIGIN and (self.crawler.origin != utils.get_url_origin(parsed_link)):
+            if Config.SAME_ORIGIN and (utils.get_url_origin(utils.get_tld_object(self.crawler.landing.url)) != utils.get_url_origin(parsed_link)):
                 continue
 
             # Check for same ETLD+1
-            if Config.SAME_ETLDP1 and (self.crawler.site.site != parsed_link.fld):
+            if Config.SAME_ETLDP1_SCHEME and (self.crawler.site.site != utils.get_url_scheme_site(parsed_link)):
                 continue
 
             # TODO: Check for same entity
 
-            # Check seen
-            parsed_link_full: str = utils.get_url_str(parsed_link)
-            if self.crawler.urldb.get_seen(parsed_link_full):
-                continue
-            self.crawler.urldb.add_seen(parsed_link_full)
-
             # Filter out unwanted entries
-            filter_out: bool = False
-            for filt in self._url_filter_out:
-                if filt(parsed_link):
-                    filter_out = True
-                    break
-            if filter_out:
+            if any(filt(parsed_link) for filt in self._url_filter_out):
                 continue
+
+            # Check seen
+            if self.crawler.urldb.get_seen(utils.get_url_str_with_query_fragment(parsed_link)):
+                continue
+            self.crawler.urldb.add_seen(
+                utils.get_url_str_with_query_fragment(parsed_link),
+                bool(parsed_link.parsed_url.query) or bool(parsed_link.parsed_url.fragment)
+            )
 
             # Add link
             urls.append(parsed_link)
@@ -103,13 +102,17 @@ class CollectUrls(Module):
             random.shuffle(urls)
 
         # For each found URL, add it to the database, while making sure not to exceed the max URL limit
-        for parsed_link in urls:
-            self.crawler.urldb.add_url(utils.get_url_str_with_query_fragment(parsed_link), self.crawler.depth + 1, self.crawler.url, force = True)
+        for parsed_link in urls[:self._max_urls]:
+            self.crawler.urldb.add_url(
+                utils.get_url_str_with_query_fragment(parsed_link),
+                self.crawler.depth + 1,
+                bool(parsed_link.parsed_url.query) or bool(parsed_link.parsed_url.fragment),
+                self.crawler.url,
+                force = True
+            )
 
-            self._max_urls -= 1
-            if self._max_urls < 1:
-                break
-
+        self._max_urls -= len(urls)
+        self._max_urls = max(0, self._max_urls)
         self.crawler.state['CollectUrls'] = self._max_urls
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:

@@ -24,8 +24,14 @@ def get_tld_object(url: str) -> Optional[tld.utils.Result]:
     except (TldBadUrl, TldDomainNotFound):
         return None
 
+def get_url_scheme(url: tld.utils.Result) -> str:
+    return url.parsed_url.scheme
+
 def get_url_origin(url: tld.utils.Result) -> str:
     return url.parsed_url.scheme + '://' + url.parsed_url.netloc
+
+def get_url_site(url: tld.utils.Result) -> str:
+    return url.fld
 
 def get_url_scheme_site(url: tld.utils.Result) -> str:
     return url.parsed_url.scheme + '://' + url.fld
@@ -40,18 +46,20 @@ def get_url_str_with_query_fragment(url: tld.utils.Result) -> str:
     return get_url_str_with_query(url) + ('#' if url.parsed_url.fragment else '') + url.parsed_url.fragment
 
 def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils.Result]:
-    if re.match('^' + origin.parsed_url.scheme, href) is not None:
+    if not href:
+        return None
+
+    if '://' in href:
         return get_tld_object(href)
 
-    if re.match('^//', href) is not None:
+    if href.startswith('//'):
         return get_tld_object(origin.parsed_url.scheme + ":" + href)
 
     if href[0] == '/':
-        path: str = origin.parsed_url.path[:-1] if (origin.parsed_url.path and origin.parsed_url.path[-1] == '/') else origin.parsed_url.path
-    else:
-        path: str = origin.parsed_url.path if (origin.parsed_url.path and origin.parsed_url.path[-1] == '/') else origin.parsed_url.path + '/'
+        return get_tld_object(origin.parsed_url.scheme + "://" + origin.parsed_url.netloc + href)
 
-    return get_tld_object(origin.parsed_url.scheme + "://" + origin.parsed_url.netloc + path + href)
+    url = get_url_str(origin)
+    return get_tld_object((url + href) if (url[-1] == '/') else (url + '/' + href))
 
 
 def get_screenshot(page: Page, path: pathlib.Path, force: bool = False, full_page: bool = False) -> bool:
@@ -151,7 +159,7 @@ def get_visible_advanced(locator: Locator) -> bool:
                                     }
                                     """)
 
-    return locator.is_visible() and (float(opacity) >= 0.005)
+    return locator.is_visible() and (float(opacity) >= 0)
 
 
 def goto(page: Page | Frame, url: str) -> Optional[Response]:

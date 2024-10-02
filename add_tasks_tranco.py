@@ -5,7 +5,6 @@ from typing import Optional, cast
 
 import tld
 from peewee import ProgrammingError
-from tld.exceptions import TldBadUrl, TldDomainNotFound
 
 import utils
 from config import Config
@@ -18,7 +17,7 @@ def main(job: str, file: Optional[pathlib.Path]) -> int:
         database.create_tables([Site])
         database.create_tables([Task])
         database.create_tables([URL])
-        
+
         try:
             Task._schema.create_foreign_key(Task.landing)
         except ProgrammingError:
@@ -28,28 +27,32 @@ def main(job: str, file: Optional[pathlib.Path]) -> int:
     with database.atomic(), open(file, encoding="utf-8") as _file:
         for entry in _file:
             rank, url = entry.split(',')
-            url = ('https://' if not url.startswith('http') else '') + url
+            url = ('https://' if not url.strip().startswith('http') else '') + url.strip()
 
-            try:
-                url_parsed: tld.Result = tld.get_tld(url, as_object=True)
-
-                _site: str = url_parsed.fld
-                site: Site = Site.get_or_create(site=_site)[0]
-                site.rank = int(rank)
-                site.save()
-
-                task: Task = Task.create(job=job, site=site)
-
-                _url: URL = [
-                    URL.create(task=task, site=site, url=url, scheme=url[:url.find(':')], origin=utils.get_url_origin(url_parsed), depth=0, repetition=repetition)
-                    for repetition in range(1, Config.REPETITIONS + 1)
-                    ][0]
-
-                task.landing = _url
-                task.save()
-            except (TldBadUrl, TldDomainNotFound):
+            url_parsed: Optional[tld.Result] = utils.get_tld_object(url)
+            if url_parsed is None:
                 # TODO log bad URL?
-                pass
+                continue
+
+            site: Site = Site.get_or_create(site=utils.get_url_scheme_site(url_parsed))[0]
+            site.rank = int(rank)
+            site.save()
+
+            task: Task = Task.create(job=job, site=site)
+
+            _url: URL = [
+                URL.create(
+                    task=task,
+                    site=site,
+                    url=url,
+                    depth=0,
+                    repetition=repetition
+                )
+                for repetition in range(1, Config.REPETITIONS + 1)
+            ][0]
+
+            task.landing = _url
+            task.save()
 
     return 0
 
