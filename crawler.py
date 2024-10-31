@@ -1,4 +1,6 @@
+import pathlib
 import pickle
+import shutil
 from datetime import datetime
 from logging import Logger
 from typing import Any, Callable, Dict, List, Optional, Type, cast
@@ -27,6 +29,10 @@ class Crawler:
     def _delete_cache(self) -> None:
         self.log.info("Deleting cache")
 
+        browser_cache: pathlib.Path = Config.LOG / f"browser-{self.task.job}-{self.task.crawler}"
+        if browser_cache.exists():
+            shutil.rmtree(browser_cache)
+
         with database.atomic():
             self.task.updated = datetime.today()
             self.state = None
@@ -50,7 +56,7 @@ class Crawler:
                 timezone_id=Config.TIMEZONE,
                 record_har_content='embed',
                 record_har_mode='full',
-                record_har_path=str(Config.HAR) + f'/{self.job_id}-{self.crawler_id}.har'
+                record_har_path=(Config.HAR / f"{self.task.job}-{self.task.crawler}.har")
             )
         else:
             self.context = self.browser.new_context(
@@ -62,18 +68,51 @@ class Crawler:
 
         self.page = self.context.new_page()
 
+    def _init_browser_extensions(self) -> None:
+        self.log.info("Initializing browser with extensions")
+
+        (Config.LOG / f"browser-{self.task.job}-{self.task.crawler}").mkdir(parents=True, exist_ok=True)
+
+        self.browser = None
+
+        if Config.HAR:
+            self.context = self.playwright.chromium.launch_persistent_context(
+                Config.LOG / f"browser-{self.task.job}-{self.task.crawler}",
+                headless=Config.HEADLESS,
+                record_har_content='embed',
+                record_har_mode='full',
+                record_har_path=(Config.HAR / f"{self.task.job}.har"),
+                args=[
+                    "--disable-extensions-except=./extensions/consent-o-matic-v1.1.3-chromium",
+                    "--load-extension=./extensions/consent-o-matic-v1.1.3-chromium",
+                ]
+            )
+        else:
+            self.context = self.playwright.chromium.launch_persistent_context(
+                Config.LOG / f"browser-{self.task.job}-{self.task.crawler}",
+                headless=Config.HEADLESS,
+                args=[
+                    "--disable-extensions-except=./extensions/consent-o-matic-v1.1.3-chromium",
+                    "--load-extension=./extensions/consent-o-matic-v1.1.3-chromium",
+                ]
+            )
+
+        self.page = self.context.new_page()
+
     def _close_browser(self) -> None:
         self.log.info("Closing browser")
 
         if len(self.urldb.get_state('free')) == 0:
             utils.get_screenshot(
                 self.page,
-                (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.job_id}-2-{self.site.site.replace(':','').replace('/','')}.png")
+                (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-2-{self.site.site.replace(':','').replace('/','')}.png")
             )
 
         self.page.close()
         self.context.close()
-        self.browser.close()
+
+        if self.browser:
+            self.browser.close()
 
     def _invoke_page_handlers(self) -> None:
         self.log.info("Invoking page handlers")
@@ -115,20 +154,18 @@ class Crawler:
 
             utils.get_screenshot(
                 self.page,
-                (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.job_id}-1-{self.site.site.replace(':','').replace('/','')}.png")
+                (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-1-{self.site.site.replace(':','').replace('/','')}.png")
             )
 
         self.log.info(f"Response status {response if response is None else response.status} repetition {self.repetition}")
         return response
 
-    def __init__(self, job: str, crawler_id: int, taskid: int, log: Logger, modules: List[Type[Module]]) -> None:
+    def __init__(self, taskid: int, log: Logger, modules: List[Type[Module]]) -> None:
         log.info("Crawler initializing")
 
         # Prepare variables
         self.stop: bool = cast(bool, False)
         self.log: Logger = log
-        self.job_id: str = job
-        self.crawler_id: int = crawler_id
         self.task: Task = cast(Task, Task.get_by_id(taskid))
         self.site: Site = cast(Site, self.task.site)
         self.landing: URL = cast(URL, self.task.landing)
@@ -183,14 +220,17 @@ class Crawler:
         # Initiate playwright, browser, context, and page
         try:
             self.playwright = sync_playwright().start()
-            self._init_browser()
+            self._init_browser_extensions()
         except Exception as error:
             self.log.error(error)
             self.stop = True
             self._delete_cache()
             return
 
-        self.log.info(f"Start {Config.BROWSER} {self.browser.version}")
+        if self.browser:
+            self.log.info(f"Start {Config.BROWSER} {self.browser.version}")
+        else:
+            self.log.info("Start Chromium with Extensions")
 
         # Get URL
         self.url: URL = self.urldb.get_url(1) if (not self.state['Initial']) else self.url
@@ -234,7 +274,7 @@ class Crawler:
                 self.state['Crawler'] = self.url.get_id()
 
             # Save state if needed
-            if Config.SAVE_CONTEXT:
+            if Config.SAVE_CONTEXT and self.browser:
                 try:
                     self.state['Context'] = self.context.storage_state()
                 except Exception:
@@ -242,12 +282,18 @@ class Crawler:
 
                 self._update_cache()
 
-            # Close everything (to avoid memory issues)
+            # Delete browser cache if needed
+            if (not Config.SAVE_CONTEXT) and (not self.browser):
+                browser_cache: pathlib.Path = Config.LOG / f"browser-{self.task.job}-{self.task.crawler}"
+                if browser_cache.exists():
+                    shutil.rmtree(browser_cache)
+
+            # Close everything (to avoid memory issues)  # TODO do I need that?
             self._close_browser()
 
             # Re-open stuff
             try:
-                self._init_browser()
+                self._init_browser_extensions()
             except Exception as error:
                 self.log.error(error)
                 self.stop = True

@@ -46,7 +46,7 @@ def get_url_str_with_query_fragment(url: tld.utils.Result) -> str:
     return get_url_str_with_query(url) + ('#' if url.parsed_url.fragment else '') + url.parsed_url.fragment
 
 def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils.Result]:
-    if not href:
+    if (href is None) or (not href.strip()):
         return None
 
     if '://' in href:
