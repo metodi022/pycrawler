@@ -78,14 +78,14 @@ def _get_task(job: str, crawler_id: int, log) -> Optional[Task]:
 
     # Otherwise get new free task
     with database.atomic():
-        result = database.execute_sql("SELECT id FROM task WHERE state='free' AND job=%s FOR UPDATE SKIP LOCKED LIMIT 1", (job,)).fetchone()
+        result = database.execute_sql(f"SELECT id FROM task WHERE state='free' AND job={database.param} LIMIT 1", (job,)).fetchone()
 
         if not result:
             log.info("Found no task")
             task = None
         else:
             log.info("Loading free task")
-            database.execute_sql("UPDATE task SET updated=%s, crawler=%s, state='progress' WHERE id=%s", (datetime.today(), crawler_id, result[0]))
+            database.execute_sql(f"UPDATE task SET updated={database.param}, crawler={database.param}, state='progress' WHERE id={database.param}", (datetime.today(), crawler_id, result[0]))
             task = Task.get_by_id(result[0])
 
     return task
@@ -169,7 +169,7 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
         start_time: datetime = datetime.now()
 
         with database:
-            is_cached: bool = not database.execute_sql("SELECT crawlerstate IS NULL FROM task WHERE id=%s", (task.get_id(),)).fetchone()[0]
+            is_cached: bool = not database.execute_sql(f"SELECT crawlerstate IS NULL FROM task WHERE id={database.param}", (task.get_id(),)).fetchone()[0]
 
         crawler: CustomProcess = CustomProcess(target=_start_crawler, args=(job, crawler_id, task.get_id(), log_path, modules))
         crawler.start()
@@ -186,8 +186,8 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
             crawler.join(timeout=Config.RESTART_TIMEOUT)
 
             with database:
-                timelastentry = database.execute_sql("SELECT updated FROM task WHERE id=%s", (task.get_id(),)).fetchone()[0]
-                is_cached = not database.execute_sql("SELECT crawlerstate IS NULL FROM task WHERE id=%s", (task.get_id(),)).fetchone()[0]
+                timelastentry = database.execute_sql(f"SELECT updated FROM task WHERE id={database.param}", (task.get_id(),)).fetchone()[0]
+                is_cached = not database.execute_sql(f"SELECT crawlerstate IS NULL FROM task WHERE id={database.param}", (task.get_id(),)).fetchone()[0]
 
             if not crawler.is_alive():
                 continue
@@ -208,7 +208,7 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
 
         with database.atomic():
             task.updated = datetime.today()
-            database.execute_sql("UPDATE task SET updated=%s, state='complete', crawlerstate=NULL WHERE id=%s", (task.updated, task.get_id()))
+            database.execute_sql(f"UPDATE task SET updated={database.param}, state='complete', crawlerstate=NULL WHERE id={database.param}", (task.updated, task.get_id()))
 
         if crawler.exception:
             log.error("Crawler %s crashed %s", task.crawler, crawler.exception)
@@ -233,12 +233,14 @@ if __name__ == '__main__':
                              help="starting crawler id (default 1); must be > 0")
     args_parser.add_argument("-l", "--listen", default=False, action='store_true',
                              help="crawler will not stop if there is no job; query and sleep until a job is found")
+    args_parser.add_argument("-o", "--log", type=str, required=False, default=Config.LOG,
+                             help="path to directory for log output")
 
     # Parse command line arguments
     args = vars(args_parser.parse_args())
 
     try:
-        _validate_arguments(args['crawlers'], args['crawlerid'], args['log'] or Config.LOG)
+        _validate_arguments(args['crawlers'], args['crawlerid'], args['log'])
     except ValueError as e:
         print(f"Error: {e}")
         sys.exit(1)

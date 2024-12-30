@@ -1,6 +1,7 @@
 import pathlib
 import pickle
 import shutil
+import time
 from datetime import datetime
 from logging import Logger
 from typing import Any, Callable, Dict, List, Optional, Type, cast
@@ -24,7 +25,7 @@ class Crawler:
         with database.atomic():
             self.task.updated = datetime.today()
             self.task.crawlerstate = pickle.dumps(self.state)
-            database.execute_sql("UPDATE task SET updated=%s, crawlerstate=%s WHERE id=%s", (self.task.updated, self.task.crawlerstate, self.task.get_id()))
+            database.execute_sql(f"UPDATE task SET updated={database.param}, crawlerstate={database.param} WHERE id={database.param}", (self.task.updated, self.task.crawlerstate, self.task.get_id()))
 
     def _delete_cache(self) -> None:
         self.log.info("Deleting cache")
@@ -36,7 +37,7 @@ class Crawler:
         with database.atomic():
             self.task.updated = datetime.today()
             self.state = None
-            database.execute_sql("UPDATE task SET updated=%s, crawlerstate=NULL WHERE id=%s", (self.task.updated, self.task.get_id()))
+            database.execute_sql(f"UPDATE task SET updated={database.param}, crawlerstate=NULL WHERE id={database.param}", (self.task.updated, self.task.get_id()))
 
     def _init_browser(self) -> None:
         self.log.info("Initializing browser")
@@ -148,7 +149,7 @@ class Crawler:
                 self.task.error = error_message
 
                 database.execute_sql(
-                    "UPDATE task SET updated=%s, code=%s, error=%s WHERE id=%s",
+                    f"UPDATE task SET updated={database.param}, code={database.param}, error={database.param} WHERE id={database.param}",
                     (self.task.updated, self.task.code, self.task.error, self.task.get_id())
                 )
 
@@ -198,7 +199,7 @@ class Crawler:
             # Crawler previously crashed on current URL
             # Therefore, invalidate the current URL
             self.log.warning("Invalidating latest URL %s", self.url.url)
-            URL.update(code=Config.ERROR_CODES['browser_error'], state='complete').where(URL.task==self.task, URL.url==self.url.url, URL.depth==self.depth).execute()
+            URL.update(code=Config.ERROR_CODES['crawler_error'], state='complete').where(URL.task==self.task, URL.url==self.url.url, URL.depth==self.depth).execute()
 
         # Initialize modules
         self.modules: List[Module] = [AcceptCookies(self)] if Config.ACCEPT_COOKIES else []
@@ -245,9 +246,22 @@ class Crawler:
 
         # Manual setup here
         if Config.MANUAL_SETUP and self.state['Initial'] and (self.url is not None):
+            self.log.info("Initiate manual setup")
+
             response: Optional[Response] = self._open_url()
-            input("Do not close the browser!\nPress Enter after you are done with the manual setup to continue...")
-            self.page.close()
+
+            print("Close the browser after you are done with the manual setup to continue.")
+            print("Waiting for browser to close...")
+
+            while not self.page.is_closed():
+                try:
+                    self.page.bring_to_front()
+                    time.sleep(10)
+                except Exception:
+                    pass
+
+            self.log.info("Finish manual setup")
+
             self.state['Context'] = self.context.storage_state()
             self.page = self.context.new_page()
 

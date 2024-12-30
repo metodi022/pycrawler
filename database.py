@@ -1,12 +1,12 @@
 from datetime import datetime
 from typing import Optional
 
-from peewee import BlobField, CharField, DateTimeField, DeferredForeignKey, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, TextField
+from peewee import BlobField, CharField, DateTimeField, DeferredForeignKey, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, SqliteDatabase, TextField
 
 import utils
 from config import Config
 
-database = PostgresqlDatabase(
+database = SqliteDatabase(Config.SQLITE) if Config.SQLITE else PostgresqlDatabase(
     Config.DATABASE,
     user=Config.USER,
     password=Config.PASSWORD,
@@ -29,7 +29,7 @@ class BaseModel(Model):
 
 
 class Site(BaseModel):
-    scheme = CharField(primary_key=True, index=True)
+    scheme = CharField(default='https', null=False, index=True)
     site = TextField(primary_key=True, index=True)
     rank = IntegerField(default=None, null=True, index=True)
     categories = TextField(default=None, null=True)

@@ -10,6 +10,8 @@ class Config:
     HOST: str = 'localhost'  # database host
     PORT: str = '5432'  # database port
 
+    SQLITE: Optional[str] = None  # path to SQLite database file
+
     LOG: pathlib.Path = pathlib.Path('./logs/')  # path for saving logs
     LOG_LEVEL = INFO  # DEBUG|INFO|WARNING|ERROR
 
@@ -29,7 +31,7 @@ class Config:
     BREADTHFIRST: bool = True  # Visit URLs in a breadth-first manner, otherwise depth-first
     SAME_SCHEME: bool = True  # URL discovery for same scheme (protocol) only
     SAME_ORIGIN: bool = False  # URL discovery for same-origin only
-    SAME_ETLDP1: bool = True  # URL discovery for same ETLD+1 and scheme only (schemeful same-site)
+    SAME_ETLDP1: bool = True  # URL discovery for same ETLD+1
     SAME_ENTITY: bool = False  # URL discovery for same entity only (ETLD+1 or company, owner, etc.)
     DEPTH: int = 2  # URL discovery limit; 0 (initial URL only), 1 (+ all URLs from initial page), etc.
     MAX_URLS: int = 1000  # limit number of URLs gathered for a domain
@@ -50,4 +52,4 @@ class Config:
 
     # Usually the code of the response in DB will be the response status (200, 404, etc.); if an
     # error occurs, for example response is NULL or browser is stuck, use the error codes below
-    ERROR_CODES: Dict[str, int] = {'response_error': -1, 'browser_error': -2}
+    ERROR_CODES: Dict[str, int] = {'response_error': -1, 'crawler_error': -2}
