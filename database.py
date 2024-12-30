@@ -6,12 +6,14 @@ from peewee import BlobField, CharField, DateTimeField, DeferredForeignKey, Fore
 import utils
 from config import Config
 
-database = PostgresqlDatabase(Config.DATABASE,
-                              user=Config.USER,
-                              password=Config.PASSWORD,
-                              host=Config.HOST,
-                              port=Config.PORT,
-                              autorollback=True)
+database = PostgresqlDatabase(
+    Config.DATABASE,
+    user=Config.USER,
+    password=Config.PASSWORD,
+    host=Config.HOST,
+    port=Config.PORT,
+    autorollback=True
+)
 
 
 class BaseModel(Model):

@@ -23,6 +23,8 @@ class Config:
 
     SAVE_CONTEXT: bool = False  # Store saved cookies and localStorage while crawling
 
+    MANUAL_SETUP: bool = False  # Setup the state manually at the start of the crawl
+
     RECURSIVE: bool = True  # Discover additional URLs while crawling
     BREADTHFIRST: bool = True  # Visit URLs in a breadth-first manner, otherwise depth-first
     SAME_SCHEME: bool = True  # URL discovery for same scheme (protocol) only

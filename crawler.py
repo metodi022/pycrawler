@@ -221,7 +221,7 @@ class Crawler:
         # Initiate playwright, browser, context, and page
         try:
             self.playwright = sync_playwright().start()
-            self._init_browser_extensions()
+            self._init_browser()
         except Exception as error:
             self.log.error(error)
             self.stop = True
@@ -231,7 +231,7 @@ class Crawler:
         if self.browser:
             self.log.info(f"Start {Config.BROWSER} {self.browser.version}")
         else:
-            self.log.info("Start Chromium with Extensions")
+            self.log.info(f"Start {Config.BROWSER} with extensions")
 
         # Get URL
         self.url: URL = self.urldb.get_url(1) if (not self.state['Initial']) else self.url
@@ -242,6 +242,14 @@ class Crawler:
             self.url = cast(URL, self.url)
             self.depth = cast(int, self.url.depth)
             self.state['Crawler'] = self.url.get_id()
+
+        # Manual setup here
+        if Config.MANUAL_SETUP and self.state['Initial'] and (self.url is not None):
+            response: Optional[Response] = self._open_url()
+            input("Do not close the browser!\nPress Enter after you are done with the manual setup to continue...")
+            self.page.close()
+            self.state['Context'] = self.context.storage_state()
+            self.page = self.context.new_page()
 
         self.state['Initial'] = False
         self._update_cache()
@@ -294,7 +302,7 @@ class Crawler:
 
             # Re-open stuff
             try:
-                self._init_browser_extensions()
+                self._init_browser()
             except Exception as error:
                 self.log.error(error)
                 self.stop = True
