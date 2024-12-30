@@ -68,12 +68,16 @@ class CollectUrls(Module):
             if not parsed_link:
                 continue
 
+            # Check for same scheme
+            if Config.SAME_SCHEME and (self.crawler.site.scheme != utils.get_url_scheme(parsed_link)):
+                continue
+
             # Check for same origin
-            if Config.SAME_ORIGIN and (utils.get_url_origin(utils.get_tld_object(self.crawler.landing.url)) != utils.get_url_origin(parsed_link)):
+            if Config.SAME_ORIGIN and (self.crawler.origin != utils.get_url_origin(parsed_link)):
                 continue
 
             # Check for same ETLD+1
-            if Config.SAME_ETLDP1_SCHEME and (self.crawler.site.site != utils.get_url_scheme_site(parsed_link)):
+            if Config.SAME_ETLDP1 and (self.crawler.site.site != utils.get_url_site(parsed_link)):
                 continue
 
             # TODO: Check for same entity

@@ -25,8 +25,9 @@ class Config:
 
     RECURSIVE: bool = True  # Discover additional URLs while crawling
     BREADTHFIRST: bool = True  # Visit URLs in a breadth-first manner, otherwise depth-first
+    SAME_SCHEME: bool = True  # URL discovery for same scheme (protocol) only
     SAME_ORIGIN: bool = False  # URL discovery for same-origin only
-    SAME_ETLDP1_SCHEME: bool = True  # URL discovery for same ETLD+1 and scheme only
+    SAME_ETLDP1: bool = True  # URL discovery for same ETLD+1 and scheme only (schemeful same-site)
     SAME_ENTITY: bool = False  # URL discovery for same entity only (ETLD+1 or company, owner, etc.)
     DEPTH: int = 2  # URL discovery limit; 0 (initial URL only), 1 (+ all URLs from initial page), etc.
     MAX_URLS: int = 1000  # limit number of URLs gathered for a domain

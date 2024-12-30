@@ -105,7 +105,7 @@ class Crawler:
         if len(self.urldb.get_state('free')) == 0:
             utils.get_screenshot(
                 self.page,
-                (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-2-{self.site.site.replace(':','').replace('/','')}.png")
+                (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-2-{self.site.scheme}-{self.site.site}.png")
             )
 
         self.page.close()
@@ -154,7 +154,7 @@ class Crawler:
 
             utils.get_screenshot(
                 self.page,
-                (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-1-{self.site.site.replace(':','').replace('/','')}.png")
+                (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-1-{self.site.scheme}-{self.site.site}.png")
             )
 
         self.log.info(f"Response status {response if response is None else response.status} repetition {self.repetition}")
@@ -169,6 +169,7 @@ class Crawler:
         self.task: Task = cast(Task, Task.get_by_id(taskid))
         self.site: Site = cast(Site, self.task.site)
         self.landing: URL = cast(URL, self.task.landing)
+        self.origin: str = utils.get_url_origin(utils.get_tld_object(self.landing.url))
         self.repetition: int = cast(int, 1)
 
         # Load previous state

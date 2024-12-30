@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from peewee import BlobField, DateTimeField, DeferredForeignKey, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, TextField
+from peewee import BlobField, CharField, DateTimeField, DeferredForeignKey, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, TextField
 
 import utils
 from config import Config
@@ -27,7 +27,8 @@ class BaseModel(Model):
 
 
 class Site(BaseModel):
-    site = TextField(primary_key=True, unique=True, index=True)
+    scheme = CharField(primary_key=True, index=True)
+    site = TextField(primary_key=True, index=True)
     rank = IntegerField(default=None, null=True, index=True)
     categories = TextField(default=None, null=True)
 
@@ -114,7 +115,8 @@ class URLDB:
             return
 
         site = Site.get_or_create(
-            site=utils.get_url_scheme_site(url_parsed)
+            scheme=utils.get_url_scheme(url_parsed),
+            site=utils.get_url_site(url_parsed)
         )[0]
 
         url_data = {

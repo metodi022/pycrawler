@@ -34,7 +34,10 @@ def main(job: str, file: Optional[pathlib.Path]) -> int:
                 # TODO log bad URL?
                 continue
 
-            site: Site = Site.get_or_create(site=utils.get_url_scheme_site(url_parsed))[0]
+            site: Site = Site.get_or_create(
+                scheme=utils.get_url_scheme(url_parsed),
+                site=utils.get_url_site(url_parsed)
+            )[0]
             site.rank = int(rank)
             site.save()
 
