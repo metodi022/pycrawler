@@ -1,5 +1,5 @@
 import random
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Set
 
 import tld
 from playwright.sync_api import Error, Locator, Response
@@ -21,6 +21,17 @@ class CollectUrls(Module):
         self.crawler.state['CollectUrls'] = self._max_urls
 
         self._url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
+
+        # Add adult filter if enabled
+        if Config.ADULT_FILTER:
+            adult_filter: Set[str] = set()
+
+            with open('easylist/easylist_adult/easylist_adult.txt', 'r', encoding='utf-8') as easylist_adult:
+                adult_filter.update(line.strip() for line in easylist_adult.readlines())
+
+            self._url_filter_out.append(
+                (lambda parsed_url: utils.get_url_site(parsed_url) in adult_filter)
+            )
 
     def receive_response(self, responses: List[Optional[Response]], final_url: str, repetition: int) -> None:
         super().receive_response(responses, final_url, repetition)
