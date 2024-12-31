@@ -16,17 +16,11 @@ PyCrawler is a Python-based extendible and modular crawling framework that uses 
 ## Starting the Crawl
 You can edit the `config.py` file to specify the PostgreSQL database and additional crawling parameters.
 
-Running `main.py -h` shows additional options:
 ```
-usage: main.py [-h] [-o LOG] [-f URLSPATH] [-u URLS [URLS ...]] [-m [MODULES ...]] -j JOB -c CRAWLERS [-i CRAWLERID] [-l]
+usage: main.py [-h] [-m [MODULES ...]] -j JOB -c CRAWLERS [-i CRAWLERID] [-l] [-o LOG]
 
 options:
   -h, --help            show this help message and exit
-  -o LOG, --log LOG     path to directory where output log will be saved
-  -f URLSPATH, --urlspath URLSPATH
-                        path to file with urls
-  -u URLS [URLS ...], --urls URLS [URLS ...]
-                        urls to crawl
   -m [MODULES ...], --modules [MODULES ...]
                         which modules the crawler will run
   -j JOB, --job JOB     unique job id for crawl
@@ -35,12 +29,22 @@ options:
   -i CRAWLERID, --crawlerid CRAWLERID
                         starting crawler id (default 1); must be > 0
   -l, --listen          crawler will not stop if there is no job; query and sleep until a job is found
+  -o LOG, --log LOG     path to directory for log output
 ```
 
 For example, if we want to start a single crawler to find login forms, we use the following command:
 `main.py -m FindLoginForms -j <your-job-id> -c 1`
 
-The `-f` and `-u` options allows you to specify a list of sites which the crawler will be visiting.
+The `add_tasks_tranco.py` scripts allows you to specify a list of sites (Tranco format) which the crawler will be visiting.
+
+```
+usage: add_tasks_tranco.py [-h] -j JOB -f FILE
+
+options:
+  -h, --help            show this help message and exit
+  -j JOB, --job JOB     unique job id for crawl
+  -f FILE, --file FILE  path to tranco CSV file
+```
 
 ## Modules
 You can find existing modules in the `./modules` directory. Additionally, you can create your own modules to do something specific. To do that:
@@ -48,6 +52,6 @@ You can find existing modules in the `./modules` directory. Additionally, you ca
 2. The `register_job` method is called whenever the database is setup
 3. The `add_handlers` method is called every time before visiting a page; here you can register listeners for the browser and its pages
 4. The `receive_response` is run whenever the crawler visits a page
-5. The `add_url_filter_out` allows you to specify functions which will ignore certain URLs during the crawling process
+5. The `add_url_filter_out` allows you to specify functions which will filter out and ignore certain URLs during the crawling process
 
-Check existing modules as a guideline to how to construct your own module.
+Check existing modules as a guideline to understand how to construct your own modules.

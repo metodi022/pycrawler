@@ -78,7 +78,10 @@ def _get_task(job: str, crawler_id: int, log) -> Optional[Task]:
 
     # Otherwise get new free task
     with database.atomic():
-        result = database.execute_sql(f"SELECT id FROM task WHERE state='free' AND job={database.param} LIMIT 1", (job,)).fetchone()
+        if not Config.SQLITE:
+            result = database.execute_sql(f"SELECT id FROM task WHERE state='free' AND job={database.param} FOR UPDATE SKIP LOCKED LIMIT 1", (job,)).fetchone()
+        else:
+            result = database.execute_sql(f"SELECT id FROM task WHERE state='free' AND job={database.param} LIMIT 1", (job,)).fetchone()
 
         if not result:
             log.info("Found no task")
@@ -120,10 +123,11 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: pathl
         database.create_tables([Task])
         database.create_tables([URL])
 
-        try:
-            Task._schema.create_foreign_key(Task.landing)
-        except ProgrammingError:
-            pass
+        if not Config.SQLITE:
+            try:
+                Task._schema.create_foreign_key(Task.landing)
+            except ProgrammingError:
+                pass
 
     # Create modules database
     log.info('Load modules database')

@@ -99,16 +99,15 @@ class CollectUrls(Module):
 
         self.crawler.log.info(f"Find {min(len(urls), self._max_urls)} URLs")
 
-        # Shuffle the URLs
-        if Config.FOCUS_FILTER:
-            # Prioritize URLs at the begining and end of the HTML document
+        # Prioritize URLs at the begining and end of the HTML document
+        if Config.FIRST_AND_LAST:
             urls_1 = urls[:int(len(urls) * 0.15)] + urls[int(len(urls) * 0.85):]
             urls_2 = urls[int(len(urls) * 0.15):int(len(urls) * 0.85)]
             random.shuffle(urls_1)
             random.shuffle(urls_2)
             urls = urls_1 + urls_2
+        # Shuffle the URLs
         else:
-            # Random shuffle
             random.shuffle(urls)
 
         # For each found URL, add it to the database, while making sure not to exceed the max URL limit
