@@ -1,7 +1,8 @@
 import argparse
 import pathlib
+import re
 import sys
-from typing import Optional, cast
+from typing import Optional, Set, cast
 
 import tld
 from peewee import ProgrammingError
@@ -12,6 +13,29 @@ from database import URL, Site, Task, database
 
 
 def main(job: str, file: Optional[pathlib.Path]) -> int:
+    # Get easylist adult sites
+    if Config.ADULT_FILTER:
+        adult_filter: Set[str] = set()
+
+        # Create easylist_adult.txt
+        if not pathlib.Path('easylist/easylist_adult/easylist_adult.txt').exists():
+            for easylist_adult_file in pathlib.Path('easylist/easylist_adult').glob('*.txt'):
+                with open(easylist_adult_file, 'r', encoding='utf-8') as easylist_adult:
+                    for line in easylist_adult:
+                        if line.startswith('!'):
+                            continue
+                        adult_filter.update(
+                            utils.get_url_site(utils.get_tld_object(entry) or utils.get_tld_object('https://' + entry))
+                            for entry in re.split(r'[^a-zA-Z0-9\\:\\/\\@\\-\\_\\.]', line)
+                            if (utils.get_tld_object(entry) or utils.get_tld_object('https://' + entry)) is not None
+                        )
+            with open('easylist/easylist_adult/easylist_adult.txt', 'w', encoding='utf-8') as easylist_adult:
+                easylist_adult.writelines(line + '\n' for line in adult_filter if '.' in line)
+        # Read easylist_adult.txt
+        else:
+            with open('easylist/easylist_adult/easylist_adult.txt', 'r', encoding='utf-8') as easylist_adult:
+                adult_filter.update(line.strip() for line in easylist_adult.readlines())
+
     # Prepare database
     with database.atomic():
         database.create_tables([Site])
@@ -32,8 +56,11 @@ def main(job: str, file: Optional[pathlib.Path]) -> int:
 
             url_parsed: Optional[tld.Result] = utils.get_tld_object(url)
             if url_parsed is None:
-                # TODO log bad URL?
-                continue
+                continue        # TODO log bad URL?
+
+            # Filter out adult urls
+            if Config.ADULT_FILTER and (utils.get_url_site(url_parsed) in adult_filter):
+                continue        # TODO log adult URL?
 
             site: Site = Site.get_or_create(
                 scheme=utils.get_url_scheme(url_parsed),

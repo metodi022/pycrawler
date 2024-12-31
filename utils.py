@@ -159,7 +159,7 @@ def get_visible_advanced(locator: Locator) -> bool:
                                     }
                                     """)
 
-    return locator.is_visible() and (float(opacity) >= 0)
+    return locator.is_visible() and (float(opacity) > float(0))
 
 
 def goto(page: Page | Frame, url: str) -> Optional[Response]:

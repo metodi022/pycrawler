@@ -48,7 +48,7 @@ class Config:
     # TODO more options
     # OBEY_ROBOTS: bool = False  # obey robots.txt
     FIRST_AND_LAST: bool = False  # prioritize visiting URLs at the top and the bottom of the HTML first
-    # ADULT_FILTER: bool = False  # avoid visiting adult sites
+    ADULT_FILTER: bool = True  # avoid visiting adult sites
 
     # Usually the code of the response in DB will be the response status (200, 404, etc.); if an
     # error occurs, for example response is NULL or browser is stuck, use the error codes below
