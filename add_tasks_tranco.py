@@ -13,6 +13,18 @@ from database import URL, Site, Task, database
 
 
 def main(job: str, file: Optional[pathlib.Path]) -> int:
+    # Prepare database
+    with database.atomic():
+        database.create_tables([Site])
+        database.create_tables([Task])
+        database.create_tables([URL])
+
+        if not Config.SQLITE:
+            try:
+                Task._schema.create_foreign_key(Task.landing)
+            except ProgrammingError:
+                pass
+
     # Get easylist adult sites
     if Config.ADULT_FILTER:
         adult_filter: Set[str] = set()
@@ -35,18 +47,6 @@ def main(job: str, file: Optional[pathlib.Path]) -> int:
         else:
             with open('easylist/easylist_adult/easylist_adult.txt', 'r', encoding='utf-8') as easylist_adult:
                 adult_filter.update(line.strip() for line in easylist_adult.readlines())
-
-    # Prepare database
-    with database.atomic():
-        database.create_tables([Site])
-        database.create_tables([Task])
-        database.create_tables([URL])
-
-        if not Config.SQLITE:
-            try:
-                Task._schema.create_foreign_key(Task.landing)
-            except ProgrammingError:
-                pass
 
     # Iterate over URLs and add them to database
     with database.atomic(), open(file, encoding="utf-8") as _file:

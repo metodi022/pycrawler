@@ -28,18 +28,21 @@ class BaseModel(Model):
         database = database
 
 
+class Entity(BaseModel):
+    name = CharField(primary_key=True, null=False, index=True, unique=True)
+
 class Site(BaseModel):
     scheme = CharField(default='https', null=False, index=True)
-    site = TextField(primary_key=True, index=True)
+    site = CharField(index=True, null=False)
     rank = IntegerField(default=None, null=True, index=True)
-    categories = TextField(default=None, null=True)
+    entity = ForeignKeyField(Entity, default=None, null=True, index=True)
 
 class Task(BaseModel):
-    job = TextField(index=True)
+    job = CharField(index=True)
     crawler = IntegerField(default=None, null=True, index=True)
     site = ForeignKeyField(Site, index=True)
     landing = DeferredForeignKey("URL", default=None, null=True, backref='tasks', index=True)
-    state = TextField(default="free", index=True)
+    state = CharField(default="free", index=True)
     code = IntegerField(default=None, null=True, index=True)
     error = TextField(default=None, null=True)
     crawlerstate = BlobField(default=None, null=True)
@@ -53,7 +56,7 @@ class URL(BaseModel):
     depth = IntegerField(index=True)
     code = IntegerField(default=None, null=True, index=True)
     repetition = IntegerField(index=True)
-    state = TextField(default="free", index=True)
+    state = CharField(default="free", index=True)
 
 
 class URLDB:

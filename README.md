@@ -4,11 +4,11 @@ PyCrawler is a Python-based extendible and modular crawling framework that uses 
 
 ## Requirements
 1. Python 3.10
-2. PostgreSQL
+2. PostgreSQL or SQLite
 3. Playwright
 
 ## Installation Instructions
-1. Clone the project
+1. Clone the project and its submodules
 2. Create a Python virtual environment and activate it
 3. Install the requirements from the `requirements.txt` text file
 4. Install additionally browser binaries using `playwright install`. For more information, check [this article](https://playwright.dev/python/docs/intro) and [this article](https://playwright.dev/python/docs/browsers)
