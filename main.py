@@ -9,12 +9,12 @@ from datetime import datetime
 from multiprocessing import Pipe, Process
 from typing import List, Optional, Type, cast
 
-#import ecs_logging  # TODO elastic search logs
-from peewee import ProgrammingError
-
 from crawler import Crawler
-from database import URL, Site, Task, database
+from database import Task, database
 from modules.Module import Module
+
+#import ecs_logging  # TODO elastic search logs
+
 
 Config = importlib.import_module('config').Config
 

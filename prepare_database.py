@@ -1,9 +1,5 @@
 import json
-import pathlib
-import re
-from typing import Optional
 
-import tld
 from peewee import ProgrammingError
 
 import utils

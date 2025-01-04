@@ -1,7 +1,7 @@
 import argparse
 import pathlib
 import sys
-from typing import Optional, Set, cast
+from typing import Optional, cast
 
 import tld
 
