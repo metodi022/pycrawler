@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from peewee import BlobField, CharField, DateTimeField, DeferredForeignKey, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, SqliteDatabase, TextField
+from peewee import BlobField, BooleanField, CharField, DateTimeField, DeferredForeignKey, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, SqliteDatabase, TextField
 
 import utils
 from config import Config
@@ -30,12 +30,20 @@ class BaseModel(Model):
 
 class Entity(BaseModel):
     name = CharField(primary_key=True, null=False, index=True, unique=True)
+    adult = BooleanField(default=None, null=True, index=True)
+    tracking = BooleanField(default=None, null=True, index=True)
+    fingerprinting = BooleanField(default=None, null=True, index=True)
+    malicious = BooleanField(default=None, null=True, index=True)
 
 class Site(BaseModel):
-    scheme = CharField(default='https', null=False, index=True)
+    entity = ForeignKeyField(Entity, default=None, null=True, index=True)
+    scheme = CharField(default=None, null=True, index=True)
     site = CharField(index=True, null=False)
     rank = IntegerField(default=None, null=True, index=True)
-    entity = ForeignKeyField(Entity, default=None, null=True, index=True)
+    adult = BooleanField(default=None, null=True, index=True)
+    tracking = BooleanField(default=None, null=True, index=True)
+    fingerprinting = BooleanField(default=None, null=True, index=True)
+    malicious = BooleanField(default=None, null=True, index=True)
 
 class Task(BaseModel):
     job = CharField(index=True)

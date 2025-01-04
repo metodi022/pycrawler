@@ -1,3 +1,6 @@
 [submodule "easylist"]
 	path = easylist
 	url = https://github.com/easylist/easylist.git
+[submodule "disconnect-tracking-protection"]
+	path = disconnect-tracking-protection
+	url = https://github.com/disconnectme/disconnect-tracking-protection.git

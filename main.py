@@ -116,19 +116,6 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: pathl
     log.debug("Import additional modules %s", str(module_names))
     modules: List[Type[Module]] = _get_modules(module_names)
 
-    # Creating database
-    log.info('Load database')
-    with database.atomic():
-        database.create_tables([Site])
-        database.create_tables([Task])
-        database.create_tables([URL])
-
-        if not Config.SQLITE:
-            try:
-                Task._schema.create_foreign_key(Task.landing)
-            except ProgrammingError:
-                pass
-
     # Create modules database
     log.info('Load modules database')
     for module in modules:
