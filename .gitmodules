@@ -4,3 +4,6 @@
 [submodule "disconnect-tracking-protection"]
 	path = disconnect-tracking-protection
 	url = https://github.com/disconnectme/disconnect-tracking-protection.git
+[submodule "Open-Cookie-Database"]
+	path = Open-Cookie-Database
+	url = https://github.com/jkwakman/Open-Cookie-Database.git

@@ -4,8 +4,6 @@ from typing import Callable, List, Optional
 import tld
 from playwright.sync_api import Response
 
-from database import URL
-
 
 class Module:
     def __init__(self, crawler) -> None:
