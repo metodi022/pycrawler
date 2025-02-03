@@ -12,9 +12,22 @@ PyCrawler is a Python-based extendible and modular crawling framework that uses 
 2. Create a Python virtual environment and activate it
 3. Install the requirements from the `requirements.txt` text file
 4. Install additionally browser binaries using `playwright install`. For more information, check [this article](https://playwright.dev/python/docs/intro) and [this article](https://playwright.dev/python/docs/browsers)
+5. Copy `config-example.py` to `config.py` and edit it accordingly
+6. Run `python prepare_database.py` to populate and prepare the database
 
 ## Starting the Crawl
-You can edit the `config.py` file to specify the PostgreSQL database and additional crawling parameters.
+You can edit the `config.py` file to specify the PostgreSQL database and additional crawling parameters before the crawl.
+
+The `add_tasks_tranco.py` scripts allows you to specify a list of sites (Tranco format) which the crawler will be visiting.
+
+```
+usage: add_tasks_tranco.py [-h] -j JOB -f FILE
+
+options:
+  -h, --help            show this help message and exit
+  -j JOB, --job JOB     unique job id for crawl
+  -f FILE, --file FILE  path to tranco CSV file
+```
 
 ```
 usage: main.py [-h] [-m [MODULES ...]] -j JOB -c CRAWLERS [-i CRAWLERID] [-l] [-o LOG]
@@ -34,17 +47,6 @@ options:
 
 For example, if we want to start a single crawler to find login forms, we use the following command:
 `main.py -m FindLoginForms -j <your-job-id> -c 1`
-
-The `add_tasks_tranco.py` scripts allows you to specify a list of sites (Tranco format) which the crawler will be visiting.
-
-```
-usage: add_tasks_tranco.py [-h] -j JOB -f FILE
-
-options:
-  -h, --help            show this help message and exit
-  -j JOB, --job JOB     unique job id for crawl
-  -f FILE, --file FILE  path to tranco CSV file
-```
 
 ## Modules
 You can find existing modules in the `./modules` directory. Additionally, you can create your own modules to do something specific. To do that:

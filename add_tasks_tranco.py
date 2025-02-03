@@ -29,7 +29,7 @@ def main(job: str, file: Optional[pathlib.Path]) -> int:
             site.save()
 
             # Filter out tasks with adult sites
-            if Config.ADULT_FILTER and Site.adult:
+            if Config.ADULT_FILTER and site.adult:
                 continue
 
             task: Task = Task.create(job=job, site=site)

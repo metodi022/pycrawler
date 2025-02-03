@@ -93,7 +93,7 @@ if __name__ == "__main__":
     # Tracking
     with database.atomic():
         for category, entities_category in entities.items():
-            if category in {'Content', 'FingerprintingInvasive', 'FingerprintingGeneral', 'Cryptomining'}:
+            if category in {'FingerprintingInvasive', 'FingerprintingGeneral', 'Cryptomining'}:
                 continue
 
             for entity in entities_category:
