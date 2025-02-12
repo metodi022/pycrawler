@@ -145,12 +145,11 @@ class Crawler:
         if self.state['Initial'] and (self.repetition == 1):
             with database.atomic():
                 self.task.updated = datetime.today()
-                self.task.code = response.status if response is not None else Config.ERROR_CODES['response_error']
                 self.task.error = error_message
 
                 database.execute_sql(
-                    f"UPDATE task SET updated={database.param}, code={database.param}, error={database.param} WHERE id={database.param}",
-                    (self.task.updated, self.task.code, self.task.error, self.task.get_id())
+                    f"UPDATE task SET updated={database.param}, error={database.param} WHERE id={database.param}",
+                    (self.task.updated, self.task.error, self.task.get_id())
                 )
 
             utils.get_screenshot(
@@ -311,7 +310,7 @@ class Crawler:
                 if browser_cache.exists():
                     shutil.rmtree(browser_cache)
 
-            # Close everything (to avoid memory issues)  # TODO do I need that?
+            # Close everything (to avoid memory issues)
             self._close_browser()
 
             # Re-open stuff

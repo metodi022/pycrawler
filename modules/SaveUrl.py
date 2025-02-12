@@ -15,5 +15,7 @@ class SaveUrl(Module):
 
         self.crawler.url.urlfinal = final_url
         self.crawler.url.code = code
+        self.crawler.url.codetext = response.status_text if response is not None else None
+        self.crawler.url.referer = (response.request.header_value('Referer') if response.request is not None else None) if response is not None else None
         self.crawler.url.state = 'complete'
         self.crawler.url.save()

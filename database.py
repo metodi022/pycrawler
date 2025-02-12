@@ -17,13 +17,6 @@ database = SqliteDatabase(Config.SQLITE) if Config.SQLITE else PostgresqlDatabas
 
 
 class BaseModel(Model):
-    created = DateTimeField(default=datetime.now)
-    updated = DateTimeField(default=datetime.now)
-
-    def save(self, *args, **kwargs):
-        self.updated = datetime.now()
-        return super(BaseModel, self).save(*args, **kwargs)
-
     class Meta:
         database = database
 
@@ -46,24 +39,27 @@ class Site(BaseModel):
     malicious = BooleanField(default=None, null=True, index=True)
 
 class Task(BaseModel):
+    created = DateTimeField(default=datetime.now)
+    updated = DateTimeField(default=datetime.now)
     job = CharField(index=True)
     crawler = IntegerField(default=None, null=True, index=True)
     site = ForeignKeyField(Site, index=True)
     landing = DeferredForeignKey("URL", default=None, null=True, backref='tasks', index=True)
     state = CharField(default="free", index=True)
-    code = IntegerField(default=None, null=True, index=True)
     error = TextField(default=None, null=True)
     crawlerstate = BlobField(default=None, null=True)
 
 class URL(BaseModel):
     task = ForeignKeyField(Task, backref='urls', index=True)
     site = ForeignKeyField(Site, index=True)
-    url = TextField(index=True)
+    url = TextField()
     urlfinal = TextField(default=None, null=True)
     fromurl = ForeignKeyField("self", default=None, null=True, backref="from_url", index=True)
     depth = IntegerField(index=True)
     code = IntegerField(default=None, null=True, index=True)
+    codetext = CharField(default=None, null=True, index=True)
     repetition = IntegerField(index=True)
+    referer = TextField(default=None, null=True)
     state = CharField(default="free", index=True)
 
 
