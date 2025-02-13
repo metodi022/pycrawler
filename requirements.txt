@@ -2,3 +2,4 @@ playwright
 psycopg2
 tld
 peewee
+beautifulsoup4

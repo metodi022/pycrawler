@@ -7,7 +7,7 @@ from logging import Logger
 from typing import Any, Callable, Dict, List, Optional, Type, cast
 
 import tld
-from playwright.sync_api import Browser, BrowserContext, Error, Page, Playwright, Response, sync_playwright
+from playwright.sync_api import Browser, BrowserContext, Error, Page, Playwright, Response, sync_playwright, CDPSession
 
 import utils
 from config import Config
@@ -15,7 +15,7 @@ from database import URL, URLDB, Site, Task, database
 from modules.AcceptCookies import AcceptCookies
 from modules.CollectUrls import CollectUrls
 from modules.Module import Module
-from modules.SaveUrl import SaveUrl
+from modules.SaveURL import SaveURL
 
 
 class Crawler:
@@ -68,6 +68,7 @@ class Crawler:
             )
 
         self.page = self.context.new_page()
+        self.cdp = self.context.new_cdp_session(self.page) if Config.BROWSER == 'chromium' else None
 
     def _init_browser_extensions(self) -> None:
         self.log.info("Initializing browser with extensions")
@@ -99,6 +100,7 @@ class Crawler:
             )
 
         self.page = self.context.new_page()
+        self.cdp = self.context.new_cdp_session(self.page) if Config.BROWSER == 'chromium' else None
 
     def _close_browser(self) -> None:
         self.log.info("Closing browser")
@@ -109,6 +111,7 @@ class Crawler:
                 (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-2-{self.site.scheme}-{self.site.site}.png")
             )
 
+        self.cdp.detach()
         self.page.close()
         self.context.close()
 
@@ -124,7 +127,15 @@ class Crawler:
     def _invoke_response_handlers(self, responses: List[Optional[Response]], repetition: int) -> None:
         self.log.info("Invoking response handlers")
 
+        # Prepare response chain if there are redirections
+        response: Optional[Response] = responses[-1]
+        while (response is not None) and (response.request.redirected_from is not None):
+            responses.append(response.request.redirected_from.response())
+            response: Optional[Response] = responses[-1]
+        responses.reverse()
+
         final_url: str = self.page.url
+
         for module in self.modules:
             module.receive_response(responses, final_url, repetition)
 
@@ -134,15 +145,17 @@ class Crawler:
         response: Optional[Response] = None
         error_message: Optional[str] = None
 
+        self.page.wait_for_timeout(Config.WAIT_BEFORE_LOAD)
+
         try:
             response = self.page.goto(cast(str, self.url.url), timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
             self.page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error as error:
             error_message = ((error.name + ' ') if error.name else '') + error.message
-            self.log.error("Error navigating to %s", self.url.url, exc_info=True)
+            self.log.error("Error navigating to %s : %s", self.url.url, error)
 
         # On first visit, also update the task
-        if self.state['Initial'] and (self.repetition == 1):
+        if (cast(URL, self.task.landing).code is None) and (self.repetition == 1):
             with database.atomic():
                 self.task.updated = datetime.today()
                 self.task.error = error_message
@@ -180,10 +193,8 @@ class Crawler:
             self.log.warning("Loading old state")
             self.log.debug(self.state)
 
-        self.state['Initial'] = self.state.get('Initial', True)
-
         # Load state-dependent variables
-        self.url: URL = URL.get_by_id(self.state.get('Crawler', cast(URL, self.task.landing)))
+        self.url: URL = URL.get_by_id(self.state.get('URL', cast(URL, self.task.landing)))
         self.depth: int = self.url.depth
 
         # Prepare browser variables
@@ -191,21 +202,22 @@ class Crawler:
         self.browser: Browser = None
         self.context: BrowserContext = None
         self.page: Page = None
+        self.cdp: Optional[CDPSession] = None
         self.urldb: URLDB = URLDB(self)
 
         # Add URL to database
-        if not self.state['Initial']:
+        if cast(URL, self.task.landing).code is not None:
             # Crawler previously crashed on current URL
             # Therefore, invalidate the current URL
-            self.log.warning("Invalidating latest URL %s", self.url.url)
+            self.log.warning("Invalidating latest crashed URL %s", self.url.url)
             URL.update(code=Config.ERROR_CODES['crawler_error'], state='complete').where(URL.task==self.task, URL.url==self.url.url, URL.depth==self.depth).execute()
 
         # Initialize modules
-        self.modules: List[Module] = [AcceptCookies(self)] if Config.ACCEPT_COOKIES else []
+        self.modules: List[Module] = []  # TODO [AcceptCookies(self)] if Config.ACCEPT_COOKIES else []
         self.modules += [CollectUrls(self)] if Config.RECURSIVE else []
         for module in modules:
             self.modules.append(module(self))
-        self.modules += [SaveUrl(self)]
+        self.modules += [SaveURL(self)]
         self.log.debug(f"Prepared modules: {self.modules}")
 
         # Initialize URL filters
@@ -234,17 +246,17 @@ class Crawler:
             self.log.info(f"Start {Config.BROWSER} with extensions")
 
         # Get URL
-        self.url: URL = self.urldb.get_url(1) if (not self.state['Initial']) else self.url
+        self.url: URL = self.urldb.get_url(1) if (cast(URL, self.task.landing).code is not None) else self.url
         self.log.info(f"Get URL {self.url.url if self.url is not None else self.url} depth {self.url.depth if self.url is not None else self.depth}")
 
         # Update state
         if self.url is not None:
             self.url = cast(URL, self.url)
             self.depth = cast(int, self.url.depth)
-            self.state['Crawler'] = self.url.get_id()
+            self.state['URL'] = self.url.get_id()
 
         # Manual setup here
-        if Config.MANUAL_SETUP and self.state['Initial'] and (self.url is not None):
+        if Config.MANUAL_SETUP and (self.url is not None):
             self.log.info("Initiate manual setup")
 
             response: Optional[Response] = self._open_url()
@@ -264,7 +276,6 @@ class Crawler:
             self.state['Context'] = self.context.storage_state()
             self.page = self.context.new_page()
 
-        self.state['Initial'] = False
         self._update_cache()
 
         # Main loop
@@ -293,7 +304,7 @@ class Crawler:
             if self.url is not None:
                 self.url = cast(URL, self.url)
                 self.depth = cast(int, self.url.depth)
-                self.state['Crawler'] = self.url.get_id()
+                self.state['URL'] = self.url.get_id()
 
             # Save state if needed
             if Config.SAVE_CONTEXT and self.browser:

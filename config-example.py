@@ -27,28 +27,28 @@ class Config:
 
     MANUAL_SETUP: bool = False  # Setup the state manually at the start of the crawl
 
-    RECURSIVE: bool = True  # Discover additional URLs while crawling
+    RECURSIVE: bool = False  # Discover additional URLs while crawling
     BREADTHFIRST: bool = True  # Visit URLs in a breadth-first manner, otherwise depth-first
     SAME_SCHEME: bool = True  # URL discovery for same scheme (protocol) only
     SAME_ORIGIN: bool = False  # URL discovery for same-origin only
     SAME_ETLDP1: bool = True  # URL discovery for same ETLD+1
     SAME_ENTITY: bool = False  # URL discovery for same entity only (ETLD+1 or company, owner, etc.)
-    DEPTH: int = 2  # URL discovery limit; 0 (initial URL only), 1 (+ all URLs from initial page), etc.
+    DEPTH: int = 1  # URL discovery limit; 0 (initial URL only), 1 (+ all URLs from initial page), etc.
     MAX_URLS: int = 1000  # limit number of URLs gathered for a domain
 
     REPETITIONS: int = 1  # how many times to crawl the same URL and invoke module response handlers
 
     WAIT_LOAD_UNTIL: Literal['commit', 'domcontentloaded', 'load', 'networkidle'] = 'load'
+    WAIT_BEFORE_LOAD: int = 1000  # let page wait (ms time) before navigating
     LOAD_TIMEOUT: int = 30000  # URL page loading timeout in ms (0 = disable timeout)
     WAIT_AFTER_LOAD: int = 5000  # let page execute after loading in ms
     RESTART_TIMEOUT: int = 600  # restart crawler if it hasn't done anything for ... seconds
 
-    ACCEPT_COOKIES: bool = False  # Attempt to find cookie banners and accept them (unreliable)
-
     # TODO more options
+    # ACCEPT_COOKIES: bool = False  # Attempt to find cookie banners and accept them (unreliable)
     # OBEY_ROBOTS: bool = False  # obey robots.txt
-    FIRST_AND_LAST: bool = False  # prioritize visiting URLs at the top and the bottom of the HTML first
-    ADULT_FILTER: bool = True  # avoid visiting adult sites
+    FIRST_AND_LAST: bool = False  # prioritize visiting "interesting" URLS (experimental)
+    ADULT_FILTER: bool = False  # avoid visiting adult sites
 
     # Usually the code of the response in DB will be the response status (200, 404, etc.); if an
     # error occurs, for example response is NULL or browser is stuck, use the error codes below
