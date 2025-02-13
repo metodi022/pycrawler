@@ -52,17 +52,18 @@ class Task(BaseModel):
 class URL(BaseModel):
     task = ForeignKeyField(Task, backref='urls', index=True)
     site = ForeignKeyField(Site, index=True)
-    url = TextField(null=True)
-    urlfinal = TextField(default=None, null=True)
     fromurl = ForeignKeyField("self", default=None, null=True, backref="from_url", index=True)
     redirect = ForeignKeyField("self", default=None, null=True, backref="from_url", index=True)
+    url = TextField(null=True)
+    urlfinal = TextField(default=None, null=True)
     depth = IntegerField(index=True)
+    repetition = IntegerField(index=True)
+    state = CharField(default="free", index=True)
     method = CharField(default=None, null=True, index=True)
     code = IntegerField(default=None, null=True, index=True)
     codetext = CharField(default=None, null=True, index=True)
-    content = CharField(default=None, null=True, index=True)
     resource = CharField(default=None, null=True, index=True)
-    repetition = IntegerField(index=True)
+    content = CharField(default=None, null=True, index=True)
     referer = TextField(default=None, null=True)
     location = TextField(default=None, null=True)
     reqheaders = TextField(default=None, null=True)
@@ -70,7 +71,6 @@ class URL(BaseModel):
     metaheaders = TextField(default=None, null=True)
     reqbody = BlobField(default=None, null=True)
     resbody = BlobField(default=None, null=True)
-    state = CharField(default="free", index=True)
 
 class URLDB:
     def __init__(self, crawler) -> None:

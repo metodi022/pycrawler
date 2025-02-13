@@ -1,4 +1,5 @@
 import json
+import re
 import traceback
 from asyncio import CancelledError
 from typing import List, Optional
@@ -32,7 +33,8 @@ class SaveURL(Module):
         if (response is not None) and (response.request.resource_type == 'document'):
             try:
                 metaheaders = BeautifulSoup(response.text(), 'html.parser')
-                metaheaders = json.dumps([str(entry) for entry in metaheaders.find_all('meta')])
+                metaheaders = metaheaders.find_all('meta', attrs={'http-equiv': re.compile('.*')})
+                metaheaders = json.dumps([str(entry['content']) for entry in metaheaders])
             except (Exception, CancelledError) as error:
                 self.crawler.log.warning('SaveURL.py:%s %s', traceback.extract_stack()[-1].lineno, error)
                 metaheaders = None
