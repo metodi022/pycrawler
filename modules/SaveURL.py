@@ -41,9 +41,10 @@ class SaveURL(Module):
         self.crawler.url.method = response.request.method if response is not None else None
         self.crawler.url.code = response.status if response is not None else Config.ERROR_CODES['response_error']
         self.crawler.url.codetext = response.status_text if response is not None else None
-        self.crawler.url.content = response.headers.get('content-type', None) if response is not None else None
+        self.crawler.url.content = response.header_value('Content-Type') if response is not None else None
         self.crawler.url.resource = response.request.resource_type if response is not None else None
         self.crawler.url.referer = response.request.header_value('Referer') if response is not None else None
+        self.crawler.url.location = response.header_value('Location') if response is not None else None
         self.crawler.url.reqheaders = json.dumps(response.request.headers_array()) if response is not None else None
         self.crawler.url.resheaders = json.dumps(response.headers_array()) if response is not None else None
         self.crawler.url.metaheaders = metaheaders
@@ -85,10 +86,11 @@ class SaveURL(Module):
                 method=response.request.method if response is not None else None,
                 code=response.status if response is not None else Config.ERROR_CODES['response_error'],
                 codetext=response.status_text if response is not None else None,
-                content=response.headers.get('content-type', None) if response is not None else None,
+                content=response.header_value('Content-Type') if response is not None else None,
                 resource=response.request.resource_type if response is not None else None,
                 repetition=repetition,
                 referer=response.request.header_value('Referer') if response is not None else None,
+                location = response.header_value('Location') if response is not None else None,
                 reqheaders=json.dumps(response.request.headers_array()) if response is not None else None,
                 resheaders=json.dumps(response.headers_array()) if response is not None else None,
                 metaheaders=metaheaders,

@@ -64,6 +64,7 @@ class URL(BaseModel):
     resource = CharField(default=None, null=True, index=True)
     repetition = IntegerField(index=True)
     referer = TextField(default=None, null=True)
+    location = TextField(default=None, null=True)
     reqheaders = TextField(default=None, null=True)
     resheaders = TextField(default=None, null=True)
     metaheaders = TextField(default=None, null=True)
