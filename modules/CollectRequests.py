@@ -53,23 +53,13 @@ class CollectRequests(Module):
 
         # Create page handler
         def handler(response: Response) -> None:
-            # Check if CSP header exists
+            # Collect headers in meta tags
             try:
-                resource_type = response.request.resource_type
+                metaheaders = BeautifulSoup(response.text(), 'html.parser')
+                metaheaders = metaheaders.find_all('meta', attrs={'http-equiv': re.compile('.*')})
+                metaheaders = json.dumps([str(entry) for entry in metaheaders])
             except (Exception, CancelledError) as error:
                 self.crawler.log.warning('CollectRequests.py:%s %s', traceback.extract_stack()[-1].lineno, error)
-                return
-
-            # Search for CSP header in meta tags
-            if resource_type == 'document':
-                try:
-                    metaheaders = BeautifulSoup(response.text(), 'html.parser')
-                    metaheaders = metaheaders.find_all('meta', attrs={'http-equiv': re.compile('.*')})
-                    metaheaders = [str(entry['content']) for entry in metaheaders]
-                except (Exception, CancelledError) as error:
-                    self.crawler.log.warning('CollectRequests.py:%s %s', traceback.extract_stack()[-1].lineno, error)
-                    metaheaders = None
-            else:
                 metaheaders = None
 
             # Get body
