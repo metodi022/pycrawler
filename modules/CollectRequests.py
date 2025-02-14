@@ -16,6 +16,7 @@ class Request(BaseModel):
     task = ForeignKeyField(Task, index=True)
     site = ForeignKeyField(Site, index=True)
     fromurl = ForeignKeyField(URL, null=True, index=True)
+    redirect = TextField(null=True)
     redirectfrom = TextField(null=True)
     tourl = TextField()
     navigation = BooleanField(index=True)
@@ -81,6 +82,7 @@ class CollectRequests(Module):
                     task=self.crawler.task,
                     site=self.crawler.site,
                     fromurl=self.crawler.url,
+                    redirect=response.request.redirected_to,
                     redirectfrom=response.request.redirected_from.url if response.request.redirected_from is not None else None,
                     tourl=response.request.url,
                     navigation=response.request.is_navigation_request,
