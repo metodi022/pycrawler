@@ -38,6 +38,8 @@ class SaveURL(Module):
             except (Exception, CancelledError) as error:
                 self.crawler.log.warning('SaveURL.py:%s %s', traceback.extract_stack()[-1].lineno, error)
                 metaheaders = None
+        else:
+            metaheaders = None
 
         self.crawler.url.urlfinal = final_url
         self.crawler.url.method = response.request.method if response is not None else None
