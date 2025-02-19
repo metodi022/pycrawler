@@ -2,12 +2,13 @@ import pathlib
 import pickle
 import shutil
 import time
+import traceback
 from datetime import datetime
 from logging import Logger
 from typing import Any, Callable, Dict, List, Optional, Type, cast
 
 import tld
-from playwright.sync_api import Browser, BrowserContext, Error, Page, Playwright, Response, sync_playwright, CDPSession
+from playwright.sync_api import Browser, BrowserContext, CDPSession, Error, Page, Playwright, Response, sync_playwright
 
 import utils
 from config import Config
@@ -152,7 +153,7 @@ class Crawler:
             self.page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error as error:
             error_message = ((error.name + ' ') if error.name else '') + error.message
-            self.log.error("Error navigating to %s : %s", self.url.url, error)
+            self.log.error('crawler.py:%s %s', traceback.extract_stack()[-1].lineno, error)
 
         # On first visit, also update the task
         if (cast(URL, self.task.landing).code is None) and (self.repetition == 1):
@@ -235,7 +236,7 @@ class Crawler:
             self.playwright = sync_playwright().start()
             self._init_browser()
         except Exception as error:
-            self.log.error(error)
+            self.log.error('crawler.py:%s %s', traceback.extract_stack()[-1].lineno, error)
             self.stop = True
             self._delete_cache()
             return
@@ -310,8 +311,8 @@ class Crawler:
             if Config.SAVE_CONTEXT and self.browser:
                 try:
                     self.state['Context'] = self.context.storage_state()
-                except Exception:
-                    self.log.error("Get main context fail", exc_info=True)
+                except Exception as error:
+                    self.log.error('crawler.py:%s %s', traceback.extract_stack()[-1].lineno, error)
 
                 self._update_cache()
 
@@ -328,7 +329,7 @@ class Crawler:
             try:
                 self._init_browser()
             except Exception as error:
-                self.log.error(error)
+                self.log.error('crawler.py:%s %s', traceback.extract_stack()[-1].lineno, error)
                 self.stop = True
 
         # Close everything

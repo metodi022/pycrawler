@@ -228,24 +228,24 @@ if __name__ == '__main__':
                              help="path to directory for log output")
 
     # Parse command line arguments
-    args = vars(args_parser.parse_args())
+    _args = vars(args_parser.parse_args())
 
     try:
-        _validate_arguments(args['crawlers'], args['crawlerid'], args['log'])
+        _validate_arguments(_args['crawlers'], _args['crawlerid'], _args['log'])
     except ValueError as e:
         print(f"Error: {e}")
         sys.exit(1)
 
     # Fix for multiple modules not correctly parsed
-    modules = args['modules'] or []
-    if modules and (' ' in modules[0]):
-        modules = modules[0].split()
+    _modules = _args['modules'] or []
+    if _modules and (' ' in _modules[0]):
+        _modules = _modules[0].split()
 
     sys.exit(main(
-        cast(str, args['job']),
-        cast(int, args['crawlers']),
-        modules,
+        cast(str, _args['job']),
+        cast(int, _args['crawlers']),
+        _modules,
         Config.LOG,
-        cast(int, args['crawlerid']),
-        cast(bool, args['listen'])
+        cast(int, _args['crawlerid']),
+        cast(bool, _args['listen'])
     ))

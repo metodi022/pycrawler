@@ -1,4 +1,5 @@
 import json
+import traceback
 
 from peewee import ProgrammingError
 
@@ -6,23 +7,15 @@ import utils
 from config import Config
 from database import URL, Entity, Site, Task, database
 
-if __name__ == "__main__":
-    # Create tables
-    with database.atomic():
-        database.create_tables([Entity])
-        database.create_tables([Site])
-        database.create_tables([Task])
-        database.create_tables([URL])
 
-        if not Config.SQLITE:
-            try:
-                Task._schema.create_foreign_key(Task.landing)
-            except ProgrammingError:
-                pass
-
+def _load_disconnect():
     # Load disconnect entities
-    with open('disconnect-tracking-protection/services.json', 'r', encoding='utf-8') as file:
-        entities = json.load(file)['categories']
+    try:
+        with open('disconnect-tracking-protection/services.json', 'r', encoding='utf-8') as file:
+            entities = json.load(file)['categories']
+    except Exception as error:
+        print('prepare_database.py:%s %s', traceback.extract_stack()[-1].lineno, error)
+        return
 
     # Fingerprinting
     with database.atomic():
@@ -114,3 +107,21 @@ if __name__ == "__main__":
                     site.entity = entity
                     site.tracking = True
                     site.save()
+
+
+if __name__ == "__main__":
+    # Create tables
+    with database.atomic():
+        database.create_tables([Entity])
+        database.create_tables([Site])
+        database.create_tables([Task])
+        database.create_tables([URL])
+
+        if not Config.SQLITE:
+            try:
+                Task._schema.create_foreign_key(Task.landing)
+            except ProgrammingError:
+                pass
+
+    # Load disconnect data
+    _load_disconnect()
