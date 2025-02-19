@@ -207,11 +207,12 @@ class Crawler:
         self.urldb: URLDB = URLDB(self)
 
         # Add URL to database
-        if cast(URL, self.task.landing).code is not None:
+        if 'URL' in self.state:
             # Crawler previously crashed on current URL
             # Therefore, invalidate the current URL
             self.log.warning("Invalidating latest crashed URL %s", self.url.url)
             URL.update(code=Config.ERROR_CODES['crawler_error'], state='complete').where(URL.task==self.task, URL.url==self.url.url, URL.depth==self.depth).execute()
+            self.url = URL.get_by_id(self.state.get('URL', cast(URL, self.task.landing)))
 
         # Initialize modules
         self.modules: List[Module] = []  # TODO [AcceptCookies(self)] if Config.ACCEPT_COOKIES else []
@@ -247,7 +248,7 @@ class Crawler:
             self.log.info(f"Start {Config.BROWSER} with extensions")
 
         # Get URL
-        self.url: URL = self.urldb.get_url(1) if (cast(URL, self.task.landing).code is not None) else self.url
+        self.url: URL = self.urldb.get_url(1) if self.url.code is not None else self.url
         self.log.info(f"Get URL {self.url.url if self.url is not None else self.url} depth {self.url.depth if self.url is not None else self.depth}")
 
         # Update state
