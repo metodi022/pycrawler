@@ -281,6 +281,7 @@ class Crawler:
         self._update_cache()
 
         # Main loop
+        _count = 0
         while (self.url is not None) and (not self.stop):
             # Invoke module page handlers
             self._invoke_page_handlers()
@@ -323,15 +324,18 @@ class Crawler:
                 if browser_cache.exists():
                     shutil.rmtree(browser_cache)
 
-            # Close everything (to avoid memory issues)
-            self._close_browser()
+            # Restart browser to to avoid memory issues
+            if _count % Config.RESTART_BROWSER == 0:
+                self._close_browser()
 
-            # Re-open stuff
-            try:
-                self._init_browser()
-            except Exception as error:
-                self.log.error('crawler.py:%s %s', traceback.extract_stack()[-1].lineno, error)
-                self.stop = True
+                # Re-open stuff
+                try:
+                    self._init_browser()
+                except Exception as error:
+                    self.log.error('crawler.py:%s %s', traceback.extract_stack()[-1].lineno, error)
+                    self.stop = True
+
+            _count += 1
 
         # Close everything
         self._close_browser()

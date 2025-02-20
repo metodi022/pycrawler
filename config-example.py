@@ -44,6 +44,8 @@ class Config:
     WAIT_AFTER_LOAD: int = 5000  # let page execute after loading in ms
     RESTART_TIMEOUT: int = 600  # restart crawler if it hasn't done anything for ... seconds
 
+    RESTART_BROWSER: int = 10  # Close and re-open browser after ... page visits
+
     # TODO more options
     # ACCEPT_COOKIES: bool = False  # Attempt to find cookie banners and accept them (unreliable)
     # OBEY_ROBOTS: bool = False  # obey robots.txt

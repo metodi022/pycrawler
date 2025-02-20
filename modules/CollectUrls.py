@@ -130,6 +130,7 @@ class CollectUrls(Module):
         self._max_urls -= len(urls)
         self._max_urls = max(0, self._max_urls)
         self.crawler.state['CollectUrls'] = self._max_urls
+        self.crawler._update_cache()
 
     def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
         self._url_filter_out = filters
