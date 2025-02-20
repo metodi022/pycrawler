@@ -1,6 +1,6 @@
 import pathlib
 from logging import DEBUG, ERROR, INFO, WARNING
-from typing import Dict, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 
 class Config:
@@ -16,6 +16,8 @@ class Config:
     LOG_LEVEL = INFO  # DEBUG|INFO|WARNING|ERROR
 
     HAR: Optional[pathlib.Path] = None
+
+    EXTENSIONS: Optional[List[pathlib.Path]] = []
 
     BROWSER: Literal['chromium', 'firefox', 'webkit'] = 'chromium'
     DEVICE: str = 'Desktop Chrome'  # A device supported by playwright (https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/deviceDescriptorsSource.json)

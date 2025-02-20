@@ -95,8 +95,8 @@ class Crawler:
                 Config.LOG / f"browser-{self.task.job}-{self.task.crawler}",
                 headless=Config.HEADLESS,
                 args=[
-                    "--disable-extensions-except=./extensions/consent-o-matic-v1.1.3-chromium",
-                    "--load-extension=./extensions/consent-o-matic-v1.1.3-chromium",
+                    *["--disable-extensions-except=" + str(extension) for extension in Config.EXTENSIONS],
+                    *["--load-extension" + str(extension) for extension in Config.EXTENSIONS],
                 ]
             )
 
@@ -235,7 +235,10 @@ class Crawler:
         # Initiate playwright, browser, context, and page
         try:
             self.playwright = sync_playwright().start()
-            self._init_browser()
+            if Config.EXTENSIONS:
+                self._init_browser_extensions()
+            else:
+                self._init_browser()
         except Exception as error:
             self.log.error('crawler.py:%s %s', traceback.extract_stack()[-1].lineno, error)
             self.stop = True
@@ -330,7 +333,10 @@ class Crawler:
 
                 # Re-open stuff
                 try:
-                    self._init_browser()
+                    if Config.EXTENSIONS:
+                        self._init_browser_extensions()
+                    else:
+                        self._init_browser()
                 except Exception as error:
                     self.log.error('crawler.py:%s %s', traceback.extract_stack()[-1].lineno, error)
                     self.stop = True
