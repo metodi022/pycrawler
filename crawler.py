@@ -86,8 +86,8 @@ class Crawler:
                 record_har_mode='full',
                 record_har_path=(Config.HAR / f"{self.task.job}.har"),
                 args=[
-                    "--disable-extensions-except=./extensions/consent-o-matic-v1.1.3-chromium",
-                    "--load-extension=./extensions/consent-o-matic-v1.1.3-chromium",
+                    *["--disable-extensions-except=" + str(extension) for extension in Config.EXTENSIONS],
+                    *["--load-extension" + str(extension) for extension in Config.EXTENSIONS],
                 ]
             )
         else:
