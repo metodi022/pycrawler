@@ -34,7 +34,7 @@ class Config:
     SAME_ETLDP1: bool = True  # URL discovery for same ETLD+1
     SAME_ENTITY: bool = False  # URL discovery for same entity only (ETLD+1 or company, owner, etc.)
     DEPTH: int = 1  # URL discovery limit; 0 (initial URL only), 1 (+ all URLs from initial page), etc.
-    MAX_URLS: int = 1000  # limit number of URLs gathered for a domain
+    MAX_URLS: int = 100  # limit number of URLs gathered for a domain
 
     REPETITIONS: int = 1  # how many times to crawl the same URL and invoke module response handlers
 

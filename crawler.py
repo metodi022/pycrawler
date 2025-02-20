@@ -316,7 +316,7 @@ class Crawler:
                 except Exception as error:
                     self.log.error('crawler.py:%s %s', traceback.extract_stack()[-1].lineno, error)
 
-                self._update_cache()
+            self._update_cache()
 
             # Delete browser cache if needed
             if (not Config.SAVE_CONTEXT) and (not self.browser):
