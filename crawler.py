@@ -125,8 +125,6 @@ class Crawler:
         self.context.close()
 
     def _close_browser(self) -> None:
-        self.log.info("Closing browser")
-
         if len(self.urldb.get_state('free')) == 0:
             utils.get_screenshot(
                 self.page,
@@ -134,6 +132,7 @@ class Crawler:
             )
 
         self._close_context()
+        self.log.info("Closing browser")
         if self.browser:
             self.browser.close()
 
@@ -324,11 +323,12 @@ class Crawler:
                 self._invoke_response_handlers([response], repetition)
 
                 # Restart page
-                self._close_context()
-                if (Config.BROWSER == 'chromium') and Config.EXTENSIONS:
-                    self._init_context_extensions()
-                else:
-                    self._init_context()
+                if repetition < Config.REPETITIONS:
+                    self._close_context()
+                    if (Config.BROWSER == 'chromium') and Config.EXTENSIONS:
+                        self._init_context_extensions()
+                    else:
+                        self._init_context()
 
             # Get next URL to crawl
             self.url = self.urldb.get_url(1)
@@ -350,7 +350,7 @@ class Crawler:
             self._update_cache()
 
             # Delete cache if needed
-            if (not Config.SAVE_CONTEXT) and (_count % Config.RESTART_BROWSER != 0):
+            if (self.url) and (not self.stop) and (not Config.SAVE_CONTEXT) and (_count % Config.RESTART_BROWSER != 0):
                 self._close_context()
                 self._delete_browser_cache()
                 if (Config.BROWSER == 'chromium') and Config.EXTENSIONS:
@@ -359,7 +359,7 @@ class Crawler:
                     self._init_context()
 
             # Restart browser to to avoid memory issues
-            elif _count % Config.RESTART_BROWSER == 0:
+            elif (self.url) and (not self.stop) and (_count % Config.RESTART_BROWSER == 0):
                 self._close_browser()
 
                 if not Config.SAVE_CONTEXT:

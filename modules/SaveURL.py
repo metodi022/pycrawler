@@ -51,7 +51,7 @@ class SaveURL(Module):
                         (
                             self.crawler.task.get_id(),
                             self.crawler.site.get_id(),
-                            self.crawler.url.fromurl,
+                            self.crawler.url.fromurl.get_id() if self.crawler.url.fromurl is not None else None,
                             previous_response.get_id() if previous_response is not None else None,
                             response.url if response is not None else None,
                             final_url,
@@ -83,7 +83,7 @@ class SaveURL(Module):
                         (
                             self.crawler.task.get_id(),
                             self.crawler.site.get_id(),
-                            self.crawler.url.fromurl,
+                            self.crawler.url.fromurl.get_id() if self.crawler.url.fromurl is not None else None,
                             previous_response,
                             response.url if response is not None else None,
                             final_url,

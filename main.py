@@ -95,7 +95,6 @@ def _get_task(job: str, crawler_id: int, log) -> Optional[Task]:
 
 def _start_crawler(job: str, crawler_id: int, task: int, log_path: pathlib.Path, modules: List[Type[Module]]) -> None:
     log = _get_logger(log_path / f"job{job}crawler{crawler_id}.log", job + str(crawler_id) + __name__)
-    log.info('Start crawler')
     crawler: Crawler = Crawler(task, log, modules)
     crawler.start_crawl()
     log.info('Stop crawler')
