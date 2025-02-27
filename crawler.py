@@ -173,14 +173,13 @@ class Crawler:
 
         # On first visit, also update the task
         if (cast(URL, self.task.landing).code is None) and (self.repetition == 1):
-            with database.atomic():
-                self.task.updated = datetime.today()
-                self.task.error = error_message
+            self.task.updated = datetime.today()
+            self.task.error = error_message
 
-                database.execute_sql(
-                    f"UPDATE task SET updated={database.param}, error={database.param} WHERE id={database.param}",
-                    (self.task.updated, self.task.error, self.task.get_id())
-                )
+            database.execute_sql(
+                f"UPDATE task SET updated={database.param}, error={database.param} WHERE id={database.param}",
+                (self.task.updated, self.task.error, self.task.get_id())
+            )
 
             utils.get_screenshot(
                 self.page,

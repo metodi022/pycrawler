@@ -18,7 +18,7 @@ class Request(BaseModel):
     fromurl = ForeignKeyField(URL, null=True, index=True)
     redirect = TextField(null=True)
     redirectfrom = TextField(null=True)
-    tourl = TextField()
+    url = TextField()
     navigation = BooleanField(index=True)
     mainframe = BooleanField(null=True, index=True)
     serviceworker = BooleanField(index=True)
@@ -28,8 +28,8 @@ class Request(BaseModel):
     method = CharField(index=True)
     code = IntegerField(index=True)
     codetext = CharField(index=True)
-    content = CharField(null=True, index=True)
     resource = CharField(index=True)
+    content = CharField(null=True, index=True)
     referer = TextField(null=True)
     location = TextField(null=True)
     reqheaders = TextField(null=True)
@@ -78,31 +78,37 @@ class CollectRequests(Module):
 
             # Record header
             try:
-                Request.create(
-                    task=self.crawler.task,
-                    site=self.crawler.site,
-                    fromurl=self.crawler.url,
-                    redirect=response.request.redirected_to,
-                    redirectfrom=response.request.redirected_from.url if response.request.redirected_from is not None else None,
-                    tourl=response.request.url,
-                    navigation=response.request.is_navigation_request,
-                    mainframe=(response.frame.parent_frame is None) if response.frame is not None else True,
-                    serviceworker=response.from_service_worker,
-                    frame=response.frame.url if response.frame is not None else None,
-                    depth=self.crawler.depth,
-                    repetition=self.crawler.repetition,
-                    method=response.request.method,
-                    code=response.status,
-                    codetext=response.status_text,
-                    content=response.header_value('Content-Type'),
-                    resource=response.request.resource_type,
-                    referer = response.request.header_value('Referer'),
-                    location=response.header_value('Location'),
-                    reqheaders=json.dumps(response.request.headers_array()),
-                    resheaders=json.dumps(response.headers_array()),
-                    metaheaders=metaheaders,
-                    reqbody=reqbody,
-                    resbody=resbody
+                self.crawler.database.execute_sql(
+                    f"""
+                    INSERT INTO Request (task_id, site_id, fromurl_id, redirect, redirectfrom, url, navigation, mainframe, serviceworker, frame, depth, repetition, method, code, codetext, resource, content, referer, location, reqheaders, resheaders, metaheaders, reqbody, resbody)
+                    VALUES ({self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param})
+                    """,
+                    (
+                        self.crawler.task.get_id(),
+                        self.crawler.site.get_id(),
+                        self.crawler.url.get_id(),
+                        response.request.redirected_to.url if response.request.redirected_to is not None else None,
+                        response.request.redirected_from.url if response.request.redirected_from is not None else None,
+                        response.request.url,
+                        response.request.is_navigation_request(),
+                        (response.frame.parent_frame is None) if response.frame is not None else True,
+                        response.from_service_worker,
+                        response.frame.url if response.frame is not None else None,
+                        self.crawler.depth,
+                        self.crawler.repetition,
+                        response.request.method,
+                        response.status,
+                        response.status_text,
+                        response.request.resource_type,
+                        response.header_value('Content-Type'),
+                        response.request.header_value('Referer'),
+                        response.header_value('Location'),
+                        json.dumps(response.request.headers_array()),
+                        json.dumps(response.headers_array()),
+                        metaheaders,
+                        reqbody,
+                        resbody
+                    )
                 )
             except (Exception, CancelledError) as error:
                 self.crawler.log.warning('CollectRequests.py:%s %s', traceback.extract_stack()[-1].lineno, error)
