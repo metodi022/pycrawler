@@ -80,8 +80,8 @@ class Crawler:
                 record_har_mode='full',
                 record_har_path=(Config.HAR / f"{self.task.job}.har"),
                 args=[
-                    "--disable-extensions-except=" + ','.join(Config.EXTENSIONS),
-                    "--load-extension" + ','.join(Config.EXTENSIONS),
+                    "--disable-extensions-except=" + ','.join([str(extension) for extension in Config.EXTENSIONS]),
+                    "--load-extension" + ','.join([str(extension) for extension in Config.EXTENSIONS]),
                 ]
             )
         else:
@@ -89,8 +89,8 @@ class Crawler:
                 Config.LOG / f"browser-{self.task.job}-{self.task.crawler}",
                 headless=Config.HEADLESS,
                 args=[
-                    "--disable-extensions-except=" + ','.join(Config.EXTENSIONS),
-                    "--load-extension" + ','.join(Config.EXTENSIONS),
+                    "--disable-extensions-except=" + ','.join([str(extension) for extension in Config.EXTENSIONS]),
+                    "--load-extension" + ','.join([str(extension) for extension in Config.EXTENSIONS]),
                 ]
             )
 
@@ -194,6 +194,8 @@ class Crawler:
 
     def __init__(self, taskid: int, log: Logger, modules: List[Type[Module]]) -> None:
         log.info("Crawler initializing")
+
+        self.database = database
 
         # Prepare variables
         self.stop: bool = cast(bool, False)
