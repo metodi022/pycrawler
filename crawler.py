@@ -322,13 +322,24 @@ class Crawler:
             self._update_cache()
 
             # Delete browser cache if needed
-            if (not Config.SAVE_CONTEXT) and (not self.browser):
-                browser_cache: pathlib.Path = Config.LOG / f"browser-{self.task.job}-{self.task.crawler}"
-                if browser_cache.exists():
-                    shutil.rmtree(browser_cache)
+            if not Config.SAVE_CONTEXT:
+                self._close_browser()
+                if not self.browser:
+                    browser_cache: pathlib.Path = Config.LOG / f"browser-{self.task.job}-{self.task.crawler}"
+                    if browser_cache.exists():
+                        shutil.rmtree(browser_cache)
+                # Re-open stuff
+                try:
+                    if (Config.BROWSER == 'chromium') and Config.EXTENSIONS:
+                        self._init_browser_extensions()
+                    else:
+                        self._init_browser()
+                except Exception as error:
+                    self.log.error('crawler.py:%s %s', traceback.extract_stack()[-1].lineno, error)
+                    self.stop = True
 
             # Restart browser to to avoid memory issues
-            if _count % Config.RESTART_BROWSER == 0:
+            elif _count % Config.RESTART_BROWSER == 0:
                 self._close_browser()
 
                 # Re-open stuff
@@ -340,7 +351,6 @@ class Crawler:
                 except Exception as error:
                     self.log.error('crawler.py:%s %s', traceback.extract_stack()[-1].lineno, error)
                     self.stop = True
-
             _count += 1
 
         # Close everything
