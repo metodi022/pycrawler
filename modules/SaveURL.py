@@ -39,6 +39,8 @@ class SaveURL(Module):
                     except (Exception, CancelledError) as error:
                         self.crawler.log.warning('SaveURL.py:%s %s', traceback.extract_stack()[-1].lineno, error)
                         metaheaders = None
+                else:
+                    metaheaders = None
 
                 if previous_response is None:
                     previous_response = self.crawler.database.execute_sql(
