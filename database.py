@@ -12,7 +12,7 @@ database = SqliteDatabase(Config.SQLITE) if Config.SQLITE else PostgresqlDatabas
     password=Config.PASSWORD,
     host=Config.HOST,
     port=Config.PORT,
-    autorollback=True
+    autorollback=False
 )
 
 

@@ -164,13 +164,12 @@ class Crawler:
         error_message: Optional[str] = None
 
         self.page.wait_for_timeout(Config.WAIT_BEFORE_LOAD)
-
         try:
             response = self.page.goto(cast(str, self.url.url), timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
-            self.page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         except Error as error:
             error_message = ((error.name + ' ') if error.name else '') + error.message
             self.log.error('crawler.py:%s %s', traceback.extract_stack()[-1].lineno, error)
+        self.page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
         # On first visit, also update the task
         if (cast(URL, self.task.landing).code is None) and (self.repetition == 1):
@@ -314,12 +313,14 @@ class Crawler:
                     self.url = cast(URL, self.urldb.get_url(repetition))
 
                 # Invoke module page handlers
+                database.execute_sql('BEGIN TRANSACTION;')
                 self._invoke_page_handlers()
 
                 # Navigate to page
                 response: Optional[Response] = self._open_url()
 
                 # Run modules response handler
+                database.execute_sql('COMMIT TRANSACTION;')
                 self._invoke_response_handlers([response], repetition)
 
                 # Restart page
