@@ -86,8 +86,8 @@ class Crawler:
                 record_har_mode='full',
                 record_har_path=(Config.HAR / f"{self.task.job}.har"),
                 args=[
-                    *["--disable-extensions-except=" + str(extension) for extension in Config.EXTENSIONS],
-                    *["--load-extension" + str(extension) for extension in Config.EXTENSIONS],
+                    "--disable-extensions-except=" + ','.join(Config.EXTENSIONS),
+                    "--load-extension" + ','.join(Config.EXTENSIONS),
                 ]
             )
         else:
@@ -95,8 +95,8 @@ class Crawler:
                 Config.LOG / f"browser-{self.task.job}-{self.task.crawler}",
                 headless=Config.HEADLESS,
                 args=[
-                    *["--disable-extensions-except=" + str(extension) for extension in Config.EXTENSIONS],
-                    *["--load-extension" + str(extension) for extension in Config.EXTENSIONS],
+                    "--disable-extensions-except=" + ','.join(Config.EXTENSIONS),
+                    "--load-extension" + ','.join(Config.EXTENSIONS),
                 ]
             )
 
@@ -235,7 +235,7 @@ class Crawler:
         # Initiate playwright, browser, context, and page
         try:
             self.playwright = sync_playwright().start()
-            if Config.EXTENSIONS:
+            if (Config.BROWSER == 'chromium') and Config.EXTENSIONS:
                 self._init_browser_extensions()
             else:
                 self._init_browser()
@@ -333,7 +333,7 @@ class Crawler:
 
                 # Re-open stuff
                 try:
-                    if Config.EXTENSIONS:
+                    if (Config.BROWSER == 'chromium') and Config.EXTENSIONS:
                         self._init_browser_extensions()
                     else:
                         self._init_browser()
