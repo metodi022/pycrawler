@@ -150,6 +150,3 @@ class URLDB:
 
             for repetition in range(2, Config.REPETITIONS + 1):
                 URL.create(**url_data, repetition=repetition, state="waiting")
-
-    def get_state(self, state: str) -> list[int]:
-        return list(URL.select(URL.id).where(URL.task==self.crawler.task, URL.state==state))

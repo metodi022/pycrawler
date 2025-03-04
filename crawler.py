@@ -80,8 +80,8 @@ class Crawler:
                 record_har_mode='full',
                 record_har_path=(Config.HAR / f"{self.task.job}.har"),
                 args=[
-                    "--disable-extensions-except=" + ','.join([str(extension) for extension in Config.EXTENSIONS]),
-                    "--load-extension" + ','.join([str(extension) for extension in Config.EXTENSIONS]),
+                    "--disable-extensions-except=" + ','.join([str(extension) for extension in Config.EXTENSIONS or []]),
+                    "--load-extension" + ','.join([str(extension) for extension in Config.EXTENSIONS or []]),
                 ]
             )
         else:
@@ -89,8 +89,8 @@ class Crawler:
                 Config.LOG / f"browser-{self.task.job}-{self.task.crawler}",
                 headless=Config.HEADLESS,
                 args=[
-                    "--disable-extensions-except=" + ','.join([str(extension) for extension in Config.EXTENSIONS]),
-                    "--load-extension" + ','.join([str(extension) for extension in Config.EXTENSIONS]),
+                    "--disable-extensions-except=" + ','.join([str(extension) for extension in Config.EXTENSIONS or []]),
+                    "--load-extension" + ','.join([str(extension) for extension in Config.EXTENSIONS or []]),
                 ]
             )
 
@@ -125,12 +125,6 @@ class Crawler:
         self.context.close()
 
     def _close_browser(self) -> None:
-        if len(self.urldb.get_state('free')) == 0:
-            utils.get_screenshot(
-                self.page,
-                (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-2-{self.site.scheme}-{self.site.site}.png")
-            )
-
         self._close_context()
         self.log.info("Closing browser")
         if self.browser:
@@ -303,32 +297,25 @@ class Crawler:
         # Main loop
         _count = 0
         while (self.url is not None) and (not self.stop):
-            # Repetition loop
-            for repetition in range(Config.REPETITIONS):
-                repetition += 1
-                self.repetition = repetition
+            # TODO implement better repetition loop
+            self.repetition = 1
 
-                if repetition > 1:
-                    self.url = cast(URL, self.urldb.get_url(repetition))
-
-                # Invoke module page handlers
-                database.execute_sql('BEGIN TRANSACTION;')
+            # Invoke module page handlers
+            if (_count == 0) or (not Config.SAVE_CONTEXT) or ((_count > 0) and ((_count - 1) % Config.RESTART_BROWSER == 0)):
                 self._invoke_page_handlers()
 
-                # Navigate to page
-                response: Optional[Response] = self._open_url()
+            # Navigate to page
+            response: Optional[Response] = self._open_url()
 
-                # Run modules response handler
-                database.execute_sql('COMMIT TRANSACTION;')
-                self._invoke_response_handlers([response], repetition)
+            # Run modules response handler
+            self._invoke_response_handlers([response], self.repetition)
 
-                # Restart page
-                if repetition < Config.REPETITIONS:
-                    self._close_context()
-                    if (Config.BROWSER == 'chromium') and Config.EXTENSIONS:
-                        self._init_context_extensions()
-                    else:
-                        self._init_context()
+            # Last screenshot
+            if not database.execute_sql(f"SELECT id FROM URL WHERE task_id={database.param} AND state='free' LIMIT 1", (self.task.get_id(),)).fetchone():
+                utils.get_screenshot(
+                    self.page,
+                    (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-2-{self.site.scheme}-{self.site.site}.png")
+                )
 
             # Get next URL to crawl
             self.url = self.urldb.get_url(1)
