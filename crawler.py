@@ -195,7 +195,7 @@ class Crawler:
         self.site: Site = cast(Site, self.task.site)
         self.landing: URL = cast(URL, self.task.landing)
         self.origin: str = utils.get_url_origin(utils.get_tld_object(self.landing.url))
-        self.repetition: int = cast(int, 1)
+        self.repetition: int = 1
 
         # Load previous state
         self.state: Dict[str, Any] = cast(Dict[str, Any], self.task.crawlerstate or {})
@@ -222,7 +222,7 @@ class Crawler:
             # Crawler previously crashed on current URL
             # Therefore, invalidate the current URL
             self.log.warning("Invalidating latest crashed URL %s", self.url.url)
-            URL.update(code=Config.ERROR_CODES['crawler_error'], state='complete').where(URL.task==self.task, URL.url==self.url.url, URL.depth==self.depth).execute()
+            URL.update(code=Config.ERROR_CODES['crawler_error'], state='complete').where(URL.task==self.task, URL.url==self.url.url, URL.depth==self.depth, URL.state!='complete').execute()
             self.url = URL.get_by_id(self.state.get('URL', cast(URL, self.task.landing)))
 
         # Initialize modules
@@ -263,7 +263,7 @@ class Crawler:
 
         # Get URL
         self.url: URL = self.urldb.get_url(1) if self.url.code is not None else self.url
-        self.log.info(f"Get URL {self.url.url if self.url is not None else self.url} depth {self.url.depth if self.url is not None else self.depth}")
+        self.log.info(f"Get URL {self.url.url if self.url is not None else self.url} depth {self.url.depth if self.url is not None else self.depth} repetition 1")
 
         # Update state
         if self.url is not None:
@@ -297,65 +297,73 @@ class Crawler:
         # Main loop
         _count = 0
         while (self.url is not None) and (not self.stop):
-            # TODO implement better repetition loop
-            self.repetition = 1
+            for repetition in range(Config.REPETITIONS):
+                if (self.url is None) or self.stop:
+                    break
 
-            # Invoke module page handlers
-            if (_count == 0) or (not Config.SAVE_CONTEXT) or ((_count > 0) and ((_count - 1) % Config.RESTART_BROWSER == 0)):
-                self._invoke_page_handlers()
+                self.repetition = repetition + 1
 
-            # Navigate to page
-            response: Optional[Response] = self._open_url()
+                # Invoke module page handlers
+                if (_count == 0) or ((self.repetition == 1) and (_count > 0) and ((_count - 1) % Config.RESTART_BROWSER == 0)) or (not Config.SAVE_CONTEXT):
+                    self._invoke_page_handlers()
 
-            # Run modules response handler
-            self._invoke_response_handlers([response], self.repetition)
+                # Navigate to page
+                response: Optional[Response] = self._open_url()
 
-            # Last screenshot
-            if not database.execute_sql(f"SELECT id FROM URL WHERE task_id={database.param} AND state='free' LIMIT 1", (self.task.get_id(),)).fetchone():
-                utils.get_screenshot(
-                    self.page,
-                    (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-2-{self.site.scheme}-{self.site.site}.png")
-                )
+                # Run modules response handler
+                self._invoke_response_handlers([response], self.repetition)
 
-            # Get next URL to crawl
-            self.url = self.urldb.get_url(1)
-            self.log.info(f"Get URL {self.url.url if self.url is not None else self.url} depth {self.url.depth if self.url is not None else self.depth}")
+                # Last screenshot
+                if (self.repetition == Config.REPETITIONS) and (not database.execute_sql(f"SELECT id FROM URL WHERE task_id={database.param} AND state='free' LIMIT 1", (self.task.get_id(),)).fetchone()):
+                    utils.get_screenshot(
+                        self.page,
+                        (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-2-{self.site.scheme}-{self.site.site}.png")
+                    )
 
-            # Update state
-            if self.url is not None:
-                self.url = cast(URL, self.url)
-                self.depth = cast(int, self.url.depth)
-                self.state['URL'] = self.url.get_id()
-
-            # Save state if needed
-            if Config.SAVE_CONTEXT and self.browser:
-                try:
-                    self.state['Context'] = self.context.storage_state()
-                except Exception as error:
-                    self.log.error('crawler.py:%s %s', traceback.extract_stack()[-1].lineno, error)
-
-            self._update_cache()
-
-            # Delete cache if needed
-            if (self.url) and (not self.stop) and (not Config.SAVE_CONTEXT) and (_count % Config.RESTART_BROWSER != 0):
-                self._close_context()
-                self._delete_browser_cache()
-                if (Config.BROWSER == 'chromium') and Config.EXTENSIONS:
-                    self._init_context_extensions()
+                # Get next URL to crawl
+                if self.repetition == Config.REPETITIONS:
+                    self.url = self.urldb.get_url(1)
+                    self.repetition = 1
                 else:
-                    self._init_context()
+                    self.url = self.urldb.get_url(self.repetition)
+                self.log.info(f"Get URL {self.url.url if self.url is not None else self.url} depth {self.url.depth if self.url is not None else self.depth} repetition {self.repetition}")
 
-            # Restart browser to to avoid memory issues
-            elif (self.url) and (not self.stop) and (_count % Config.RESTART_BROWSER == 0):
-                self._close_browser()
+                # Update state
+                if self.url is not None:
+                    self.url = cast(URL, self.url)
+                    self.depth = cast(int, self.url.depth)
+                    self.state['URL'] = self.url.get_id()
 
-                if not Config.SAVE_CONTEXT:
+                # Save state if needed
+                if Config.SAVE_CONTEXT and self.browser and (self.repetition == 1):
+                    try:
+                        self.state['Context'] = self.context.storage_state()
+                    except Exception as error:
+                        self.log.error('crawler.py:%s %s', traceback.extract_stack()[-1].lineno, error)
+
+                self._update_cache()
+
+                # Delete cache if needed
+                if self.url and (not self.stop) and (not Config.SAVE_CONTEXT) and ((_count % Config.RESTART_BROWSER != 0) or (self.repetition > 1)):
+                    self._close_context()
                     self._delete_browser_cache()
+                    if (Config.BROWSER == 'chromium') and Config.EXTENSIONS:
+                        self._init_context_extensions()
+                    else:
+                        self._init_context()
 
-                if (Config.BROWSER == 'chromium') and Config.EXTENSIONS:
-                    self._init_browser_extensions()
-                else:
-                    self._init_browser()
+                # Restart browser to to avoid memory issues
+                elif (self.repetition == 1) and self.url and (not self.stop) and (_count % Config.RESTART_BROWSER == 0):
+                    self._close_browser()
+
+                    if not Config.SAVE_CONTEXT:
+                        self._delete_browser_cache()
+
+                    if (Config.BROWSER == 'chromium') and Config.EXTENSIONS:
+                        self._init_browser_extensions()
+                    else:
+                        self._init_browser()
+
             _count += 1
 
         # Close everything
