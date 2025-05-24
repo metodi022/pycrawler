@@ -1,7 +1,8 @@
+from abc import abstractmethod
 from datetime import datetime
 from typing import Optional
 
-from peewee import BlobField, BooleanField, CharField, DateTimeField, DeferredForeignKey, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, SqliteDatabase, TextField
+from peewee import AutoField, BlobField, BooleanField, CharField, DateTimeField, DeferredForeignKey, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, SqliteDatabase, TextField
 
 import utils
 from config import Config
@@ -20,6 +21,10 @@ class BaseModel(Model):
     class Meta:
         database = database
 
+    @abstractmethod
+    @classmethod
+    def create_table(cls, safe: bool = False, **options) -> None:
+        ...
 
 class Entity(BaseModel):
     name = CharField(primary_key=True, null=False, index=True, unique=True)
@@ -28,37 +33,114 @@ class Entity(BaseModel):
     fingerprinting = BooleanField(default=None, null=True, index=True)
     malicious = BooleanField(default=None, null=True, index=True)
 
+    @classmethod
+    def create_table(cls, safe: bool = False, **options) -> None:
+        if database.table_exists('entity'):
+            return
+
+        with database.atomic():
+            database.execute_sql("""
+                CREATE TABLE entity (
+                name VARCHAR PRIMARY KEY,
+                adult BOOLEAN DEFAULT NULL,
+                tracking BOOLEAN DEFAULT NULL,
+                fingerprinting BOOLEAN DEFAULT NULL,
+                malicious BOOLEAN DEFAULT NULL);
+
+                CREATE INDEX idx_entity_adult ON entity(adult);
+                CREATE INDEX idx_entity_tracking ON entity(tracking);
+                CREATE INDEX idx_entity_fingerprinting ON entity(fingerprinting);
+                CREATE INDEX idx_entity_malicious ON entity(malicious);
+            """)
+
 class Site(BaseModel):
-    entity = ForeignKeyField(Entity, default=None, null=True, index=True)
-    scheme = CharField(default=None, null=True, index=True)
+    id = AutoField()
+    scheme = CharField(default='https', null=False, index=True)
     site = CharField(index=True, null=False)
+    entity = ForeignKeyField(Entity, default=None, null=True, index=True)
     rank = IntegerField(default=None, null=True, index=True)
     adult = BooleanField(default=None, null=True, index=True)
     tracking = BooleanField(default=None, null=True, index=True)
     fingerprinting = BooleanField(default=None, null=True, index=True)
     malicious = BooleanField(default=None, null=True, index=True)
 
+    @classmethod
+    def create_table(cls, safe: bool = False, **options) -> None:
+        if database.table_exists('site'):
+            return
+
+        with database.atomic():
+            database.execute_sql("""
+                CREATE TABLE site (
+                id SERIAL PRIMARY KEY,
+                scheme VARCHAR NOT NULL DEFAULT 'https',
+                site VARCHAR NOT NULL,
+                entity VARCHAR REFERENCES entity(name) DEFAULT NULL,
+                rank INTEGER DEFAULT NULL,
+                adult BOOLEAN DEFAULT NULL,
+                tracking BOOLEAN DEFAULT NULL,
+                fingerprinting BOOLEAN DEFAULT NULL,
+                malicious BOOLEAN DEFAULT NULL,
+                UNIQUE (scheme, site)
+                );
+
+                CREATE INDEX idx_site_entity ON site(entity);
+                CREATE INDEX idx_site_rank ON site(rank);
+                CREATE INDEX idx_site_adult ON site(adult);
+                CREATE INDEX idx_site_tracking ON site(tracking);
+                CREATE INDEX idx_site_fingerprinting ON site(fingerprinting);
+                CREATE INDEX idx_site_malicious ON site(malicious);
+            """)
+
 class Task(BaseModel):
+    id = AutoField()
     created = DateTimeField(default=datetime.now)
     updated = DateTimeField(default=datetime.now)
-    job = CharField(index=True)
+    job = CharField(index=True, null=False)
+    site = ForeignKeyField(Site, index=True, null=False)
     crawler = IntegerField(default=None, null=True, index=True)
-    site = ForeignKeyField(Site, index=True)
     landing = DeferredForeignKey("URL", default=None, null=True, backref='tasks', index=True)
     state = CharField(default="free", index=True)
     error = TextField(default=None, null=True)
     crawlerstate = BlobField(default=None, null=True)
 
+    @classmethod
+    def create_table(cls, safe: bool = False, **options) -> None:
+        if database.table_exists('task'):
+            return
+
+        with database.atomic():
+            database.execute_sql("""
+                CREATE TABLE task (
+                id SERIAL PRIMARY KEY,
+                job VARCHAR NOT NULL,
+                site INTEGER NOT NULL REFERENCES site(id),
+                created TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                state ENUM('free', 'progress', 'waiting', 'complete') NOT NULL DEFAULT 'free',
+                crawler INTEGER DEFAULT NULL,
+                landing INTEGER REFERENCES url(id) DEFAULT NULL,
+                error TEXT DEFAULT NULL,
+                crawlerstate BYTEA DEFAULT NULL);
+
+                CREATE INDEX idx_task_job ON task(job);
+                CREATE INDEX idx_task_site ON task(site);
+                CREATE INDEX idx_task_state ON task(state);
+                CREATE INDEX idx_task_crawler ON task(crawler);
+                CREATE INDEX idx_task_landing ON task(landing);
+            """)
+
 class URL(BaseModel):
-    task = ForeignKeyField(Task, backref='urls', index=True)
-    site = ForeignKeyField(Site, index=True)
+    id = AutoField()
+    task = ForeignKeyField(Task, backref='urls', index=True, null=False)
+    site = ForeignKeyField(Site, index=True, null=False)
     fromurl = ForeignKeyField("self", default=None, null=True, backref="from_url", index=True)
     redirect = ForeignKeyField("self", default=None, null=True, backref="from_url", index=True)
     url = TextField(null=True)
     urlfinal = TextField(default=None, null=True)
-    depth = IntegerField(index=True)
-    repetition = IntegerField(index=True)
-    state = CharField(default="free", index=True)
+    depth = IntegerField(index=True, null=False)
+    repetition = IntegerField(index=True, null=False)
+    state = CharField(default="free", index=True, null=False)
     method = CharField(default=None, null=True, index=True)
     code = IntegerField(default=None, null=True, index=True)
     codetext = CharField(default=None, null=True, index=True)
@@ -71,6 +153,51 @@ class URL(BaseModel):
     metaheaders = TextField(default=None, null=True)
     reqbody = BlobField(default=None, null=True)
     resbody = BlobField(default=None, null=True)
+
+    @classmethod
+    def create_table(cls, safe: bool = False, **options) -> None:
+        if database.table_exists('url'):
+            return
+
+        with database.atomic():
+            database.execute_sql("""
+                CREATE TABLE url (
+                id SERIAL PRIMARY KEY,
+                task INTEGER NOT NULL REFERENCES task(id),
+                site INTEGER NOT NULL REFERENCES site(id),
+                fromurl INTEGER REFERENCES url(id) DEFAULT NULL,
+                redirect INTEGER REFERENCES url(id) DEFAULT NULL,
+                url TEXT,
+                urlfinal TEXT DEFAULT NULL,
+                depth INTEGER NOT NULL,
+                repetition INTEGER NOT NULL,
+                state ENUM('free', 'progress', 'waiting', 'complete') NOT NULL DEFAULT 'free',
+                method VARCHAR DEFAULT NULL,
+                code INTEGER DEFAULT NULL,
+                codetext VARCHAR DEFAULT NULL,
+                resource VARCHAR DEFAULT NULL,
+                content VARCHAR DEFAULT NULL,
+                referer TEXT DEFAULT NULL,
+                location TEXT DEFAULT NULL,
+                reqheaders TEXT DEFAULT NULL,
+                resheaders TEXT DEFAULT NULL,
+                metaheaders TEXT DEFAULT NULL,
+                reqbody BYTEA DEFAULT NULL,
+                resbody BYTEA DEFAULT NULL);
+
+                CREATE INDEX idx_url_task ON url(task);
+                CREATE INDEX idx_url_site ON url(site);
+                CREATE INDEX idx_url_fromurl ON url(fromurl);
+                CREATE INDEX idx_url_redirect ON url(redirect);
+                CREATE INDEX idx_url_depth ON url(depth);
+                CREATE INDEX idx_url_repetition ON url(repetition);
+                CREATE INDEX idx_url_state ON url(state);
+                CREATE INDEX idx_url_method ON url(method);
+                CREATE INDEX idx_url_code ON url(code);
+                CREATE INDEX idx_url_codetext ON url(codetext);
+                CREATE INDEX idx_url_resource ON url(resource);
+                CREATE INDEX idx_url_content ON url(content);
+            """)
 
 class URLDB:
     def __init__(self, crawler) -> None:
@@ -105,28 +232,22 @@ class URLDB:
             url = URL.get_or_none(*query)
 
         if url:
-            url.state = "progress"
+            url.state = "progress"  # type: ignore
             url.save()
 
         return url
 
     def get_seen(self, url: str) -> bool:
-        url = url.rstrip('/')
-        return (url in self._seen) or ((url + '/') in self._seen)
+        return utils.normalize_url(url) in self._seen
 
-    def add_seen(self, url: str, query_fragment: bool):
-        if query_fragment:
-            self._seen.add(url)
-        else:
-            url = url.rstrip('/')
-            self._seen.add(url)
-            self._seen.add(url + '/')
+    def add_seen(self, url: str) -> None:
+        self._seen.add(utils.normalize_url(url))
 
-    def add_url(self, url: str, depth: int, query_fragment: bool, fromurl: Optional[URL], force: bool = False) -> None:
+    def add_url(self, url: str, depth: int, fromurl: Optional[URL], force: bool = False) -> None:
         if (not force) and self.get_seen(url):
             return
 
-        self.add_seen(url, query_fragment)
+        self.add_seen(url)
 
         url_parsed = utils.get_tld_object(url)
         if url_parsed is None:
@@ -145,8 +266,7 @@ class URLDB:
             "depth": depth
         }
 
-        with database.atomic():
-            URL.create(**url_data, repetition=1)
+        URL.create(**url_data, repetition=1)
 
-            for repetition in range(2, Config.REPETITIONS + 1):
-                URL.create(**url_data, repetition=repetition, state="waiting")
+        for repetition in range(2, Config.REPETITIONS + 1):
+            URL.create(**url_data, repetition=repetition, state="waiting")

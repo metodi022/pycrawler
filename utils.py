@@ -1,6 +1,7 @@
 import pathlib
 import re
-from typing import List, Optional
+from typing import Optional
+from urllib.parse import urljoin, urlparse, urlunparse
 
 import tld
 from playwright.sync_api import BrowserContext, Error, Frame, Locator, Page, Response
@@ -20,9 +21,30 @@ SSO: str = r'facebook|twitter|google|yahoo|windows.?live|linked.?in|git.?hub|pay
 
 def get_tld_object(url: str) -> Optional[tld.utils.Result]:
     try:
-        return tld.get_tld(url, as_object=True)
+        return tld.get_tld(url, as_object=True)  # type: ignore
     except (TldBadUrl, TldDomainNotFound):
         return None
+
+def normalize_url(url: str, query: bool = True, fragment: bool = False) -> str:
+    url = url.strip().rstrip('/')
+
+    parsed = urlparse(url)
+    scheme = parsed.scheme.lower()
+    netloc = parsed.hostname.lower() if parsed.hostname else ''
+
+    if ((scheme == 'http') and (parsed.port == 80)) or ((scheme == 'https') and (parsed.port == 443)):
+        pass
+    elif parsed.port:
+        netloc += f':{parsed.port}'
+
+    path = parsed.path or '/'
+    while '//' in path:
+        path = path.replace('//', '/')
+
+    if path != '/' and path.endswith('/'):
+        path = path.rstrip('/')
+
+    return urlunparse((scheme, netloc, path, '', parsed.query if query else '', parsed.fragment if fragment else ''))
 
 def get_url_scheme(url: tld.utils.Result) -> str:
     return url.parsed_url.scheme
@@ -34,32 +56,23 @@ def get_url_site(url: tld.utils.Result) -> str:
     return url.fld
 
 def get_url_scheme_site(url: tld.utils.Result) -> str:
-    return url.parsed_url.scheme + '://' + url.fld
+    return normalize_url(url.parsed_url.scheme + '://' + url.fld, fragment=True)
 
 def get_url_str(url: tld.utils.Result) -> str:
-    return url.parsed_url.scheme + '://' + url.parsed_url.netloc + url.parsed_url.path
+    return normalize_url(url.parsed_url.scheme + '://' + url.parsed_url.netloc + url.parsed_url.path, fragment=True)
 
 def get_url_str_with_query(url: tld.utils.Result) -> str:
-    return get_url_str(url) + ('?' if url.parsed_url.query else '') + url.parsed_url.query
+    return normalize_url(get_url_str(url) + ('?' if url.parsed_url.query else '') + url.parsed_url.query, fragment=True)
 
 def get_url_str_with_query_fragment(url: tld.utils.Result) -> str:
-    return get_url_str_with_query(url) + ('#' if url.parsed_url.fragment else '') + url.parsed_url.fragment
+    return normalize_url(get_url_str_with_query(url) + ('#' if url.parsed_url.fragment else '') + url.parsed_url.fragment, fragment=True)
 
-def get_url_from_href(href: str, origin: tld.utils.Result) -> Optional[tld.utils.Result]:
+def get_url_from_href(href: str, page: tld.utils.Result) -> Optional[tld.utils.Result]:
     if (href is None) or (not href.strip()):
         return None
 
-    if '://' in href:
-        return get_tld_object(href)
-
-    if href.startswith('//'):
-        return get_tld_object(origin.parsed_url.scheme + ":" + href)
-
-    if href[0] == '/':
-        return get_tld_object(origin.parsed_url.scheme + "://" + origin.parsed_url.netloc + href)
-
-    url = get_url_str(origin)
-    return get_tld_object((url + href) if (url[-1] == '/') else (url + '/' + href))
+    href_final = urljoin(get_url_str_with_query_fragment(page), href)
+    return get_tld_object(normalize_url(href_final, fragment=True))
 
 
 def get_screenshot(page: Page, path: pathlib.Path, force: bool = False, full_page: bool = False) -> bool:
@@ -126,7 +139,7 @@ def invoke_click(page: Page | Frame, clickable: Locator, timeout=30000, trial=Fa
         clickable.hover(timeout=timeout, trial=trial)
         page.wait_for_timeout(250)
         clickable.click(delay=350, timeout=timeout, trial=trial)
-        page.wait_for_load_state(Config.WAIT_LOAD_UNTIL)
+        page.wait_for_load_state(state=(Config.WAIT_LOAD_UNTIL if Config.WAIT_LOAD_UNTIL != 'commit' else 'load'))
         page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
         return True
     except Error:
@@ -177,32 +190,26 @@ def goto(page: Page | Frame, url: str) -> Optional[Response]:
     return response
 
 
-def search_google(context: BrowserContext, query: str, page_number: int = 0, start_page: int = 0) -> List[str]:
-    result: List[str] = []
+def search_google(context: BrowserContext, query: str, page_number: int = 0, start_page: int = 0) -> list[str]:
+    result: list[str] = []
     page: Page = context.new_page()
 
-    url: str = f'https://www.google.com/search?q={query}&start={(page_number + start_page) * 10}'
-    response: Optional[Response] = None
-
     try:
-        response = page.goto(url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
-        page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
-    except Error:
-        # Ignored
-        pass
+        url: str = f'https://www.google.com/search?q={query}&start={(page_number + start_page) * 10}'
+        response: Optional[Response] = None
 
-    try:
-        body: str = response.text()
-        result = re.findall(r'<a jsname=".+?" href=".+?" data-ved=".+?" ping=".+?">', body)
-        result = re.findall(r'(?<=href=").+?(?=")', ''.join(result))
-    except Error:
-        # Ignored
-        pass
+        try:
+            response = page.goto(url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
+            page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
+        except Error:
+            # Ignored
+            pass
 
-    try:
+        if response is not None:
+            body: str = response.text()
+            result = re.findall(r'<a jsname=".+?" href=".+?" data-ved=".+?" ping=".+?">', body)
+            result = re.findall(r'(?<=href=").+?(?=")', ''.join(result))
+    finally:
         page.close()
-    except Error:
-        # Ignored
-        pass
 
     return result

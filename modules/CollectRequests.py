@@ -115,6 +115,6 @@ class CollectRequests(Module):
 
         # Set page handler
         try:
-            self.crawler.page.on('response', handler)
+            self.crawler.context.on('response', handler)
         except (Exception, CancelledError) as error:
             self.crawler.log.warning('CollectRequests.py:%s %s', traceback.extract_stack()[-1].lineno, error)

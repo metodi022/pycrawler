@@ -1,5 +1,5 @@
 import random
-from typing import Callable, List, Optional
+from typing import Callable, Optional
 
 import tld
 from playwright.sync_api import Error, Locator, Response
@@ -21,15 +21,16 @@ class CollectUrls(Module):
         self._max_urls: int = self.crawler.state.get('CollectUrls', Config.MAX_URLS)
         self.crawler.state['CollectUrls'] = self._max_urls
 
-        self._url_filter_out: List[Callable[[tld.utils.Result], bool]] = []
+        self._url_filter_out: list[Callable[[tld.utils.Result], bool]] = []
 
         # Add adult filter if enabled
         if Config.ADULT_FILTER:
-            self._url_filter_out.append(
-                (lambda parsed_url: Site.get_or_none(Site.site == utils.get_url_site(parsed_url), Site.adult is True) is not None)
-            )
+            self._adult_sites = list(Site.select(Site.site).where(Site.adult is True))
+            self._url_filter_out.append((
+                lambda parsed_url: utils.get_url_site(parsed_url) in self._adult_sites
+            ))
 
-    def receive_response(self, responses: List[Optional[Response]], final_url: str, repetition: int) -> None:
+    def receive_response(self, responses: list[Optional[Response]], final_url: str, repetition: int) -> None:
         super().receive_response(responses, final_url, repetition)
 
         # Speedup by ignoring repetitive URL collection from the same page
@@ -43,16 +44,17 @@ class CollectUrls(Module):
         if self._max_urls < 1:
             return
 
-        # Make sure to add page as seen
         parsed_url_final: Optional[tld.utils.Result] = utils.get_tld_object(final_url)
         if parsed_url_final is None:
             return
+
+        # Make sure to add page as seen
         self.crawler.urldb.add_seen(
-            utils.get_url_str_with_query_fragment(parsed_url_final),
-            bool(parsed_url_final.parsed_url.query) or bool(parsed_url_final.parsed_url.fragment)
+            utils.get_url_str_with_query_fragment(parsed_url_final)
         )
 
         # TODO add other checks
+        # pass
 
         # TODO improve link collection?
         try:
@@ -60,12 +62,17 @@ class CollectUrls(Module):
         except Error:
             return
 
-        urls: List[tld.utils.Result] = []
+        urls: list[tld.utils.Result] = []
 
         # Iterate over each link
         for i in range(utils.get_locator_count(links)):
+            # Get element
+            elem: Optional[Locator] = utils.get_locator_nth(links, i)
+            if elem is None:
+                continue
+
             # Get href attribute
-            link: Optional[str] = utils.get_locator_attribute(utils.get_locator_nth(links, i), 'href')
+            link: Optional[str] = utils.get_locator_attribute(elem, 'href')
 
             if (link is None) or (not link.strip()):
                 continue
@@ -88,6 +95,7 @@ class CollectUrls(Module):
                 continue
 
             # TODO: Check for same entity
+            # pass
 
             # Filter out unwanted entries
             if any(filt(parsed_link) for filt in self._url_filter_out):
@@ -96,9 +104,10 @@ class CollectUrls(Module):
             # Check seen
             if self.crawler.urldb.get_seen(utils.get_url_str_with_query_fragment(parsed_link)):
                 continue
+
+            # Add to seen
             self.crawler.urldb.add_seen(
-                utils.get_url_str_with_query_fragment(parsed_link),
-                bool(parsed_link.parsed_url.query) or bool(parsed_link.parsed_url.fragment)
+                utils.get_url_str_with_query_fragment(parsed_link)
             )
 
             # Add link
@@ -118,19 +127,19 @@ class CollectUrls(Module):
             random.shuffle(urls)
 
         # For each found URL, add it to the database, while making sure not to exceed the max URL limit
-        for parsed_link in urls[:self._max_urls]:
-            self.crawler.urldb.add_url(
-                utils.get_url_str_with_query_fragment(parsed_link),
-                self.crawler.depth + 1,
-                bool(parsed_link.parsed_url.query) or bool(parsed_link.parsed_url.fragment),
-                self.crawler.url,
-                force = True
-            )
+        with self.crawler.database.atomic():
+            for parsed_link in urls[:self._max_urls]:
+                self.crawler.urldb.add_url(
+                    utils.get_url_str_with_query_fragment(parsed_link),
+                    self.crawler.depth + 1,
+                    self.crawler.url,
+                    force = True
+                )
 
         self._max_urls -= len(urls)
         self._max_urls = max(0, self._max_urls)
         self.crawler.state['CollectUrls'] = self._max_urls
         self.crawler._update_cache()
 
-    def add_url_filter_out(self, filters: List[Callable[[tld.utils.Result], bool]]) -> None:
+    def add_url_filter_out(self, filters: list[Callable[[tld.utils.Result], bool]]) -> None:
         self._url_filter_out = filters
