@@ -19,7 +19,7 @@ def main(job: str, file: Optional[pathlib.Path]) -> int:
 
             url_parsed: Optional[tld.Result] = utils.get_tld_object(url)
             if url_parsed is None:
-                continue        # TODO log bad URL?
+                continue  # TODO log bad URL?
 
             site: Site = Site.get_or_create(
                 scheme=utils.get_url_scheme(url_parsed),

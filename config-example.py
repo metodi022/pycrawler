@@ -25,12 +25,15 @@ class Config:
     TIMEZONE: str = 'Europe/Berlin'
     HEADLESS: bool = False  # Headless browser
 
+    INSTRUMENT_MEDIA: bool = False  # Intercept GET requests to media content (e.g., images, videos) and return a fake content to reduce load
+
     SAVE_CONTEXT: bool = False  # Store saved cookies and localStorage while crawling
 
     MANUAL_SETUP: bool = False  # Setup the state manually at the start of the crawl
 
     RECURSIVE: bool = False  # Discover additional URLs while crawling
     BREADTHFIRST: bool = True  # Visit URLs in a breadth-first manner, otherwise depth-first
+    FORCE_COLLECT: bool = False  # Attempt to collect URLs even if page did not load correctly
     SAME_SCHEME: bool = True  # URL discovery for same scheme (protocol) only
     SAME_ORIGIN: bool = False  # URL discovery for same-origin only
     SAME_ETLDP1: bool = True  # URL discovery for same ETLD+1

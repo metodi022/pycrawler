@@ -15,13 +15,14 @@ from config import Config
 from database import URL, URLDB, Site, Task, database
 from modules.AcceptCookies import AcceptCookies
 from modules.CollectUrls import CollectUrls
+from modules.InstrumentMedia import InstrumentMedia
 from modules.Module import Module
 from modules.SaveURL import SaveURL
 
 
 class Crawler:
     def _update_cache(self) -> None:
-        self.log.info("Updating cache")
+        self.log.debug("Updating cache")
 
         with database.atomic():
             self.task.updated = datetime.today()
@@ -29,14 +30,14 @@ class Crawler:
             database.execute_sql(f"UPDATE task SET updated={database.param}, crawlerstate={database.param} WHERE id={database.param}", (self.task.updated, self.task.crawlerstate, self.task.get_id()))
 
     def _delete_browser_cache(self) -> None:
-        self.log.info("Deleting browser cache")
+        self.log.debug("Deleting browser cache")
 
         browser_cache: pathlib.Path = Config.LOG / f"browser-{self.task.job}-{self.task.crawler}"
         if browser_cache.exists():
             shutil.rmtree(browser_cache)
 
     def _delete_cache(self) -> None:
-        self.log.info("Deleting cache")
+        self.log.debug("Deleting cache")
 
         self._delete_browser_cache()
 
@@ -46,7 +47,7 @@ class Crawler:
             database.execute_sql(f"UPDATE task SET updated={database.param}, crawlerstate=NULL WHERE id={database.param}", (self.task.updated, self.task.get_id()))
 
     def _init_context(self) -> None:
-        self.log.info("Initializing context")
+        self.log.debug("Initializing context")
 
         if Config.HAR:
             self.context = self.browser.new_context(
@@ -70,7 +71,7 @@ class Crawler:
         self.cdp = self.context.new_cdp_session(self.page) if Config.BROWSER == 'chromium' else None
 
     def _init_context_extensions(self) -> None:
-        self.log.info("Initializing context with extensions")
+        self.log.debug("Initializing context with extensions")
 
         if Config.HAR:
             self.context = self.playwright.chromium.launch_persistent_context(
@@ -98,7 +99,7 @@ class Crawler:
         self.cdp = self.context.new_cdp_session(self.page) if Config.BROWSER == 'chromium' else None
 
     def _init_browser(self) -> None:
-        self.log.info("Initializing browser")
+        self.log.debug("Initializing browser")
 
         if Config.BROWSER == 'firefox':
             self.browser = self.playwright.firefox.launch(headless=Config.HEADLESS)
@@ -110,7 +111,7 @@ class Crawler:
         self._init_context()
 
     def _init_browser_extensions(self) -> None:
-        self.log.info("Initializing Chromium browser with extensions")
+        self.log.debug("Initializing Chromium browser with extensions")
 
         (Config.LOG / f"browser-{self.task.job}-{self.task.crawler}").mkdir(parents=True, exist_ok=True)
 
@@ -119,25 +120,25 @@ class Crawler:
         self._init_context_extensions()
 
     def _close_context(self) -> None:
-        self.log.info("Closing context")
+        self.log.debug("Closing context")
         self.cdp.detach()
         self.page.close()
         self.context.close()
 
     def _close_browser(self) -> None:
         self._close_context()
-        self.log.info("Closing browser")
+        self.log.debug("Closing browser")
         if self.browser:
             self.browser.close()
 
     def _invoke_page_handlers(self) -> None:
-        self.log.info("Invoking page handlers")
+        self.log.debug("Invoking page handlers")
 
         for module in self.modules:
             module.add_handlers()
 
     def _invoke_response_handlers(self, responses: List[Optional[Response]], repetition: int) -> None:
-        self.log.info("Invoking response handlers")
+        self.log.debug("Invoking response handlers")
 
         # Prepare response chain if there are redirections
         response: Optional[Response] = responses[-1]
@@ -184,7 +185,7 @@ class Crawler:
         return response
 
     def __init__(self, taskid: int, log: Logger, modules: List[Type[Module]]) -> None:
-        log.info("Crawler initializing")
+        log.debug("Crawler initializing")
 
         self.database = database
 
@@ -226,11 +227,13 @@ class Crawler:
             self.url = URL.get_by_id(self.state.get('URL', cast(URL, self.task.landing)))
 
         # Initialize modules
-        self.modules: List[Module] = []  # TODO [AcceptCookies(self)] if Config.ACCEPT_COOKIES else []
+        self.modules: List[Module] = []
+        # TODO [AcceptCookies(self)] if Config.ACCEPT_COOKIES else []
         self.modules += [CollectUrls(self)] if Config.RECURSIVE else []
         for module in modules:
             self.modules.append(module(self))
         self.modules += [SaveURL(self)]
+        self.modules += [InstrumentMedia(self)] if Config.INSTRUMENT_MEDIA else []
         self.log.debug(f"Prepared modules: {self.modules}")
 
         # Initialize URL filters
@@ -306,6 +309,7 @@ class Crawler:
                 # Invoke module page handlers
                 if (_count == 0) or ((self.repetition == 1) and (_count > 0) and ((_count - 1) % Config.RESTART_BROWSER == 0)) or (not Config.SAVE_CONTEXT):
                     self._invoke_page_handlers()
+                self.page.wait_for_timeout(5000)
 
                 # Navigate to page
                 response: Optional[Response] = self._open_url()
@@ -344,7 +348,7 @@ class Crawler:
                 self._update_cache()
 
                 # Delete cache if needed
-                if self.url and (not self.stop) and (not Config.SAVE_CONTEXT) and ((_count % Config.RESTART_BROWSER != 0) or (self.repetition > 1)):
+                if (self.url is not None) and (not self.stop) and (not Config.SAVE_CONTEXT):
                     self._close_context()
                     self._delete_browser_cache()
                     if (Config.BROWSER == 'chromium') and Config.EXTENSIONS:
@@ -352,17 +356,17 @@ class Crawler:
                     else:
                         self._init_context()
 
-                # Restart browser to to avoid memory issues
-                elif (self.repetition == 1) and self.url and (not self.stop) and (_count % Config.RESTART_BROWSER == 0):
-                    self._close_browser()
+            # Restart browser to to avoid memory issues every few page visits
+            if (self.url is not None) and (not self.stop) and (_count % Config.RESTART_BROWSER == 0):
+                self._close_browser()
 
-                    if not Config.SAVE_CONTEXT:
-                        self._delete_browser_cache()
+                if not Config.SAVE_CONTEXT:
+                    self._delete_browser_cache()
 
-                    if (Config.BROWSER == 'chromium') and Config.EXTENSIONS:
-                        self._init_browser_extensions()
-                    else:
-                        self._init_browser()
+                if (Config.BROWSER == 'chromium') and Config.EXTENSIONS:
+                    self._init_browser_extensions()
+                else:
+                    self._init_browser()
 
             _count += 1
 

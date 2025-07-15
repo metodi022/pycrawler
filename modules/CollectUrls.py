@@ -53,6 +53,11 @@ class CollectUrls(Module):
             utils.get_url_str_with_query_fragment(parsed_url_final)
         )
 
+        # Force collect URLs if page didn't load correctly
+        response: Optional[Response] = responses[-1] if len(responses) > 0 else None
+        if (response is None) and (not Config.FORCE_COLLECT):
+            return
+
         # TODO add other checks
         # pass
 
