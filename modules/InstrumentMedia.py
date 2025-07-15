@@ -20,7 +20,9 @@ class InstrumentMedia(Module):
 
             response = route.fetch(method='HEAD')
             response.method = 'GET'
-            route.fulfill(body='TEST', response=response, status=response.status)
+
+            # TODO actual real fake images?
+            route.fulfill(body='', response=response, status=response.status)
 
         # Set context handler
         try:
