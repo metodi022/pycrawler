@@ -10,7 +10,7 @@ class Config:
     HOST: str = 'localhost'  # database host
     PORT: str = '5432'  # database port
 
-    SQLITE: Optional[str] = None  # path to SQLite database file
+    SQLITE: Optional[str] = None  # use SQLite database file instead for quick testing
 
     LOG: pathlib.Path = pathlib.Path('./logs/')  # path for saving logs
     LOG_LEVEL = INFO  # DEBUG|INFO|WARNING|ERROR

@@ -116,9 +116,9 @@ class Task(BaseModel):
                 site_id INTEGER NOT NULL REFERENCES site(id),
                 created TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                state {"VARCHAR" if Config.SQLITE is not None else "ENUM('free', 'progress', 'waiting', 'complete')"} NOT NULL DEFAULT 'free',
+                state VARCHAR NOT NULL DEFAULT 'free',
                 crawler INTEGER DEFAULT NULL,
-                landing_id INTEGER REFERENCES url(id) DEFAULT NULL,
+                landing_id INTEGER DEFAULT NULL,
                 error TEXT DEFAULT NULL,
                 crawlerstate {"BLOB" if Config.SQLITE is not None else "BYTEA"} DEFAULT NULL);
             """)
@@ -170,7 +170,7 @@ class URL(BaseModel):
                 urlfinal TEXT DEFAULT NULL,
                 depth INTEGER NOT NULL,
                 repetition INTEGER NOT NULL,
-                state {"VARCHAR" if Config.SQLITE is not None else "ENUM('free', 'progress', 'waiting', 'complete')"} NOT NULL DEFAULT 'free',
+                state VARCHAR NOT NULL DEFAULT 'free',
                 method VARCHAR DEFAULT NULL,
                 code INTEGER DEFAULT NULL,
                 codetext VARCHAR DEFAULT NULL,
@@ -197,6 +197,8 @@ class URL(BaseModel):
             database.execute_sql("CREATE INDEX idx_url_codetext ON url(codetext);")
             database.execute_sql("CREATE INDEX idx_url_resource ON url(resource);")
             database.execute_sql("CREATE INDEX idx_url_content ON url(content);")
+
+            database.execute_sql("ALTER TABLE task ADD CONSTRAINT task_landing_fk FOREIGN KEY (landing_id) REFERENCES url(id) ON DELETE SET NULL;")
 
 class URLDB:
     def __init__(self, crawler) -> None:
