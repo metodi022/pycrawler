@@ -12,7 +12,7 @@ from config import Config
 from database import URL, BaseModel, Site, Task, database
 from modules.Module import Module
 
-
+# TODO compare with HAR and CDP and add other data?
 class Request(BaseModel):
     task = ForeignKeyField(Task, index=True)
     site = ForeignKeyField(Site, index=True)
@@ -41,7 +41,7 @@ class Request(BaseModel):
 
 class CollectRequests(Module):
     """
-    Module to collect headers, specifically CSP
+    Module to collect all requests and responses
     """
 
     @staticmethod

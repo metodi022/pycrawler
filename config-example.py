@@ -26,6 +26,7 @@ class Config:
     HEADLESS: bool = False  # Headless browser
 
     INSTRUMENT_MEDIA: bool = False  # Intercept GET requests to media content (e.g., images, videos) and return a fake content to reduce load
+    INSTRUMENT_MEDIA_GET: bool = True  # Use GET instead of HEAD before returning fake content
 
     SAVE_CONTEXT: bool = False  # Store saved cookies and localStorage while crawling
 
