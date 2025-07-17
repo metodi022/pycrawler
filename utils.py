@@ -28,7 +28,11 @@ def get_tld_object(url: str) -> Optional[tld.utils.Result]:
 def normalize_url(url: str, query: bool = True, fragment: bool = False) -> str:
     url = url.strip().rstrip('/')
 
-    parsed = urlparse(url)
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return url
+
     scheme = parsed.scheme.lower()
     netloc = parsed.hostname.lower() if parsed.hostname else ''
 
@@ -56,23 +60,23 @@ def get_url_site(url: tld.utils.Result) -> str:
     return url.fld
 
 def get_url_scheme_site(url: tld.utils.Result) -> str:
-    return normalize_url(url.parsed_url.scheme + '://' + url.fld, fragment=True)
+    return url.parsed_url.scheme + '://' + url.fld
 
 def get_url_str(url: tld.utils.Result) -> str:
-    return normalize_url(url.parsed_url.scheme + '://' + url.parsed_url.netloc + url.parsed_url.path, fragment=True)
+    return url.parsed_url.scheme + '://' + url.parsed_url.netloc + url.parsed_url.path
 
 def get_url_str_with_query(url: tld.utils.Result) -> str:
-    return normalize_url(get_url_str(url) + ('?' if url.parsed_url.query else '') + url.parsed_url.query, fragment=True)
+    return get_url_str(url) + ('?' if url.parsed_url.query else '') + url.parsed_url.query
 
 def get_url_str_with_query_fragment(url: tld.utils.Result) -> str:
-    return normalize_url(get_url_str_with_query(url) + ('#' if url.parsed_url.fragment else '') + url.parsed_url.fragment, fragment=True)
+    return get_url_str_with_query(url) + ('#' if url.parsed_url.fragment else '') + url.parsed_url.fragment
 
 def get_url_from_href(href: str, page: tld.utils.Result) -> Optional[tld.utils.Result]:
     if (href is None) or (not href.strip()):
         return None
 
     href_final = urljoin(get_url_str_with_query_fragment(page), href)
-    return get_tld_object(normalize_url(href_final, fragment=True))
+    return get_tld_object(href_final)
 
 
 def get_screenshot(page: Page, path: pathlib.Path, force: bool = False, full_page: bool = False) -> bool:
@@ -146,7 +150,7 @@ def invoke_click(page: Page | Frame, clickable: Locator, timeout=30000, trial=Fa
         return False
 
 
-def get_visible_advanced(locator: Locator) -> bool:
+def get_visible(locator: Locator) -> bool:
     if get_locator_count(locator) != 1:
         return False
 

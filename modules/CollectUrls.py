@@ -21,14 +21,9 @@ class CollectUrls(Module):
         self._max_urls: int = self.crawler.state.get('CollectUrls', Config.MAX_URLS)
         self.crawler.state['CollectUrls'] = self._max_urls
 
-        self._url_filter_out: list[Callable[[tld.utils.Result], bool]] = []
+        self._adult_sites = list(Site.select(Site.site).where(Site.adult is True)) if Config.ADULT_FILTER else []
 
-        # Add adult filter if enabled
-        if Config.ADULT_FILTER:
-            self._adult_sites = list(Site.select(Site.site).where(Site.adult is True))
-            self._url_filter_out.append((
-                lambda parsed_url: utils.get_url_site(parsed_url) in self._adult_sites
-            ))
+        self._url_filter_out: list[Callable[[tld.utils.Result], bool]] = []
 
     def receive_response(self, responses: list[Optional[Response]], final_url: str, repetition: int) -> None:
         super().receive_response(responses, final_url, repetition)
@@ -148,3 +143,9 @@ class CollectUrls(Module):
 
     def add_url_filter_out(self, filters: list[Callable[[tld.utils.Result], bool]]) -> None:
         self._url_filter_out = filters
+
+        # Add adult filter if enabled
+        if Config.ADULT_FILTER:
+            self._url_filter_out.append((
+                lambda parsed_url: (utils.get_url_site(parsed_url) in self._adult_sites) if parsed_url else False
+            ))

@@ -34,7 +34,7 @@ def main(job: str, file: Optional[pathlib.Path]) -> int:
 
             task: Task = Task.create(job=job, site=site)
 
-            _url: URL = [
+            _url: URL = cast(URL, [
                 URL.create(
                     task=task,
                     site=site,
@@ -43,7 +43,7 @@ def main(job: str, file: Optional[pathlib.Path]) -> int:
                     repetition=repetition
                 )
                 for repetition in range(1, Config.REPETITIONS + 1)
-            ][0]
+            ][0])
 
             task.landing = _url
             task.save()

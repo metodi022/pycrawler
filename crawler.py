@@ -167,7 +167,7 @@ class Crawler:
         self.page.wait_for_timeout(Config.WAIT_AFTER_LOAD)
 
         # On first visit, also update the task
-        if (cast(URL, self.task.landing).code is None) and (self.repetition == 1):
+        if (self.landing.code is None) and (self.repetition == 1):
             self.task.updated = datetime.today()
             self.task.error = error_message
 
@@ -207,7 +207,7 @@ class Crawler:
             self.log.debug(self.state)
 
         # Load state-dependent variables
-        self.url: URL = URL.get_by_id(self.state.get('URL', cast(URL, self.task.landing)))
+        self.url: URL = URL.get_by_id(self.state.get('URL', self.landing.get_id()))
         self.depth: int = self.url.depth
 
         # Prepare browser variables
@@ -224,7 +224,7 @@ class Crawler:
             # Therefore, invalidate the current URL
             self.log.warning("Invalidating latest crashed URL %s", self.url.url)
             URL.update(code=Config.ERROR_CODES['crawler_error'], state='complete').where(URL.task==self.task, URL.url==self.url.url, URL.depth==self.depth, URL.state!='complete').execute()
-            self.url = URL.get_by_id(self.state.get('URL', cast(URL, self.task.landing)))
+            self.url = URL.get_by_id(self.state.get('URL', self.landing.get_id()))
 
         # Initialize modules
         self.modules: List[Module] = []
