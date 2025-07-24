@@ -10,37 +10,36 @@ from config import Config
 _database_proxy: DatabaseProxy = DatabaseProxy()
 _database: SqliteDatabase | PostgresqlDatabase = None
 
-def load_database(timeout: int = 300) -> SqliteDatabase | PostgresqlDatabase:
+def load_database() -> SqliteDatabase | PostgresqlDatabase:
     global _database
+
+    if _database and (not _database.is_closed()):
+        _database.close()
 
     if _database is None:
         if Config.SQLITE:
-            _database = SqliteDatabase(Config.SQLITE)
+            _database = SqliteDatabase(
+                Config.SQLITE,
+                pragmas={
+                    'journal_mode': 'wal',
+                    'busy_timeout': 10000
+                }
+            )
         else:
-            if timeout:
-                _database = PostgresqlDatabase(
-                    Config.DATABASE,
-                    user=Config.USER,
-                    password=Config.PASSWORD,
-                    host=Config.HOST,
-                    port=Config.PORT,
-                    sslmode="prefer",
-                    autorollback=False,
-                )
-            else:
-                _database = PostgresqlDatabase(
-                    Config.DATABASE,
-                    user=Config.USER,
-                    password=Config.PASSWORD,
-                    host=Config.HOST,
-                    port=Config.PORT,
-                    sslmode="prefer",
-                    autorollback=False,
-                )
-        _database_proxy.initialize(_database)
+            _database = PostgresqlDatabase(
+                Config.DATABASE,
+                user=Config.USER,
+                password=Config.PASSWORD,
+                host=Config.HOST,
+                port=Config.PORT,
+                sslmode="prefer",
+                autorollback=False,
+            )
+
+    _database_proxy.initialize(_database)
 
     if _database.is_closed():
-        _database.connect(reuse_if_open=True)
+        assert _database.connect(reuse_if_open=True)
 
     return _database
 

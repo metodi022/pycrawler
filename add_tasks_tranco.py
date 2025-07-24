@@ -49,6 +49,8 @@ def main(job: str, file: pathlib.Path) -> int:
             task.landing = _url.id
             task.save()
 
+    database.close()
+
     return 0
 
 if __name__ == '__main__':

@@ -125,4 +125,6 @@ if __name__ == "__main__":
                 pass
 
     # Load disconnect data
-    #_load_disconnect(database)
+    _load_disconnect(database)
+
+    database.close()

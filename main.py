@@ -146,7 +146,7 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: pathl
 
 def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: List[Type[Module]], listen: bool) -> None:
     log = _get_logger(log_path / f"job{job}crawler{crawler_id}.log", job + str(crawler_id) + __name__)
-    database = load_database(timeout=0)
+    database = load_database()
     task: Optional[Task] = _get_task(job, crawler_id, database, log)
 
     # Main loop
