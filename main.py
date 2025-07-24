@@ -10,7 +10,7 @@ from multiprocessing import Pipe, Process
 from typing import List, Optional, Type, cast
 
 from crawler import Crawler
-from database import Task, database
+from database import Task, load_database
 from modules.Module import Module
 
 #import ecs_logging  # TODO elastic search logs
@@ -69,7 +69,7 @@ def _get_modules(module_names: List[str]) -> List[Type[Module]]:
         modules.append(getattr(module, module_name))
     return modules
 
-def _get_task(job: str, crawler_id: int, log) -> Optional[Task]:
+def _get_task(job: str, crawler_id: int, database, log) -> Optional[Task]:
     # Get progress task
     task: Optional[Task] = Task.get_or_none(job=job, crawler=crawler_id, state='progress')
     if task is not None:
@@ -146,14 +146,14 @@ def main(job: str, crawlers_count: int, module_names: List[str], log_path: pathl
 
 def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: List[Type[Module]], listen: bool) -> None:
     log = _get_logger(log_path / f"job{job}crawler{crawler_id}.log", job + str(crawler_id) + __name__)
-
-    task: Optional[Task] = _get_task(job, crawler_id, log)
+    database = load_database(timeout=0)
+    task: Optional[Task] = _get_task(job, crawler_id, database, log)
 
     # Main loop
     while task or listen:
         if not task:
             time.sleep(60)
-            task = _get_task(job, crawler_id, log)
+            task = _get_task(job, crawler_id, database, log)
             continue
 
         start_time: datetime = datetime.now()
@@ -205,8 +205,9 @@ def _manage_crawler(job: str, crawler_id: int, log_path: pathlib.Path, modules: 
 
         log.info("Crawler %s finished after %s", task.crawler, (datetime.now() - start_time), extra=())  # TODO
 
-        task = _get_task(job, crawler_id, log)
+        task = _get_task(job, crawler_id, database, log)
 
+    database.close()
     log.handlers[-1].close()
 
 

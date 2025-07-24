@@ -7,11 +7,12 @@ import tld
 
 import utils
 from config import Config
-from database import URL, Site, Task, database
+from database import URL, Site, Task, load_database
 
 
-def main(job: str, file: Optional[pathlib.Path]) -> int:
+def main(job: str, file: pathlib.Path, database) -> int:
     # Iterate over URLs and add them to database
+    database = load_database()
     with database.atomic(), open(file, encoding="utf-8") as _file:
         for entry in _file:
             rank, url = entry.split(',')
@@ -45,7 +46,7 @@ def main(job: str, file: Optional[pathlib.Path]) -> int:
                 for repetition in range(1, Config.REPETITIONS + 1)
             ][0])
 
-            task.landing = _url
+            task.landing = _url.id
             task.save()
 
     return 0

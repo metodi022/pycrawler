@@ -12,7 +12,7 @@ from playwright.sync_api import Browser, BrowserContext, CDPSession, Error, Page
 
 import utils
 from config import Config
-from database import URL, URLDB, Site, Task, database
+from database import URL, URLDB, Site, Task, load_database
 from modules.AcceptCookies import AcceptCookies
 from modules.CollectUrls import CollectUrls
 from modules.InstrumentMedia import InstrumentMedia
@@ -24,10 +24,10 @@ class Crawler:
     def _update_cache(self) -> None:
         self.log.debug("Updating cache")
 
-        with database.atomic():
+        with self.database.atomic():
             self.task.updated = datetime.today()
             self.task.crawlerstate = pickle.dumps(self.state)
-            database.execute_sql(f"UPDATE task SET updated={database.param}, crawlerstate={database.param} WHERE id={database.param}", (self.task.updated, self.task.crawlerstate, self.task.get_id()))
+            self.database.execute_sql(f"UPDATE task SET updated={self.database.param}, crawlerstate={self.database.param} WHERE id={self.database.param}", (self.task.updated, self.task.crawlerstate, self.task.get_id()))
 
     def _delete_browser_cache(self) -> None:
         self.log.debug("Deleting browser cache")
@@ -41,10 +41,10 @@ class Crawler:
 
         self._delete_browser_cache()
 
-        with database.atomic():
+        with self.database.atomic():
             self.task.updated = datetime.today()
             self.state = None
-            database.execute_sql(f"UPDATE task SET updated={database.param}, crawlerstate=NULL WHERE id={database.param}", (self.task.updated, self.task.get_id()))
+            self.database.execute_sql(f"UPDATE task SET updated={self.database.param}, crawlerstate=NULL WHERE id={self.database.param}", (self.task.updated, self.task.get_id()))
 
     def _init_context(self) -> None:
         self.log.debug("Initializing context")
@@ -171,8 +171,8 @@ class Crawler:
             self.task.updated = datetime.today()
             self.task.error = error_message
 
-            database.execute_sql(
-                f"UPDATE task SET updated={database.param}, error={database.param} WHERE id={database.param}",
+            self.database.execute_sql(
+                f"UPDATE task SET updated={self.database.param}, error={self.database.param} WHERE id={self.database.param}",
                 (self.task.updated, self.task.error, self.task.get_id())
             )
 
@@ -187,7 +187,7 @@ class Crawler:
     def __init__(self, taskid: int, log: Logger, modules: List[Type[Module]]) -> None:
         log.debug("Crawler initializing")
 
-        self.database = database
+        self.database = load_database()
 
         # Prepare variables
         self.stop: bool = cast(bool, False)
@@ -376,3 +376,4 @@ class Crawler:
 
         # Delete old cache
         self._delete_cache()
+        self.database.close()

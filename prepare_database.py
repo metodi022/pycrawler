@@ -5,10 +5,10 @@ from peewee import ProgrammingError
 
 import utils
 from config import Config
-from database import URL, Entity, Site, Task, database
+from database import URL, Entity, Site, Task, load_database
 
 
-def _load_disconnect():
+def _load_disconnect(database):
     # Load disconnect entities
     try:
         with open('disconnect-tracking-protection/services.json', 'r', encoding='utf-8') as file:
@@ -111,6 +111,7 @@ def _load_disconnect():
 
 if __name__ == "__main__":
     # Create tables
+    database = load_database()
     with database.atomic():
         database.create_tables([Entity])
         database.create_tables([Site])
@@ -124,4 +125,4 @@ if __name__ == "__main__":
                 pass
 
     # Load disconnect data
-    _load_disconnect()
+    #_load_disconnect(database)

@@ -1,25 +1,54 @@
-from abc import abstractmethod
 from datetime import datetime
 from typing import Optional
 
-from peewee import AutoField, BlobField, BooleanField, CharField, DateTimeField, DeferredForeignKey, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, SqliteDatabase, TextField
+from peewee import AutoField, BlobField, BooleanField, CharField, DatabaseProxy, DateTimeField, DeferredForeignKey, ForeignKeyField, IntegerField, Model, PostgresqlDatabase, SqliteDatabase, TextField
 
 import utils
 from config import Config
 
-database = SqliteDatabase(Config.SQLITE) if Config.SQLITE else PostgresqlDatabase(
-    Config.DATABASE,
-    user=Config.USER,
-    password=Config.PASSWORD,
-    host=Config.HOST,
-    port=Config.PORT,
-    autorollback=False
-)
+
+_database_proxy: DatabaseProxy = DatabaseProxy()
+_database: SqliteDatabase | PostgresqlDatabase = None
+
+def load_database(timeout: int = 300) -> SqliteDatabase | PostgresqlDatabase:
+    global _database
+
+    if _database is None:
+        if Config.SQLITE:
+            _database = SqliteDatabase(Config.SQLITE)
+        else:
+            if timeout:
+                _database = PostgresqlDatabase(
+                    Config.DATABASE,
+                    user=Config.USER,
+                    password=Config.PASSWORD,
+                    host=Config.HOST,
+                    port=Config.PORT,
+                    stale_timeout=300,
+                    sslmode="prefer",
+                    autorollback=False,
+                )
+            else:
+                database = PostgresqlDatabase(
+                    Config.DATABASE,
+                    user=Config.USER,
+                    password=Config.PASSWORD,
+                    host=Config.HOST,
+                    port=Config.PORT,
+                    sslmode="prefer",
+                    autorollback=False,
+                )
+        _database_proxy.initialize(_database)
+
+    if _database.is_closed():
+        _database.connect(reuse_if_open=True)
+
+    return _database
 
 
 class BaseModel(Model):
     class Meta:
-        database = database
+        database = _database_proxy
 
     @classmethod
     def create_table(cls, safe: bool = False, **options) -> None:
@@ -34,6 +63,7 @@ class Entity(BaseModel):
 
     @classmethod
     def create_table(cls, safe: bool = False, **options) -> None:
+        database = load_database()
         if database.table_exists('entity'):
             return
 
@@ -65,6 +95,7 @@ class Site(BaseModel):
 
     @classmethod
     def create_table(cls, safe: bool = False, **options) -> None:
+        database = load_database()
         if database.table_exists('site'):
             return
 
@@ -105,6 +136,7 @@ class Task(BaseModel):
 
     @classmethod
     def create_table(cls, safe: bool = False, **options) -> None:
+        database = load_database()
         if database.table_exists('task'):
             return
 
@@ -155,6 +187,7 @@ class URL(BaseModel):
 
     @classmethod
     def create_table(cls, safe: bool = False, **options) -> None:
+        database = load_database()
         if database.table_exists('url'):
             return
 

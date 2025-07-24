@@ -9,7 +9,7 @@ from peewee import BlobField, BooleanField, CharField, ForeignKeyField, IntegerF
 from playwright.sync_api import Response
 
 from config import Config
-from database import URL, BaseModel, Site, Task, database
+from database import URL, BaseModel, Site, Task, load_database
 from modules.Module import Module
 
 # TODO compare with HAR and CDP and add other data?
@@ -46,6 +46,7 @@ class CollectRequests(Module):
 
     @staticmethod
     def register_job(log: Logger) -> None:
+        database = load_database()
         if database.table_exists('request'):
             return
 
