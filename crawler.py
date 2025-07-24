@@ -318,7 +318,7 @@ class Crawler:
                 self._invoke_response_handlers([response], self.repetition)
 
                 # Last screenshot
-                if (self.repetition == Config.REPETITIONS) and (not database.execute_sql(f"SELECT id FROM URL WHERE task_id={database.param} AND state='free' LIMIT 1", (self.task.get_id(),)).fetchone()):
+                if (self.repetition == Config.REPETITIONS) and (not self.database.execute_sql(f"SELECT id FROM URL WHERE task_id={self.database.param} AND state='free' LIMIT 1", (self.task.get_id(),)).fetchone()):
                     utils.get_screenshot(
                         self.page,
                         (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-2-{self.site.scheme}-{self.site.site}.png")

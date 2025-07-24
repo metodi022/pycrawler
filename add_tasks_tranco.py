@@ -10,7 +10,7 @@ from config import Config
 from database import URL, Site, Task, load_database
 
 
-def main(job: str, file: pathlib.Path, database) -> int:
+def main(job: str, file: pathlib.Path) -> int:
     # Iterate over URLs and add them to database
     database = load_database()
     with database.atomic(), open(file, encoding="utf-8") as _file:

@@ -24,12 +24,11 @@ def load_database(timeout: int = 300) -> SqliteDatabase | PostgresqlDatabase:
                     password=Config.PASSWORD,
                     host=Config.HOST,
                     port=Config.PORT,
-                    stale_timeout=300,
                     sslmode="prefer",
                     autorollback=False,
                 )
             else:
-                database = PostgresqlDatabase(
+                _database = PostgresqlDatabase(
                     Config.DATABASE,
                     user=Config.USER,
                     password=Config.PASSWORD,
