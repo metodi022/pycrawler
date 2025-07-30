@@ -115,7 +115,7 @@ class CollectUrls(Module):
 
         self.crawler.log.info(f"Find {min(len(urls), self._max_urls)} URLs")
 
-        # Prioritize URLs at the begining and end of the HTML document
+        # Prioritize URLs at the beginning and end of the HTML document
         if Config.FIRST_AND_LAST:
             urls_1 = urls[:int(len(urls) * 0.15)] + urls[int(len(urls) * 0.85):]
             urls_2 = urls[int(len(urls) * 0.15):int(len(urls) * 0.85)]

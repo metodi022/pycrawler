@@ -121,7 +121,8 @@ class Crawler:
 
     def _close_context(self) -> None:
         self.log.debug("Closing context")
-        self.cdp.detach()
+        if (Config.BROWSER == 'chromium') and (self.cdp is not None):
+            self.cdp.detach()
         self.page.close()
         self.context.close()
 
