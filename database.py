@@ -13,7 +13,7 @@ _database: SqliteDatabase | PostgresqlDatabase = None
 def load_database() -> SqliteDatabase | PostgresqlDatabase:
     global _database
 
-    if _database and (not _database.is_closed()):
+    if _database and (not _database.is_closed()) and (not _database.in_transaction()):
         _database.close()
 
     if _database is None:
