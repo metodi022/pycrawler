@@ -1,4 +1,3 @@
-import base64
 import os
 import traceback
 from asyncio import CancelledError
@@ -44,7 +43,12 @@ class InstrumentMedia(Module):
                 route.fallback()
                 return
 
-            response = route.fetch(method=('GET' if Config.INSTRUMENT_MEDIA_GET else 'HEAD'))
+            try:
+                response = route.fetch(method=('GET' if Config.INSTRUMENT_MEDIA_GET else 'HEAD'))
+            except (Exception, CancelledError) as error:
+                self.crawler.log.warning('InstrumentMedia.py:%s %s', traceback.extract_stack()[-1].lineno, error)
+                route.fallback()
+                return
 
             try:
                 content_type = response.headers.get('content-type', None)
