@@ -229,7 +229,8 @@ class URL(BaseModel):
             database.execute_sql("CREATE INDEX idx_url_resource ON url(resource);")
             database.execute_sql("CREATE INDEX idx_url_content ON url(content);")
 
-            database.execute_sql("ALTER TABLE task ADD CONSTRAINT task_landing_fk FOREIGN KEY (landing_id) REFERENCES url(id) ON DELETE SET NULL;")
+            if not Config.SQLITE:
+                database.execute_sql("ALTER TABLE task ADD CONSTRAINT task_landing_fk FOREIGN KEY (landing_id) REFERENCES url(id) ON DELETE SET NULL;")
 
 class URLDB:
     def __init__(self, crawler) -> None:
