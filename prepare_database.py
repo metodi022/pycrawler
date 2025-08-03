@@ -87,6 +87,27 @@ def _load_disconnect(database):
 
                 _save_entity_sites(entity, sites, tracking=True)
 
+def _load_ocdb(database):
+    try:
+        with open('Open-Cookie-Database/open-cookie-database.json', 'r', encoding='utf-8') as file:
+            entities = json.load(file)
+    except Exception as error:
+        print(f'WARNING:test.py:{traceback.extract_stack()[-1].lineno} {error}')
+        return
+
+    trackers = set()
+    for entity in entities:
+        if not entity:
+            continue
+
+        for cookie in entities[entity]:
+            if cookie['category'] not in {'Analytics', 'Marketing'}:
+                trackers.add(entity)
+
+    with database.atomic():
+        for entity in trackers:
+            _save_entity_sites(entity, [], tracking=True)
+
 
 if __name__ == "__main__":
     # Create tables
@@ -99,5 +120,8 @@ if __name__ == "__main__":
 
     # Load disconnect data
     _load_disconnect(database)
+
+    # Load open cookie database data
+    _load_ocdb(database)
 
     database.close()
