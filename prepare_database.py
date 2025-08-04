@@ -102,11 +102,14 @@ def _load_ocdb(database):
 
         for cookie in entities[entity]:
             if cookie['category'] not in {'Analytics', 'Marketing'}:
-                trackers.add(entity)
+                continue
+
+            site: str = cookie['domain'].strip('.')
+            trackers.add((entity, site if site else None))
 
     with database.atomic():
-        for entity in trackers:
-            _save_entity_sites(entity, [], tracking=True)
+        for entity, site in trackers:
+            _save_entity_sites(entity, [site] if site else [], tracking=True)
 
 
 if __name__ == "__main__":

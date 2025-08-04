@@ -16,6 +16,7 @@ def main(job: str, file: pathlib.Path) -> int:
     with database.atomic(), open(file, encoding="utf-8") as _file:
         for entry in _file:
             rank, url = entry.split(',')
+            scheme: Optional[str] = 'https' if url.startswith('https') else ('http' if url.startswith('http') else 'https')
             url = ('https://' if not url.strip().startswith('http') else '') + url.strip()
 
             url_parsed: Optional[tld.Result] = utils.get_tld_object(url)
@@ -23,7 +24,7 @@ def main(job: str, file: pathlib.Path) -> int:
                 continue  # TODO log bad URL?
 
             site: Site = Site.get_or_create(
-                scheme=utils.get_url_scheme(url_parsed),
+                scheme=scheme,
                 site=utils.get_url_site(url_parsed)
             )[0]
             site.rank = int(rank)
