@@ -68,13 +68,14 @@ class Entity(BaseModel):
         with database.atomic():
             database.execute_sql("""
                 CREATE TABLE entity (
-                name VARCHAR PRIMARY KEY,
+                entity VARCHAR PRIMARY KEY,
                 adult BOOLEAN DEFAULT NULL,
                 tracking BOOLEAN DEFAULT NULL,
                 fingerprinting BOOLEAN DEFAULT NULL,
                 malicious BOOLEAN DEFAULT NULL);
             """)
 
+            database.execute_sql("CREATE INDEX idx_entity_entity ON entity(entity);")
             database.execute_sql("CREATE INDEX idx_entity_adult ON entity(adult);")
             database.execute_sql("CREATE INDEX idx_entity_tracking ON entity(tracking);")
             database.execute_sql("CREATE INDEX idx_entity_fingerprinting ON entity(fingerprinting);")
@@ -83,9 +84,12 @@ class Entity(BaseModel):
 class Site(BaseModel):
     id = AutoField()
     scheme = CharField(default='https', null=False, index=True)
+    tld = CharField(index=True, null=False)
     site = CharField(index=True, null=False)
     entity = ForeignKeyField(Entity, default=None, null=True, index=True)
     rank = IntegerField(default=None, null=True, index=True)
+    lang = CharField(default=None, null=True, index=True)
+    categories = TextField(default=None, null=True)
     adult = BooleanField(default=None, null=True, index=True)
     tracking = BooleanField(default=None, null=True, index=True)
     fingerprinting = BooleanField(default=None, null=True, index=True)
@@ -102,9 +106,12 @@ class Site(BaseModel):
                 CREATE TABLE site (
                 id {"INTEGER" if Config.SQLITE is not None else "SERIAL"} PRIMARY KEY {"AUTOINCREMENT" if Config.SQLITE is not None else ""},
                 scheme VARCHAR NOT NULL DEFAULT 'https',
+                tld VARCHAR NOT NULL,
                 site VARCHAR NOT NULL,
-                entity_id VARCHAR REFERENCES entity(name) DEFAULT NULL,
+                entity_id VARCHAR REFERENCES entity(entity) DEFAULT NULL,
                 rank INTEGER DEFAULT NULL,
+                lang VARCHAR DEFAULT NULL,
+                categories TEXT DEFAULT NULL,
                 adult BOOLEAN DEFAULT NULL,
                 tracking BOOLEAN DEFAULT NULL,
                 fingerprinting BOOLEAN DEFAULT NULL,
@@ -113,8 +120,12 @@ class Site(BaseModel):
                 );
             """)
 
+            database.execute_sql("CREATE INDEX idx_site_scheme ON site(scheme);")
+            database.execute_sql("CREATE INDEX idx_site_tld ON site(tld);")
+            database.execute_sql("CREATE INDEX idx_site_site ON site(site);")
             database.execute_sql("CREATE INDEX idx_site_entity ON site(entity_id);")
             database.execute_sql("CREATE INDEX idx_site_rank ON site(rank);")
+            database.execute_sql("CREATE INDEX idx_site_lang ON site(lang);")
             database.execute_sql("CREATE INDEX idx_site_adult ON site(adult);")
             database.execute_sql("CREATE INDEX idx_site_tracking ON site(tracking);")
             database.execute_sql("CREATE INDEX idx_site_fingerprinting ON site(fingerprinting);")
@@ -142,10 +153,10 @@ class Task(BaseModel):
             database.execute_sql(f"""
                 CREATE TABLE task (
                 id {"INTEGER" if Config.SQLITE is not None else "SERIAL"} PRIMARY KEY {"AUTOINCREMENT" if Config.SQLITE is not None else ""},
-                job VARCHAR NOT NULL,
-                site_id INTEGER NOT NULL REFERENCES site(id),
                 created TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                job VARCHAR NOT NULL,
+                site_id INTEGER NOT NULL REFERENCES site(id),
                 state VARCHAR NOT NULL DEFAULT 'free',
                 crawler INTEGER DEFAULT NULL,
                 landing_id INTEGER DEFAULT NULL,
@@ -288,6 +299,7 @@ class URLDB:
 
         site = Site.get_or_create(
             scheme=utils.get_url_scheme(url_parsed),
+            tld=url_parsed.tld,
             site=utils.get_url_site(url_parsed)
         )[0]
 

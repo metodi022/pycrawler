@@ -1,6 +1,7 @@
 import json
 import traceback
 
+import tld
 import utils
 from config import Config
 from database import URL, Entity, Site, Task, load_database
@@ -16,6 +17,7 @@ def _save_entity_sites(entity, sites, adult=False, tracking=False, fingerprintin
 
     for site in sites:
         site: Site = Site.get_or_create(site=site)[0]
+        site.tld = tld.get_tld(site.site)
         site.entity = site.entity or entity
         site.adult = site.adult or adult
         site.tracking= site.tracking or tracking

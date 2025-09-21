@@ -25,6 +25,7 @@ def main(job: str, file: pathlib.Path) -> int:
 
             site: Site = Site.get_or_create(
                 scheme=scheme,
+                tld=url_parsed.tld,
                 site=utils.get_url_site(url_parsed)
             )[0]
             site.rank = int(rank)
