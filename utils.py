@@ -227,28 +227,27 @@ def search_google(context: BrowserContext, query: str, page_number: int = 0, sta
 
     return result
 
-def tokenize(data: str, autocorrect: bool = False) -> str:
-    result = data.strip().lower()
+def tokenize(data: str, lower: bool = True, alpha: bool = False, autocorrect: bool = False, stop: bool = False, stem: bool = False) -> str:
+    result = data.strip().lower() if lower else data.strip()
 
-    result = re.sub(r'\s+', ' ', result.replace('\n', ' ').replace('\t', ' ')).strip()
-    result = re.sub(r'[^A-Za-z\s-]', '', result).strip()
+    # TODO: add custom rules?
+    result = re.sub(r'\s+', ' ', re.sub(r'[^A-Za-z\s]' if alpha else r'[^A-Za-z0-9\s]', ' ', result)).strip()
+    result = ''.join(result)
 
     if autocorrect:
         result = _speller(result)
 
-    result = [entry for entry in result.split() if entry.strip().replace('-', '').strip().isalpha()]
-    result = nltk.word_tokenize(' '.join(result))
-    result = [entry for entry in result if entry.strip().replace('-', '').strip().isalpha()]
+    result = nltk.word_tokenize(result)
 
     result = [_lem.lemmatize(entry) for entry in result]
 
-    result = [entry for entry in result if entry not in _stop and len(entry) > 1]
+    if stop:
+        result = [entry for entry in result if (entry not in _stop) and (len(entry) > 1)]
 
-    result = [entry for entry in result if entry.strip().replace('-', '').strip().isalpha()]
+    if stem:
+        result = [_stem.stem(entry) for entry in result]
 
-    result = [_stem.stem(entry) for entry in result]
-
-    return ''.join(result)
+    return ' '.join(result)
 
 def decode(data: str) -> Dict[str, bytes | str]:
     data = data.strip()
