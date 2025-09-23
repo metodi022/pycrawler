@@ -1,3 +1,5 @@
+autocorrect
+nltk
 playwright
 psycopg2
 tld

@@ -8,8 +8,13 @@ import re
 import urllib.parse
 from typing import Dict, List, Optional
 
+import nltk
 import tld
+from autocorrect import Speller
 from config import Config
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from nltk.stem import SnowballStemmer
 from playwright.sync_api import BrowserContext, Error, Frame, Locator, Page, Response
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
@@ -21,6 +26,12 @@ SSO: str = r'facebook|twitter|google|yahoo|windows.?live|linked.?in|git.?hub|pay
            r'v.?kontakte|yandex|37.?signals|salesforce|fitbit|baidu|ren.?ren|weibo|aol|shopify|' \
            r'word.?press|dwolla|miicard|yammer|sound.?cloud|instagram|the.?city|apple|slack|' \
            r'evernote'
+
+
+_speller = Speller(only_replacements=True)
+_stop = stopwords.words('english')
+_lem = WordNetLemmatizer()
+_stem = SnowballStemmer('english')
 
 
 def get_tld_object(url: str) -> Optional[tld.utils.Result]:
@@ -216,12 +227,28 @@ def search_google(context: BrowserContext, query: str, page_number: int = 0, sta
 
     return result
 
-def tokenize(data: str) -> str:
-    result = data.strip()
+def tokenize(data: str, autocorrect: bool = False) -> str:
+    result = data.strip().lower()
 
-    # TODO: implement
+    result = re.sub(r'\s+', ' ', result.replace('\n', ' ').replace('\t', ' ')).strip()
+    result = re.sub(r'[^A-Za-z\s-]', '', result).strip()
 
-    return result
+    if autocorrect:
+        result = _speller(result)
+
+    result = [entry for entry in result.split() if entry.strip().replace('-', '').strip().isalpha()]
+    result = nltk.word_tokenize(' '.join(result))
+    result = [entry for entry in result if entry.strip().replace('-', '').strip().isalpha()]
+
+    result = [_lem.lemmatize(entry) for entry in result]
+
+    result = [entry for entry in result if entry not in _stop and len(entry) > 1]
+
+    result = [entry for entry in result if entry.strip().replace('-', '').strip().isalpha()]
+
+    result = [_stem.stem(entry) for entry in result]
+
+    return ''.join(result)
 
 def decode(data: str) -> Dict[str, bytes | str]:
     data = data.strip()
