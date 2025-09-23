@@ -1,17 +1,21 @@
+import base64
+import codecs
+import hashlib
+import html
+import json
 import pathlib
 import re
-from typing import Optional
-from urllib.parse import urljoin, urlparse, urlunparse
+import urllib.parse
+from typing import Dict, List, Optional
 
 import tld
+from config import Config
 from playwright.sync_api import BrowserContext, Error, Frame, Locator, Page, Response
 from tld.exceptions import TldBadUrl, TldDomainNotFound
 
-from config import Config
 
 CLICKABLES: str = r'button,*[role="button"],*[onclick],*[type="button"],*[type="submit"],*[type="reset"],' \
                   r'a[href="#"]'
-
 
 SSO: str = r'facebook|twitter|google|yahoo|windows.?live|linked.?in|git.?hub|pay.?pal|amazon|' \
            r'v.?kontakte|yandex|37.?signals|salesforce|fitbit|baidu|ren.?ren|weibo|aol|shopify|' \
@@ -29,7 +33,7 @@ def normalize_url(url: str, query: bool = True, fragment: bool = False) -> str:
     url = url.strip().rstrip('/')
 
     try:
-        parsed = urlparse(url)
+        parsed = urllib.parse.urlparse(url)
     except Exception:
         return url
 
@@ -48,7 +52,7 @@ def normalize_url(url: str, query: bool = True, fragment: bool = False) -> str:
     if path != '/' and path.endswith('/'):
         path = path.rstrip('/')
 
-    return urlunparse((scheme, netloc, path, '', parsed.query if query else '', parsed.fragment if fragment else ''))
+    return urllib.parse.urlunparse((scheme, netloc, path, '', parsed.query if query else '', parsed.fragment if fragment else ''))
 
 def get_url_scheme(url: tld.utils.Result) -> str:
     return url.parsed_url.scheme
@@ -75,9 +79,8 @@ def get_url_from_href(href: str, page: tld.utils.Result) -> Optional[tld.utils.R
     if (href is None) or (not href.strip()):
         return None
 
-    href_final = urljoin(get_url_str_with_query_fragment(page), href)
+    href_final = urllib.parse.urljoin(get_url_str_with_query_fragment(page), href)
     return get_tld_object(href_final)
-
 
 def get_screenshot(page: Page, path: pathlib.Path, force: bool = False, full_page: bool = False) -> bool:
     if path.exists() and (not force):
@@ -88,7 +91,6 @@ def get_screenshot(page: Page, path: pathlib.Path, force: bool = False, full_pag
         return True
     except Error:
         return False
-
 
 def get_locator_count(locator: Locator) -> int:
     try:
@@ -134,7 +136,6 @@ def get_locator_outer_html(locator: Locator) -> Optional[str]:
     except Error:
         return None
 
-
 def invoke_click(page: Page | Frame, clickable: Locator, timeout=30000, trial=False) -> bool:
     if get_locator_count(clickable) != 1:
         return False
@@ -148,7 +149,6 @@ def invoke_click(page: Page | Frame, clickable: Locator, timeout=30000, trial=Fa
         return True
     except Error:
         return False
-
 
 def get_visible(locator: Locator) -> bool:
     if get_locator_count(locator) != 1:
@@ -178,7 +178,6 @@ def get_visible(locator: Locator) -> bool:
 
     return locator.is_visible() and (float(opacity) > float(0))
 
-
 def goto(page: Page | Frame, url: str) -> Optional[Response]:
     try:
         response = page.goto(url, timeout=Config.LOAD_TIMEOUT, wait_until=Config.WAIT_LOAD_UNTIL)
@@ -193,9 +192,8 @@ def goto(page: Page | Frame, url: str) -> Optional[Response]:
 
     return response
 
-
-def search_google(context: BrowserContext, query: str, page_number: int = 0, start_page: int = 0) -> list[str]:
-    result: list[str] = []
+def search_google(context: BrowserContext, query: str, page_number: int = 0, start_page: int = 0) -> List[str]:
+    result: List[str] = []
     page: Page = context.new_page()
 
     try:
@@ -215,5 +213,96 @@ def search_google(context: BrowserContext, query: str, page_number: int = 0, sta
             result = re.findall(r'(?<=href=").+?(?=")', ''.join(result))
     finally:
         page.close()
+
+    return result
+
+def tokenize(data: str) -> str:
+    result = data.strip()
+
+    # TODO: implement
+
+    return result
+
+def decode(data: str) -> Dict[str, bytes | str]:
+    data = data.strip()
+    result = {}
+
+    result['text'] = data
+
+    try:
+        result['url_plus'] = urllib.parse.unquote_plus(data)
+    except Exception:
+        pass
+
+    try:
+        result['url'] = urllib.parse.unquote(data)
+    except Exception:
+        pass
+
+    try:
+        result['html'] = html.unescape(data)
+    except Exception:
+        pass
+
+    try:
+        result['rot13'] = codecs.decode(data, "rot_13")
+    except Exception:
+        pass
+
+    try:
+        result['unicode'] = bytes(data, "utf-8").decode("unicode_escape")
+    except Exception:
+        pass
+
+    try:
+        result['punycode'] = data.encode().decode('idna')
+    except Exception:
+        pass
+
+    try:
+        result['base64'] = base64.b64decode(data)
+        try:
+            result['base64'] = result['base64'].decode()
+        except UnicodeDecodeError:
+            pass
+    except Exception:
+        pass
+
+    try:
+        result['hex'] = bytes.fromhex(data)
+        try:
+            result['hex'] = result['hex'].decode()
+        except UnicodeDecodeError:
+            pass
+    except Exception:
+        pass
+
+    try:
+        result['json'] = json.dumps(json.loads(data))
+    except Exception:
+        pass
+
+    # TODO: try other things, e.g., ciphey
+
+    return result
+
+def hashes(data: bytes) -> Dict[str, str]:
+    result = {}
+
+    _hash = hashlib.md5()
+    _hash.update(data)
+    result['md5'] = _hash.digest()
+
+    _hash = hashlib.sha1()
+    _hash.update(data)
+    result['sha1'] = _hash.digest()
+
+    _hash = hashlib.sha256()
+    _hash.update(data)
+    result['sha256'] = _hash.digest()
+
+    _hash = hashlib.sha512()
+    _hash.update(data)
+    result['sha512'] = _hash.digest()
 
     return result
