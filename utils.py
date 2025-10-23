@@ -231,6 +231,7 @@ def tokenize(data: str, lower: bool = True, alpha: bool = False, autocorrect: bo
     result = data.strip().lower() if lower else data.strip()
 
     # TODO: add custom rules?
+
     result = re.sub(r'\s+', ' ', re.sub(r'[^A-Za-z\s]' if alpha else r'[^A-Za-z0-9\s]', ' ', result)).strip()
     result = ''.join(result)
 
@@ -312,7 +313,7 @@ def decode(data: str) -> Dict[str, bytes | str]:
 
     return result
 
-def hashes(data: bytes) -> Dict[str, str]:
+def hashes(data: bytes) -> Dict[str, bytes]:
     result = {}
 
     _hash = hashlib.md5()
@@ -332,3 +333,7 @@ def hashes(data: bytes) -> Dict[str, str]:
     result['sha512'] = _hash.digest()
 
     return result
+
+def decompress(data: bytes) -> bytes:
+    # TODO: implement
+    return b''
