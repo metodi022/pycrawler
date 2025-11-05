@@ -17,7 +17,7 @@ class SaveURL(Module):
         super().receive_response(responses, final_url, repetition)
 
         with self.crawler.database.atomic():
-            previous_response = None
+            previous_response: Optional[int] = None
             for response in reversed(responses):
                 try:
                     reqbody = response.request.post_data_buffer if response is not None else None
@@ -46,7 +46,7 @@ class SaveURL(Module):
                     previous_response = self.crawler.database.execute_sql(
                         f"""
                         UPDATE URL
-                        SET task_id={self.crawler.database.param},site_id={self.crawler.database.param},fromurl_id={self.crawler.database.param},redirect_id={self.crawler.database.param},url={self.crawler.database.param},urlfinal={self.crawler.database.param},depth={self.crawler.database.param},repetition={self.crawler.database.param},state={self.crawler.database.param},method={self.crawler.database.param},code={self.crawler.database.param},codetext={self.crawler.database.param},resource={self.crawler.database.param},content={self.crawler.database.param},referer={self.crawler.database.param},location={self.crawler.database.param},reqheaders={self.crawler.database.param},resheaders={self.crawler.database.param},metaheaders={self.crawler.database.param},reqbody={self.crawler.database.param},resbody={self.crawler.database.param}
+                        SET task_id={self.crawler.database.param},site_id={self.crawler.database.param},fromurl_id={self.crawler.database.param},redirect_id={self.crawler.database.param},redirectfrom_id={self.crawler.database.param},url={self.crawler.database.param},urlfinal={self.crawler.database.param},depth={self.crawler.database.param},repetition={self.crawler.database.param},state={self.crawler.database.param},method={self.crawler.database.param},code={self.crawler.database.param},codetext={self.crawler.database.param},resource={self.crawler.database.param},content={self.crawler.database.param},referer={self.crawler.database.param},location={self.crawler.database.param},reqheaders={self.crawler.database.param},resheaders={self.crawler.database.param},metaheaders={self.crawler.database.param},reqbody={self.crawler.database.param},resbody={self.crawler.database.param}
                         WHERE id={self.crawler.database.param}
                         RETURNING id
                         """,
@@ -54,7 +54,8 @@ class SaveURL(Module):
                             self.crawler.task.get_id(),
                             self.crawler.site.get_id(),
                             self.crawler.url.fromurl.get_id() if self.crawler.url.fromurl is not None else None,
-                            previous_response.get_id() if previous_response is not None else None,
+                            None,
+                            None,
                             response.url if response is not None else None,
                             final_url,
                             self.crawler.url.depth,
@@ -76,10 +77,10 @@ class SaveURL(Module):
                         )
                     ).fetchone()[0]
                 else:
-                    previous_response = self.crawler.database.execute_sql(
+                    _previous_response: Optional[int] = self.crawler.database.execute_sql(
                         f"""
-                        INSERT INTO URL (task_id, site_id, fromurl_id, redirect_id, url, urlfinal, depth, repetition, state, method, code, codetext, resource, content, referer, location, reqheaders, resheaders, metaheaders, reqbody, resbody)
-                        VALUES ({self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param})
+                        INSERT INTO URL (task_id, site_id, fromurl_id, redirect_id, redirectfrom_id, url, urlfinal, depth, repetition, state, method, code, codetext, resource, content, referer, location, reqheaders, resheaders, metaheaders, reqbody, resbody)
+                        VALUES ({self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param},{self.crawler.database.param})
                         RETURNING id
                         """,
                         (
@@ -87,6 +88,7 @@ class SaveURL(Module):
                             self.crawler.site.get_id(),
                             self.crawler.url.fromurl.get_id() if self.crawler.url.fromurl is not None else None,
                             previous_response,
+                            None,
                             response.url if response is not None else None,
                             final_url,
                             self.crawler.url.depth,
@@ -106,5 +108,21 @@ class SaveURL(Module):
                             resbody
                         )
                     ).fetchone()[0]
+                    _previous_response = int(_previous_response) if _previous_response is not None else _previous_response
+
+                    if _previous_response is not None:
+                        self.crawler.database.execute_sql(
+                            f"""
+                            UPDATE URL
+                            SET redirectfrom_id={self.crawler.database.param}
+                            WHERE id={self.crawler.database.param}
+                            """,
+                            (
+                                ...,
+                                _previous_response
+                            )
+                        )
+
+                    previous_response = _previous_response
 
             self.crawler.url = cast(URL, URL.get_by_id(self.crawler.url.get_id()))

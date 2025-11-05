@@ -140,6 +140,7 @@ class Crawler:
 
     def _invoke_response_handlers(self, responses: List[Optional[Response]], repetition: int) -> None:
         self.log.debug("Invoking response handlers")
+        assert len(responses) == 1
 
         # Prepare response chain if there are redirections
         response: Optional[Response] = responses[-1]
@@ -179,7 +180,7 @@ class Crawler:
 
             utils.get_screenshot(
                 self.page,
-                (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-1-{self.site.scheme}-{self.site.site}.png")
+                (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-{self.task.crawler}-1-{self.site.scheme}-{self.site.site}.png")
             )
 
         self.log.info(f"Response status {response if response is None else response.status} repetition {self.repetition}")
@@ -322,7 +323,7 @@ class Crawler:
                 if (self.repetition == Config.REPETITIONS) and (not self.database.execute_sql(f"SELECT id FROM URL WHERE task_id={self.database.param} AND state='free' LIMIT 1", (self.task.get_id(),)).fetchone()):
                     utils.get_screenshot(
                         self.page,
-                        (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-2-{self.site.scheme}-{self.site.site}.png")
+                        (Config.LOG / f"screenshots/{datetime.now().strftime('%Y-%m-%d')}-{self.task.job}-{self.task.crawler}-2-{self.site.scheme}-{self.site.site}.png")
                     )
 
                 # Get next URL to crawl

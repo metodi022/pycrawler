@@ -176,6 +176,7 @@ class URL(BaseModel):
     site = ForeignKeyField(Site, index=True, null=False)
     fromurl = ForeignKeyField("self", default=None, null=True, backref="from_url", index=True)
     redirect = ForeignKeyField("self", default=None, null=True, backref="from_url", index=True)
+    redirectfrom = ForeignKeyField("self", default=None, null=True, backref="from_url", index=True)
     url = TextField(null=True)
     urlfinal = TextField(default=None, null=True)
     depth = IntegerField(index=True, null=False)
@@ -208,6 +209,7 @@ class URL(BaseModel):
                 site_id INTEGER NOT NULL REFERENCES site(id),
                 fromurl_id INTEGER REFERENCES url(id) DEFAULT NULL,
                 redirect_id INTEGER REFERENCES url(id) DEFAULT NULL,
+                redirectfrom_id INTEGER REFERENCES url(id) DEFAULT NULL,
                 url TEXT,
                 urlfinal TEXT DEFAULT NULL,
                 depth INTEGER NOT NULL,
@@ -231,6 +233,7 @@ class URL(BaseModel):
             database.execute_sql("CREATE INDEX idx_url_site ON url(site_id);")
             database.execute_sql("CREATE INDEX idx_url_fromurl ON url(fromurl_id);")
             database.execute_sql("CREATE INDEX idx_url_redirect ON url(redirect_id);")
+            database.execute_sql("CREATE INDEX idx_url_redirect ON url(redirectfrom_id);")
             database.execute_sql("CREATE INDEX idx_url_depth ON url(depth);")
             database.execute_sql("CREATE INDEX idx_url_repetition ON url(repetition);")
             database.execute_sql("CREATE INDEX idx_url_state ON url(state);")
