@@ -118,8 +118,8 @@ class SaveURL(Module):
                             WHERE id={self.crawler.database.param}
                             """,
                             (
-                                ...,
-                                _previous_response
+                                _previous_response,
+                                previous_response
                             )
                         )
 
